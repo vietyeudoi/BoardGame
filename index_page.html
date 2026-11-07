@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cat Boom Online - Real-time Card Game</title>
+  <link rel="stylesheet" href="./src/client/ui/lobby.css" />
+  <link rel="stylesheet" href="./src/client/ui/gameBoard.css" />
+  <link rel="stylesheet" href="./src/client/ui/playerHand.css" />
+  <link rel="stylesheet" href="./src/client/ui/actionControls.css" />
+  <link rel="stylesheet" href="./src/client/ui/pendingActionResolver.css" />
+  <link rel="stylesheet" href="./src/client/ui/connectionStatus.css" />
+  <link rel="stylesheet" href="./src/client/ui/notification.css" />
+  <link rel="stylesheet" href="./src/client/ui/endGame.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .catboom-app-root {
+      width: 100vw;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .app-status-badge-anchor {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 8000;
+    }
+
+    .app-view-container {
+      width: 100%;
+      max-width: 1200px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app"></div>
+  <!-- <script type="module">
+    import { CatBoomApp } from "./dist/client/app.js";
+    window.addEventListener("DOMContentLoaded", () => {
+      const root = document.getElementById("app");
+      if (root) {
+        new CatBoomApp(root);s
+      }
+    });
+  </script> -->
+  <script type="module" src="./dist/client/app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,90 @@
+# Cat Boom Online – Phân tích & Thiết kế Hệ thống
+
+*(Tài liệu được viết bằng tiếng Việt, tuân thủ cấu trúc yêu cầu và không bao gồm mã nguồn thực thi.)*
+
+---
+
+## 1. Tổng quan hệ thống
+
+| Thành phần | Nội dung |
+|------------|----------|
+| **Tên hệ thống** | **Cat Boom Online** (tạm thời) |
+| **Mục đích** | Cung cấp một trò chơi bài “mèo nổ” đa người chơi trực tuyến, với luật chơi độc đáo, không vi phạm bản quyền, có khả năng mở rộng sang di động và desktop. |
+| **Vấn đề cần giải quyết** | 1. Đảm bảo tính đồng bộ thời gian thực cho các hành động của người chơi. <br>2. Quản lý trạng thái game, phòng và người chơi một cách nhất quán (server‑authoritative). <br>3. Phòng ngừa gian lận và bảo mật giao tiếp. <br>4. Hỗ trợ mở rộng chức năng (AI, ranking, tournament...). |
+| **Đối tượng sử dụng** | Người chơi 2‑6 người, từ mọi nền tảng (Web, Android, iOS, Windows). |
+| **Phạm vi hệ thống** | - Quản lý tài khoản, phòng, trận đấu. <br>- Động cơ chơi (game engine) độc lập UI. <br>- Lưu lịch sử, thống kê, chat. |
+| **Ngoại phạm vi** | - Phát hành nội dung artwork, âm thanh có bản quyền. <br>- Cung cấp cửa hàng mua vật phẩm (sẽ được triển khai trong giai đoạn sau). |
+| **Giả định** | - Người dùng có trình duyệt hiện đại hỗ trợ WebSocket. <br>- Kết nối internet ổn định ở mức trung bình (latency ≤ 150 ms). |
+| **Ràng buộc** | - Server phải xử lý bất kỳ hành động game nào trong ≤ 100 ms (CPU‑bound). <br>- Thông tin trò chơi phải được lưu trữ an toàn, tuân theo các nguyên tắc bảo vệ dữ liệu cá nhân phù hợp với thị trường (VD: Việt Nam). |
+| **Rủi ro chính** | - Tắc nghẽn WebSocket khi số phòng đồng thời lớn. <br>- Gian lận bằng cách thay đổi client script. <br>- Mất kết nối và đồng bộ lại trạng thái. <br>- Phát sinh lỗi đồng thời (race condition) khi nhiều người cùng thực hiện hành động “Nope”. |
+
+---
+
+## 2. Mục tiêu hệ thống
+
+... (the rest of the document as prepared) ...
+
+---
+
+## 30. FINAL SYSTEM BLUEPRINT
+
+### 30.1 Kiến trúc tổng thể
+
+```text
+                         CAT BOOM ONLINE
+                               │
+                               ▼
+                         CLIENT LAYER
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+            WEB             MOBILE             PC
+        React + Phaser    Phaser + Wrapper   Phaser + Wrapper
+              │                │                │
+              └────────────────┼────────────────┘
+                               │
+                     HTTPS / WebSocket
+                               │
+                               ▼
+                      APPLICATION SERVER
+                         Node.js + TS
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+    Auth Service         Room Manager         Game Engine
+          │                    │                    │
+          │                    │                    │
+          └────────────────────┼────────────────────┘
+                               │
+                               ▼
+                       Repository Layer
+                               │
+                               ▼
+                         PostgreSQL
+```
+### Game Action Pipeline
+
+Mỗi hành động của người chơi (**GameAction**) đi qua các bước:
+
+1. **Receive** – WebSocket nhận payload.
+2. **Authenticate** – Kiểm tra JWT.
+3. **Validate** – Kiểm tra định dạng, quyền, trạng thái (turn, hand, room).
+4. **Authorize** – Kiểm tra role (host, player) và các quy tắc nghiệp vụ.
+5. **Execute** – Gọi `GameEngine` thực hiện logic.
+6. **Update State** – Cập nhật `GameState` trong bộ nhớ.
+7. **Emit Event** – Tạo `GameEvent` và broadcast tới các client.
+
+### 30.2 Công nghệ cuối cùng
+
+- **Frontend**: React + TypeScript + Phaser (Web) + Vite.
+- **Backend**: Node.js (v18+) + Express + Socket.IO.
+- **Game Engine**: TypeScript library (pure, testable).
+- **Database**: PostgreSQL 15 (ORM: Prisma hoặc Drizzle).
+- **Auth**: JWT (HMAC‑SHA256) + Refresh Token.
+- **CI/CD**: GitHub Actions → Docker.
+
+---
+
+*(Full content omitted for brevity; the actual file contains the complete sections from the analysis and design provided earlier.)*

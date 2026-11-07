@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Tool caches and test reports
+.vite/
+.vitest/
+.cache/
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Environment files
+.env
+.env.*
+*.env
+!.env.example
+!.env.sample
+!.env.template
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pid
+*.pid.lock
+
+# Local visual-debug output (keep documentation screenshots tracked)
+/debug_*.png
+/drag_*.png
+/hover_*.png
+/m172_*.png
+/phase1_*.png
+/screen_*.png
+/test_hand_top.png
+/bbox_result.json
+/debug_hand_data.json
+
+# Legacy backups (local only)
+_backup_*/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# TypeScript cache
+*.tsbuildinfo
+

@@ -1,0 +1,4195 @@
+{
+  "note": "Static import graph + conservative text references; not an automatic deletion list.",
+  "moduleCount": 182,
+  "reachableFromCurrentEntrypoints": [
+    "backend/src/index.ts",
+    "backend/src/player/PlayerSession.ts",
+    "backend/src/protocol/MessageDispatcher.ts",
+    "backend/src/protocol/RoomBroadcaster.ts",
+    "backend/src/room/Room.ts",
+    "backend/src/room/RoomManager.ts",
+    "backend/src/room/RoomStore.ts",
+    "backend/src/room/ViewStateBuilder.ts",
+    "backend/src/server/HttpServer.ts",
+    "backend/src/server/WebSocketServer.ts",
+    "backend/src/utils/IdGenerator.ts",
+    "backend/src/utils/Logger.ts",
+    "backend/src/validation/MessageValidator.ts",
+    "frontend/src/animation/CardTransferAnimator.ts",
+    "frontend/src/app/App.ts",
+    "frontend/src/interaction/DragController.ts",
+    "frontend/src/interaction/HoverExpansionController.ts",
+    "frontend/src/interaction/InteractionConfig.ts",
+    "frontend/src/interaction/RaycastInteractionManager.ts",
+    "frontend/src/main.ts",
+    "frontend/src/network/CursorBroadcaster.ts",
+    "frontend/src/network/MessageHandler.ts",
+    "frontend/src/network/NetworkClient.ts",
+    "frontend/src/network/NetworkConfig.ts",
+    "frontend/src/objects/CardConfig.ts",
+    "frontend/src/objects/CardObject3D.ts",
+    "frontend/src/objects/CardRegistry.ts",
+    "frontend/src/objects/CardStack.ts",
+    "frontend/src/objects/CardStackManager.ts",
+    "frontend/src/objects/CardTextureGenerator.ts",
+    "frontend/src/objects/CardTypeHelper.ts",
+    "frontend/src/objects/DeckConfig.ts",
+    "frontend/src/objects/DeckObject3D.ts",
+    "frontend/src/objects/HandZoneConfig.ts",
+    "frontend/src/objects/HandZoneManager.ts",
+    "frontend/src/objects/HandZoneObject3D.ts",
+    "frontend/src/objects/LayeringManager.ts",
+    "frontend/src/objects/PlayerAreaConfig.ts",
+    "frontend/src/objects/PlayerAreaManager.ts",
+    "frontend/src/objects/PlayerAreaObject3D.ts",
+    "frontend/src/objects/StackBadge.ts",
+    "frontend/src/objects/TableConfig.ts",
+    "frontend/src/objects/TableGeometryBuilder.ts",
+    "frontend/src/objects/TableObject3D.ts",
+    "frontend/src/objects/TableShapeConfig.ts",
+    "frontend/src/objects/TableZoneManager.ts",
+    "frontend/src/objects/TableZoneObject3D.ts",
+    "frontend/src/objects/TableZonesConfig.ts",
+    "frontend/src/scene/CameraController.ts",
+    "frontend/src/scene/LightingManager.ts",
+    "frontend/src/scene/PlayerPerspectiveHelper.ts",
+    "frontend/src/scene/RemoteCursorManager.ts",
+    "frontend/src/scene/Renderer.ts",
+    "frontend/src/scene/SceneManager.ts",
+    "frontend/src/store/ClientStore.ts",
+    "frontend/src/ui/ContextMenu.ts",
+    "frontend/src/ui/FanPreviewConfig.ts",
+    "frontend/src/ui/GameScreen.ts",
+    "frontend/src/ui/LobbyScreen.ts",
+    "frontend/src/ui/PlayerAreaHUD.ts",
+    "frontend/src/ui/UIManager.ts",
+    "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+    "frontend/src/ui/components/InsertionModal.ts",
+    "frontend/src/utils/Disposer.ts",
+    "frontend/src/utils/Logger.ts",
+    "shared/constants/config.ts",
+    "shared/types/gameObjects.ts",
+    "shared/types/protocol.ts",
+    "shared/types/room.ts"
+  ],
+  "outsideCurrentRuntime": [
+    "backend/src/__tests__/cursorAndOpponentSecurity.test.ts",
+    "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+    "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+    "backend/src/__tests__/multiplayerSecurity.test.ts",
+    "backend/src/__tests__/multiplayerSync153.test.ts",
+    "backend/src/__tests__/opponentHandInteraction174.test.ts",
+    "backend/src/__tests__/rotationSync175.test.ts",
+    "backend/src/__tests__/server.test.ts",
+    "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+    "frontend/src/utils/AssetLoader.ts",
+    "frontend/src/vite-env.d.ts",
+    "frontend/src/__tests__/advancedInsertion345.test.ts",
+    "frontend/src/__tests__/browserIntegration3452.test.ts",
+    "frontend/src/__tests__/cardManipulation.test.ts",
+    "frontend/src/__tests__/cardObject3D.test.ts",
+    "frontend/src/__tests__/cardStack342.test.ts",
+    "frontend/src/__tests__/clientStore.test.ts",
+    "frontend/src/__tests__/deckDraw.test.ts",
+    "frontend/src/__tests__/deckObject3D.test.ts",
+    "frontend/src/__tests__/dragController.test.ts",
+    "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+    "frontend/src/__tests__/dynamicTable141.test.ts",
+    "frontend/src/__tests__/freePlacement143.test.ts",
+    "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+    "frontend/src/__tests__/fullHandFanPreview179.test.ts",
+    "frontend/src/__tests__/gridRemoval1754.test.ts",
+    "frontend/src/__tests__/handFanPreview173.test.ts",
+    "frontend/src/__tests__/handHoverLeak1756.test.ts",
+    "frontend/src/__tests__/handInteraction172.test.ts",
+    "frontend/src/__tests__/handRedesign177.test.ts",
+    "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+    "frontend/src/__tests__/handZone150.test.ts",
+    "frontend/src/__tests__/handZone150Integration.test.ts",
+    "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+    "frontend/src/__tests__/hoverExpansion153.test.ts",
+    "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+    "frontend/src/__tests__/onlineCameraInitialization1710.test.ts",
+    "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+    "frontend/src/__tests__/opponentHandMasking1743.test.ts",
+    "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+    "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+    "frontend/src/__tests__/persistentFanDrag1710.test.ts",
+    "frontend/src/__tests__/playerAlignment143.test.ts",
+    "frontend/src/__tests__/playerArea140.test.ts",
+    "frontend/src/__tests__/playerPerspective152.test.ts",
+    "frontend/src/__tests__/playerPerspective179.test.ts",
+    "frontend/src/__tests__/raycastInteraction.test.ts",
+    "frontend/src/__tests__/remoteCursor153.test.ts",
+    "frontend/src/__tests__/seatOrientation1752.test.ts",
+    "frontend/src/__tests__/sharedHandInteraction1742.test.ts",
+    "frontend/src/__tests__/smartDiscard143.test.ts",
+    "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+    "frontend/src/__tests__/tableAndCamera.test.ts",
+    "frontend/src/__tests__/tableGeometry142.test.ts",
+    "frontend/src/__tests__/tableZones142.test.ts",
+    "frontend/src/__tests__/wheelRotation1753.test.ts",
+    "src/client/app.ts",
+    "src/client/gameClient.ts",
+    "src/client/ui/actionControls.ts",
+    "src/client/ui/connectionStatus.ts",
+    "src/client/ui/endGame.ts",
+    "src/client/ui/gameBoard.ts",
+    "src/client/ui/lobby.ts",
+    "src/client/ui/notification.ts",
+    "src/client/ui/peekModal.ts",
+    "src/client/ui/pendingActionResolver.ts",
+    "src/client/ui/playerHand.ts",
+    "src/client/ui/playing.ts",
+    "src/client/__tests__/actionControls.target.test.ts",
+    "src/client/__tests__/actionControls.test.ts",
+    "src/client/__tests__/connectionStatus.test.ts",
+    "src/client/__tests__/endGame.test.ts",
+    "src/client/__tests__/gameBoard.test.ts",
+    "src/client/__tests__/gameClient.test.ts",
+    "src/client/__tests__/lobby.test.ts",
+    "src/client/__tests__/notification.test.ts",
+    "src/client/__tests__/peekModal.test.ts",
+    "src/client/__tests__/pendingActionResolver.test.ts",
+    "src/client/__tests__/playerHand.test.ts",
+    "src/game/commands.ts",
+    "src/game/deckFactory.ts",
+    "src/game/engine.ts",
+    "src/game/gameInitializer.ts",
+    "src/game/invariants.ts",
+    "src/game/models.ts",
+    "src/game/shuffle.ts",
+    "src/game/types.ts",
+    "src/game/__tests__/attackLifecycle.test.ts",
+    "src/game/__tests__/deckFactory.test.ts",
+    "src/game/__tests__/engine.combos.test.ts",
+    "src/game/__tests__/engine.draw.test.ts",
+    "src/game/__tests__/engine.end_turn_validation.test.ts",
+    "src/game/__tests__/engine.exploding.test.ts",
+    "src/game/__tests__/engine.exploding_ownership.test.ts",
+    "src/game/__tests__/engine.nope_pass_draw.test.ts",
+    "src/game/__tests__/engine.peek.test.ts",
+    "src/game/__tests__/engine.test.ts",
+    "src/game/__tests__/gameInitializer.test.ts",
+    "src/server/bootstrap.ts",
+    "src/server/commandValidator.ts",
+    "src/server/config.ts",
+    "src/server/connectionManager.ts",
+    "src/server/index.ts",
+    "src/server/server.ts",
+    "src/server/sessionManager.ts",
+    "src/server/startServer.ts",
+    "src/server/types.ts",
+    "src/server/viewStateBuilder.ts",
+    "src/server/__tests__/connectionManager.test.ts",
+    "src/server/__tests__/server.test.ts",
+    "src/server/__tests__/sessionManager.init.test.ts",
+    "src/server/__tests__/sessionManager.pair.test.ts",
+    "src/server/__tests__/sessionManager.test.ts"
+  ],
+  "exportCandidatesWithoutExternalTextReferences": [
+    {
+      "file": "backend/src/room/RoomManager.ts",
+      "name": "CreateRoomOptions"
+    },
+    {
+      "file": "frontend/src/animation/CardTransferAnimator.ts",
+      "name": "CardTransferOptions"
+    },
+    {
+      "file": "frontend/src/interaction/DragController.ts",
+      "name": "DragOrigin"
+    },
+    {
+      "file": "frontend/src/objects/CardConfig.ts",
+      "name": "CardConfigType"
+    },
+    {
+      "file": "frontend/src/objects/CardObject3D.ts",
+      "name": "CardContent"
+    },
+    {
+      "file": "frontend/src/objects/CardObject3D.ts",
+      "name": "CardOptions"
+    },
+    {
+      "file": "frontend/src/objects/CardObject3D.ts",
+      "name": "CARD_FLIP_DURATION_MS"
+    },
+    {
+      "file": "frontend/src/objects/CardObject3D.ts",
+      "name": "CardFlipOptions"
+    },
+    {
+      "file": "frontend/src/objects/CardRegistry.ts",
+      "name": "CardRecord"
+    },
+    {
+      "file": "frontend/src/objects/CardRegistry.ts",
+      "name": "IntegrityCheckResult"
+    },
+    {
+      "file": "frontend/src/objects/CardStack.ts",
+      "name": "CardStackOptions"
+    },
+    {
+      "file": "frontend/src/objects/CardTextureGenerator.ts",
+      "name": "CardRenderContent"
+    },
+    {
+      "file": "frontend/src/objects/CardTypeHelper.ts",
+      "name": "CardTypeId"
+    },
+    {
+      "file": "frontend/src/objects/CardTypeHelper.ts",
+      "name": "getCardTypeFromTitle"
+    },
+    {
+      "file": "frontend/src/objects/DeckConfig.ts",
+      "name": "DeckConfigType"
+    },
+    {
+      "file": "frontend/src/objects/DeckObject3D.ts",
+      "name": "DeckOptions"
+    },
+    {
+      "file": "frontend/src/objects/HandZoneConfig.ts",
+      "name": "HandZonePosition"
+    },
+    {
+      "file": "frontend/src/objects/HandZoneObject3D.ts",
+      "name": "HandZoneObject3DOptions"
+    },
+    {
+      "file": "frontend/src/objects/PlayerAreaConfig.ts",
+      "name": "PlayerAreaPosition"
+    },
+    {
+      "file": "frontend/src/objects/PlayerAreaConfig.ts",
+      "name": "PlayerAreaLayoutConfig"
+    },
+    {
+      "file": "frontend/src/objects/PlayerAreaConfig.ts",
+      "name": "buildPolygonPositions"
+    },
+    {
+      "file": "frontend/src/objects/PlayerAreaObject3D.ts",
+      "name": "PlayerAreaObject3DOptions"
+    },
+    {
+      "file": "frontend/src/objects/TableConfig.ts",
+      "name": "TableConfigType"
+    },
+    {
+      "file": "frontend/src/objects/TableGeometryBuilder.ts",
+      "name": "RailMeshSpec"
+    },
+    {
+      "file": "frontend/src/objects/TableGeometryBuilder.ts",
+      "name": "ApronMeshSpec"
+    },
+    {
+      "file": "frontend/src/objects/TableGeometryBuilder.ts",
+      "name": "LegPositionSpec"
+    },
+    {
+      "file": "frontend/src/objects/TableShapeConfig.ts",
+      "name": "getRectangleVertices"
+    },
+    {
+      "file": "frontend/src/objects/TableZoneObject3D.ts",
+      "name": "TableZoneObject3DOptions"
+    },
+    {
+      "file": "frontend/src/scene/CameraController.ts",
+      "name": "CameraControllerOptions"
+    },
+    {
+      "file": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "name": "PlayerPerspective"
+    },
+    {
+      "file": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "name": "FanCardLayout"
+    },
+    {
+      "file": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "name": "FanLayoutResult"
+    },
+    {
+      "file": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "name": "FullHandFanPreviewHandlers"
+    },
+    {
+      "file": "frontend/src/ui/components/InsertionModal.ts",
+      "name": "InsertionModalOptions"
+    },
+    {
+      "file": "frontend/src/ui/ContextMenu.ts",
+      "name": "ContextMenuItem"
+    },
+    {
+      "file": "frontend/src/ui/UIManager.ts",
+      "name": "ScreenName"
+    },
+    {
+      "file": "frontend/src/utils/AssetLoader.ts",
+      "name": "AssetLoader"
+    },
+    {
+      "file": "frontend/src/utils/Logger.ts",
+      "name": "ILogger"
+    },
+    {
+      "file": "shared/types/gameObjects.ts",
+      "name": "CardDefinition"
+    },
+    {
+      "file": "shared/types/protocol.ts",
+      "name": "CursorMovePayload"
+    },
+    {
+      "file": "shared/types/protocol.ts",
+      "name": "ObjectDragStartPayload"
+    },
+    {
+      "file": "shared/types/protocol.ts",
+      "name": "ObjectDragMovePayload"
+    },
+    {
+      "file": "shared/types/protocol.ts",
+      "name": "ObjectDragEndPayload"
+    },
+    {
+      "file": "shared/types/room.ts",
+      "name": "ObjectLocation"
+    },
+    {
+      "file": "src/client/gameClient.ts",
+      "name": "GameClientEvents"
+    },
+    {
+      "file": "src/client/gameClient.ts",
+      "name": "EventListener"
+    },
+    {
+      "file": "src/client/gameClient.ts",
+      "name": "GameClientOptions"
+    },
+    {
+      "file": "src/client/ui/actionControls.ts",
+      "name": "ActionControlsUIOptions"
+    },
+    {
+      "file": "src/client/ui/connectionStatus.ts",
+      "name": "ConnectionStatusUIOptions"
+    },
+    {
+      "file": "src/client/ui/endGame.ts",
+      "name": "EndGameUIOptions"
+    },
+    {
+      "file": "src/client/ui/gameBoard.ts",
+      "name": "GameBoardUIOptions"
+    },
+    {
+      "file": "src/client/ui/lobby.ts",
+      "name": "LobbyUIOptions"
+    },
+    {
+      "file": "src/client/ui/notification.ts",
+      "name": "NotificationLevel"
+    },
+    {
+      "file": "src/client/ui/notification.ts",
+      "name": "NotificationItem"
+    },
+    {
+      "file": "src/client/ui/notification.ts",
+      "name": "NotificationUIOptions"
+    },
+    {
+      "file": "src/client/ui/pendingActionResolver.ts",
+      "name": "PendingActionResolverUIOptions"
+    },
+    {
+      "file": "src/client/ui/playerHand.ts",
+      "name": "PlayerHandUIOptions"
+    },
+    {
+      "file": "src/client/ui/playing.ts",
+      "name": "PlayingUIOptions"
+    },
+    {
+      "file": "src/client/ui/playing.ts",
+      "name": "PlayingUI"
+    },
+    {
+      "file": "src/game/commands.ts",
+      "name": "RequiredFields"
+    },
+    {
+      "file": "src/game/gameInitializer.ts",
+      "name": "InitializeGameOptions"
+    },
+    {
+      "file": "src/server/config.ts",
+      "name": "SERVER_CONFIG"
+    }
+  ],
+  "dynamicImports": [
+    {
+      "file": "frontend/src/__tests__/gridRemoval1754.test.ts",
+      "expression": "import('../interaction/InteractionConfig')"
+    }
+  ],
+  "edges": [
+    {
+      "from": "backend/src/index.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/index.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/index.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/index.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/index.ts",
+      "to": "shared/constants/config.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/player/PlayerSession.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/player/PlayerSession.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/player/PlayerSession.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/player/PlayerSession.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/room/Room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/room/ViewStateBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/protocol/RoomBroadcaster.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/validation/MessageValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/MessageDispatcher.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/RoomBroadcaster.ts",
+      "to": "backend/src/room/Room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/RoomBroadcaster.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/RoomBroadcaster.ts",
+      "to": "backend/src/player/PlayerSession.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/RoomBroadcaster.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/protocol/RoomBroadcaster.ts",
+      "to": "backend/src/room/ViewStateBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/Room.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/Room.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/Room.ts",
+      "to": "shared/types/gameObjects.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/Room.ts",
+      "to": "shared/constants/config.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/Room.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/RoomManager.ts",
+      "to": "backend/src/room/Room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/RoomManager.ts",
+      "to": "backend/src/room/RoomStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/RoomManager.ts",
+      "to": "backend/src/utils/IdGenerator.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/RoomManager.ts",
+      "to": "shared/constants/config.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/RoomManager.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/RoomStore.ts",
+      "to": "backend/src/room/Room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/ViewStateBuilder.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/room/ViewStateBuilder.ts",
+      "to": "backend/src/room/Room.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/HttpServer.ts",
+      "package": "http"
+    },
+    {
+      "from": "backend/src/server/HttpServer.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "package": "http"
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "backend/src/player/PlayerSession.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "backend/src/protocol/MessageDispatcher.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "backend/src/utils/IdGenerator.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "shared/constants/config.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/server/WebSocketServer.ts",
+      "to": "backend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/utils/IdGenerator.ts",
+      "package": "crypto"
+    },
+    {
+      "from": "backend/src/validation/MessageValidator.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/cursorAndOpponentSecurity.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/cursorAndOpponentSecurity.test.ts",
+      "to": "backend/src/validation/MessageValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/handPrivacyAndOwnership154.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSecurity.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSecurity.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSecurity.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSecurity.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSecurity.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSecurity.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSync153.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSync153.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSync153.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSync153.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSync153.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/multiplayerSync153.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/opponentHandInteraction174.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/opponentHandInteraction174.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/rotationSync175.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/rotationSync175.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/rotationSync175.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/rotationSync175.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/rotationSync175.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/rotationSync175.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "package": "http"
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/server.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "to": "backend/src/server/HttpServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "to": "backend/src/server/WebSocketServer.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "to": "backend/src/room/RoomManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "backend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/animation/CardTransferAnimator.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/animation/CardTransferAnimator.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/animation/CardTransferAnimator.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/ui/UIManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/ui/ContextMenu.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/ui/components/InsertionModal.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/ui/PlayerAreaHUD.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/network/MessageHandler.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/interaction/HoverExpansionController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/scene/RemoteCursorManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/network/CursorBroadcaster.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/network/NetworkConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/app/App.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/DragController.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/HoverExpansionController.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/HoverExpansionController.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/InteractionConfig.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/InteractionConfig.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/InteractionConfig.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/main.ts",
+      "to": "frontend/src/app/App.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/CursorBroadcaster.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/CursorBroadcaster.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/CursorBroadcaster.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/MessageHandler.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/MessageHandler.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/MessageHandler.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/MessageHandler.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/MessageHandler.ts",
+      "to": "frontend/src/scene/RemoteCursorManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/MessageHandler.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/NetworkClient.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/NetworkClient.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/network/NetworkConfig.ts",
+      "to": "shared/constants/config.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardObject3D.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/CardObject3D.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardObject3D.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardObject3D.ts",
+      "to": "frontend/src/objects/CardTextureGenerator.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardObject3D.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardRegistry.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardRegistry.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardRegistry.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/objects/StackBadge.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStack.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStackManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/CardStackManager.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStackManager.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStackManager.ts",
+      "to": "frontend/src/objects/CardStack.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStackManager.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardStackManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardTextureGenerator.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/CardTextureGenerator.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/CardTextureGenerator.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/DeckConfig.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/DeckObject3D.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/DeckObject3D.ts",
+      "to": "frontend/src/objects/DeckConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/DeckObject3D.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/DeckObject3D.ts",
+      "to": "frontend/src/objects/CardTextureGenerator.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/DeckObject3D.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneConfig.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneConfig.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneConfig.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/HandZoneManager.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneManager.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneManager.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneManager.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneObject3D.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/HandZoneObject3D.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneObject3D.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneObject3D.ts",
+      "to": "frontend/src/utils/Disposer.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/HandZoneObject3D.ts",
+      "to": "frontend/src/animation/CardTransferAnimator.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/LayeringManager.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/LayeringManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaConfig.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaConfig.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaConfig.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaManager.ts",
+      "to": "frontend/src/objects/PlayerAreaObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaManager.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaManager.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaManager.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaObject3D.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/PlayerAreaObject3D.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/StackBadge.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/StackBadge.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableGeometryBuilder.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/TableGeometryBuilder.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableGeometryBuilder.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableObject3D.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/TableObject3D.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableObject3D.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableObject3D.ts",
+      "to": "frontend/src/objects/TableGeometryBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableObject3D.ts",
+      "to": "frontend/src/utils/Disposer.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableObject3D.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableShapeConfig.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZoneManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/TableZoneManager.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZoneManager.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZoneManager.ts",
+      "to": "frontend/src/objects/TableZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZoneManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZoneObject3D.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/objects/TableZoneObject3D.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZonesConfig.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/objects/TableZonesConfig.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/CameraController.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/scene/CameraController.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/LightingManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/scene/LightingManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/RemoteCursorManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/scene/RemoteCursorManager.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/RemoteCursorManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/Renderer.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/scene/Renderer.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/scene/Renderer.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/scene/LightingManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/TableObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/DeckConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/CardRegistry.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/interaction/DragController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/CardStackManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/CardStack.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/LayeringManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/PlayerAreaManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/PlayerAreaObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/TableZoneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/HandZoneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/animation/CardTransferAnimator.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/objects/CardTypeHelper.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/scene/SceneManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/store/ClientStore.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/store/ClientStore.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/store/ClientStore.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "to": "frontend/src/ui/FanPreviewConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/components/InsertionModal.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/ContextMenu.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/GameScreen.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/GameScreen.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/GameScreen.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/LobbyScreen.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/LobbyScreen.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/PlayerAreaHUD.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/UIManager.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/UIManager.ts",
+      "to": "frontend/src/ui/LobbyScreen.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/UIManager.ts",
+      "to": "frontend/src/ui/GameScreen.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/UIManager.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/UIManager.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/ui/UIManager.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/utils/AssetLoader.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/utils/AssetLoader.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/utils/Disposer.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/utils/Disposer.ts",
+      "to": "frontend/src/utils/Logger.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "to": "frontend/src/objects/CardStack.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "to": "frontend/src/objects/CardStackManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/advancedInsertion345.test.ts",
+      "to": "frontend/src/ui/components/InsertionModal.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "to": "frontend/src/ui/components/InsertionModal.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/browserIntegration3452.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/objects/CardStack.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardManipulation.test.ts",
+      "to": "frontend/src/ui/ContextMenu.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardObject3D.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/cardObject3D.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/cardObject3D.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardObject3D.test.ts",
+      "to": "frontend/src/objects/CardConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardObject3D.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardStack342.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/cardStack342.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/cardStack342.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardStack342.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/cardStack342.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/clientStore.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/clientStore.test.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/clientStore.test.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "to": "frontend/src/objects/CardRegistry.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckDraw.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckObject3D.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/deckObject3D.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/deckObject3D.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckObject3D.test.ts",
+      "to": "frontend/src/objects/DeckConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/deckObject3D.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "to": "frontend/src/interaction/DragController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "to": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragController.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "frontend/src/network/MessageHandler.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dragJitterAndPrivacy1531.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/TableGeometryBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/TableObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/PlayerAreaManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/CardRegistry.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/dynamicTable141.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/freePlacement143.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/freePlacement143.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/freePlacement143.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview178.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview179.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview179.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview179.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview179.test.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/fullHandFanPreview179.test.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/gridRemoval1754.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/gridRemoval1754.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/gridRemoval1754.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handFanPreview173.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handFanPreview173.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handFanPreview173.test.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handFanPreview173.test.ts",
+      "to": "frontend/src/objects/HandZoneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handFanPreview173.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handFanPreview173.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "to": "frontend/src/interaction/HoverExpansionController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handHoverLeak1756.test.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handInteraction172.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handInteraction172.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handInteraction172.test.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handInteraction172.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handInteraction172.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handInteraction172.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "to": "frontend/src/interaction/HoverExpansionController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handRedesign177.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handTableHoverReset1751.test.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150Integration.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150Integration.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150Integration.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZone150Integration.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/handZoneAndOwnership154.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/hoverExpansion153.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/hoverExpansion153.test.ts",
+      "to": "frontend/src/interaction/HoverExpansionController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/hoverExpansion153.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/network/NetworkConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/ui/LobbyScreen.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/ui/GameScreen.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/multiplayerIntegration151.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/onlineCameraInitialization1710.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/onlineCameraInitialization1710.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/onlineCameraInitialization1710.test.ts",
+      "to": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/onlineCameraInitialization1710.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "frontend/src/animation/CardTransferAnimator.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandInteraction174.test.ts",
+      "to": "frontend/src/animation/CardTransferAnimator.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandMasking1743.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandMasking1743.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandMasking1743.test.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHandMasking1743.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentHoverDrag1741.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/network/CursorBroadcaster.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/scene/RemoteCursorManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/objects/HandZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/objects/HandZoneConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/opponentInteractionAndCursorFix.test.ts",
+      "to": "frontend/src/network/NetworkClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/persistentFanDrag1710.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/persistentFanDrag1710.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/persistentFanDrag1710.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/persistentFanDrag1710.test.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/persistentFanDrag1710.test.ts",
+      "to": "frontend/src/ui/components/FullHandFanPreviewUI.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerAlignment143.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/playerAlignment143.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerAlignment143.test.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerArea140.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/playerArea140.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/playerArea140.test.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerArea140.test.ts",
+      "to": "frontend/src/objects/PlayerAreaObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerArea140.test.ts",
+      "to": "frontend/src/objects/PlayerAreaManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerArea140.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective152.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective152.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective152.test.ts",
+      "to": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective152.test.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective152.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective152.test.ts",
+      "to": "frontend/src/store/ClientStore.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective179.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective179.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective179.test.ts",
+      "to": "frontend/src/scene/PlayerPerspectiveHelper.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective179.test.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/playerPerspective179.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/raycastInteraction.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/raycastInteraction.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/raycastInteraction.test.ts",
+      "to": "frontend/src/interaction/RaycastInteractionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/raycastInteraction.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/raycastInteraction.test.ts",
+      "to": "frontend/src/objects/DeckObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/raycastInteraction.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/remoteCursor153.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/remoteCursor153.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/remoteCursor153.test.ts",
+      "to": "frontend/src/scene/RemoteCursorManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/remoteCursor153.test.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/seatOrientation1752.test.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/sharedHandInteraction1742.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/smartDiscard143.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/smartDiscard143.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/smartDiscard143.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/smartDiscard143.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/stackAutoArrangement343.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableAndCamera.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/tableAndCamera.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/tableAndCamera.test.ts",
+      "to": "frontend/src/objects/TableObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableAndCamera.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableAndCamera.test.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableAndCamera.test.ts",
+      "to": "frontend/src/scene/LightingManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/TableGeometryBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/TableObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/TableConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/PlayerAreaConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/CardRegistry.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableGeometry142.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableZones142.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/tableZones142.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/tableZones142.test.ts",
+      "to": "frontend/src/objects/TableShapeConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableZones142.test.ts",
+      "to": "frontend/src/objects/TableZonesConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableZones142.test.ts",
+      "to": "frontend/src/objects/TableZoneObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/tableZones142.test.ts",
+      "to": "frontend/src/objects/TableZoneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/wheelRotation1753.test.ts",
+      "package": "vitest"
+    },
+    {
+      "from": "frontend/src/__tests__/wheelRotation1753.test.ts",
+      "package": "three"
+    },
+    {
+      "from": "frontend/src/__tests__/wheelRotation1753.test.ts",
+      "to": "frontend/src/scene/SceneManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/wheelRotation1753.test.ts",
+      "to": "frontend/src/scene/CameraController.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/wheelRotation1753.test.ts",
+      "to": "frontend/src/interaction/InteractionConfig.ts",
+      "resolved": true
+    },
+    {
+      "from": "frontend/src/__tests__/wheelRotation1753.test.ts",
+      "to": "frontend/src/objects/CardObject3D.ts",
+      "resolved": true
+    },
+    {
+      "from": "shared/types/protocol.ts",
+      "to": "shared/types/room.ts",
+      "resolved": true
+    },
+    {
+      "from": "shared/types/room.ts",
+      "to": "shared/types/protocol.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/lobby.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/gameBoard.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/playerHand.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/actionControls.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/pendingActionResolver.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/connectionStatus.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/notification.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/endGame.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/client/ui/peekModal.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/app.ts",
+      "to": "./ui/peekModal.css",
+      "resolved": false
+    },
+    {
+      "from": "src/client/gameClient.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/gameClient.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/actionControls.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/actionControls.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/actionControls.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/actionControls.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/connectionStatus.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/endGame.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/endGame.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/endGame.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/gameBoard.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/gameBoard.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/gameBoard.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/lobby.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/lobby.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/lobby.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/notification.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/peekModal.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/peekModal.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/pendingActionResolver.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/pendingActionResolver.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/pendingActionResolver.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/playerHand.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/playerHand.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/playing.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/playing.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/playing.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/ui/playing.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.target.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/actionControls.target.test.ts",
+      "to": "src/client/ui/actionControls.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.target.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.target.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.target.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.target.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/actionControls.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/actionControls.test.ts",
+      "to": "src/client/ui/actionControls.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/actionControls.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/connectionStatus.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/connectionStatus.test.ts",
+      "to": "src/client/ui/connectionStatus.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/connectionStatus.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/connectionStatus.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/endGame.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/endGame.test.ts",
+      "to": "src/client/ui/endGame.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/endGame.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/endGame.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/endGame.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/endGame.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "to": "src/client/ui/gameBoard.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameBoard.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/gameClient.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameClient.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameClient.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/gameClient.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/lobby.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/lobby.test.ts",
+      "to": "src/client/ui/lobby.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/lobby.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/lobby.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/lobby.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/lobby.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/notification.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/notification.test.ts",
+      "to": "src/client/ui/notification.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/notification.test.ts",
+      "to": "src/client/gameClient.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/notification.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/client/__tests__/peekModal.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/peekModal.test.ts",
+      "to": "src/client/ui/peekModal.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/peekModal.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/peekModal.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/pendingActionResolver.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/pendingActionResolver.test.ts",
+      "to": "src/client/ui/pendingActionResolver.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/pendingActionResolver.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/pendingActionResolver.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/playerHand.test.ts",
+      "package": "jsdom"
+    },
+    {
+      "from": "src/client/__tests__/playerHand.test.ts",
+      "to": "src/client/ui/playerHand.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/playerHand.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/client/__tests__/playerHand.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/commands.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/deckFactory.ts",
+      "package": "crypto"
+    },
+    {
+      "from": "src/game/deckFactory.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/deckFactory.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/engine.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/engine.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/engine.ts",
+      "to": "src/game/invariants.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/gameInitializer.ts",
+      "package": "crypto"
+    },
+    {
+      "from": "src/game/gameInitializer.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/gameInitializer.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/gameInitializer.ts",
+      "to": "src/game/deckFactory.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/gameInitializer.ts",
+      "to": "src/game/shuffle.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/invariants.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/invariants.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/invariants.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/models.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/attackLifecycle.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/attackLifecycle.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/attackLifecycle.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/deckFactory.test.ts",
+      "to": "src/game/deckFactory.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/deckFactory.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/deckFactory.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.combos.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.combos.test.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.combos.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.combos.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.combos.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.draw.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.draw.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.draw.test.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.draw.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.draw.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.draw.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.end_turn_validation.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.end_turn_validation.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.end_turn_validation.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.end_turn_validation.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.end_turn_validation.test.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.end_turn_validation.test.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding_ownership.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding_ownership.test.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding_ownership.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding_ownership.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.exploding_ownership.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.nope_pass_draw.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.nope_pass_draw.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.nope_pass_draw.test.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.nope_pass_draw.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.nope_pass_draw.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.nope_pass_draw.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.peek.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.peek.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.peek.test.ts",
+      "to": "src/server/viewStateBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.peek.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.peek.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.peek.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/engine.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/gameInitializer.test.ts",
+      "to": "src/game/gameInitializer.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/gameInitializer.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/game/__tests__/gameInitializer.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/bootstrap.ts",
+      "to": "src/server/server.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/bootstrap.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/commandValidator.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/commandValidator.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/commandValidator.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/commandValidator.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/index.ts",
+      "to": "src/server/server.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "package": "http"
+    },
+    {
+      "from": "src/server/server.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/server/server.ts",
+      "package": "fs"
+    },
+    {
+      "from": "src/server/server.ts",
+      "package": "path"
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/server/connectionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/server/viewStateBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/server.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/server/viewStateBuilder.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "to": "src/game/gameInitializer.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/sessionManager.ts",
+      "package": "crypto"
+    },
+    {
+      "from": "src/server/startServer.ts",
+      "to": "src/server/server.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/startServer.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/startServer.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/types.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/types.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/viewStateBuilder.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/viewStateBuilder.ts",
+      "to": "src/server/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/viewStateBuilder.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/viewStateBuilder.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/connectionManager.test.ts",
+      "to": "src/server/connectionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/server.test.ts",
+      "package": "http"
+    },
+    {
+      "from": "src/server/__tests__/server.test.ts",
+      "package": "ws"
+    },
+    {
+      "from": "src/server/__tests__/server.test.ts",
+      "to": "src/server/server.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/server.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/server.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.init.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.init.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.init.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.init.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.pair.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.pair.test.ts",
+      "to": "src/server/commandValidator.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.pair.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.pair.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.pair.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.test.ts",
+      "to": "src/server/sessionManager.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.test.ts",
+      "to": "src/game/commands.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.test.ts",
+      "to": "src/game/models.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.test.ts",
+      "to": "src/game/types.ts",
+      "resolved": true
+    },
+    {
+      "from": "src/server/__tests__/sessionManager.test.ts",
+      "to": "src/game/engine.ts",
+      "resolved": true
+    }
+  ]
+}
