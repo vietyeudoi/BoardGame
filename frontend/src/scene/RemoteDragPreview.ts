@@ -43,13 +43,14 @@ export class RemoteDragPreview {
 
   update(frame: RemoteDragPreviewFrame): void {
     frame.cards.forEach((position, index) => {
-      let preview = this._cards.get(position.objectId);
+      const card = this._findCard(position.objectId);
+      if (!card || card.isDisposed()) return;
+      const id = card.cardId;
+      let preview = this._cards.get(id);
       if (frame.phase === 'start') {
-        const card = this._findCard(position.objectId);
-        if (!card || card.isDisposed()) return;
-        if (preview) this._remove(position.objectId, preview);
+        if (preview) this._remove(id, preview);
         preview = this._create(card, frame, !!position.masked || card.isInHand(), index === 0);
-        this._cards.set(position.objectId, preview);
+        this._cards.set(id, preview);
       }
       if (!preview || preview.actor !== frame.playerId || preview.dragId !== frame.dragId || preview.settlingSince !== undefined) return;
       preview.target.set(position.x, Math.max(LIFT, position.y), position.z);

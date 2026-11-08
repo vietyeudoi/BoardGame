@@ -86,6 +86,7 @@ export interface RoomState {
   deckCount?: number;
   deck?: PublicDeckState;
   handCounts?: Record<string, number>;
+  handSlots?: Record<string, string[]>;
 }
 
 export interface ObjectPosition {

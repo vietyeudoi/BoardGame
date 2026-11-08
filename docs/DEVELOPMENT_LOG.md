@@ -2619,3 +2619,5 @@ vitest@^2.1.4           — testing
 - Danh mục chung chứa Bộ gốc, Imploding Kittens, Streaking Kittens và Barking Kittens. Máy chủ lưu bộ đang bật và số lá đã chỉnh, kể cả của bộ đang tắt.
 - Mỗi người nhận 1 Gỡ Bom và 5 lá không phải bom hoặc Gỡ Bom. Máy chủ xáo phần còn lại thành chồng. Cảnh báo Streaking chỉ để tham khảo.
 - Các lá mở rộng dùng mặt chữ kèm màu và nhãn của bộ. Tower of Power có dữ liệu lá bài, chưa có kho dự trữ.
+
+- Khôi phục tương tác với tay bài của người khác bằng mã lá ẩn danh. Máy chủ giữ khóa theo lá thật. Kéo lá từ tay người khác ra bàn hoặc chèn vào chồng vẫn giữ mặt úp.

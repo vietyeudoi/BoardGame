@@ -81,6 +81,9 @@ export class SceneManager {
   onOnlineDeckClick?: () => void;
   private _roundSetup = false;
   private _roundSpectator = false;
+  private readonly _sharedHandCards = new Map<string, SandboxObject>();
+  private readonly _localHandAliases = new Map<string, string>();
+  private _localHandSlotOrder: string[] = [];
   private readonly _spectatorFlipIds = new Set<string>();
   private _onlineCardRoomId: string | null = null;
   readonly tableActions: TableActions3D;
@@ -123,7 +126,7 @@ export class SceneManager {
   public onDeckCountChanged: ((deckId: string, count: number) => void) | null = null;
 
   /** Callback invoked when a local card transfer to an opponent is requested (M1.5.4) */
-  public onCardTransferRequested: ((cardId: string, targetPlayerIndex: number) => void) | null = null;
+  public onCardTransferRequested: ((cardId: string, targetPlayerIndex: number, handIndex?: number) => void) | null = null;
 
   /**
    * M1.7.8: fires when the pointer enters/leaves the LOCAL player's own HAND.
@@ -176,7 +179,7 @@ export class SceneManager {
     // Initialize Centralized Card ID Registry (M1.3.3)
     this._cardRegistry = new CardRegistry();
     this.remoteDragPreview = new RemoteDragPreview(this._scene,
-      id => this._cardRegistry.getCardObject(id) ?? undefined, () => this.requestRender());
+      id => this._cardRegistry.getCardObject(this._localHandAliases.get(id) ?? id) ?? undefined, () => this.requestRender());
 
     // M1.7.4: Single owner for animated hand-transfer trajectories
 
@@ -349,9 +352,8 @@ export class SceneManager {
       this._onCardDropped(card, isGroup, followers);
     };
 
-    // Tay đối thủ trong ván mới chỉ có mesh úp minh họa, không thể kéo.
     this._dragController.canDragCard = (card: CardObject3D) => {
-      if (this._roundSetup || this._roundSpectator || card.cardId.startsWith(ANONYMOUS_HAND_PREFIX)
+      if (this._roundSetup || this._roundSpectator || (card.cardId.startsWith(ANONYMOUS_HAND_PREFIX) && !this._sharedHandCards.has(card.cardId))
         || card.isDisposed() || card.isLayoutControlled() || this.remoteDragPreview.isLocked(card.cardId)) return false;
       return true;
     };
@@ -1382,6 +1384,9 @@ export class SceneManager {
       this._removeRoomCard(id, object);
     }
     this._cardRegistry.clear();
+    this._sharedHandCards.clear();
+    this._localHandAliases.clear();
+    this._localHandSlotOrder = [];
     this._pendingTransfers.clear();
     this._lastTransferSeq.clear();
     this._remoteDragSeq.clear();
@@ -1424,7 +1429,18 @@ export class SceneManager {
     return !this._roundSpectator || this._spectatorFlipIds.has(card.cardId);
   }
 
-  syncPrivateRoundObjects(objects: SandboxObject[], players: PlayerInfo[], handCounts: Record<string, number>): void {
+  getSharedHandObject(id: string): SandboxObject | undefined {
+    return this._sharedHandCards.get(id);
+  }
+
+  syncPrivateRoundObjects(objects: SandboxObject[], players: PlayerInfo[], handCounts: Record<string, number>, handSlots?: Record<string, string[]>): void {
+    this._sharedHandCards.clear();
+    this._localHandAliases.clear();
+    for (const object of objects) {
+      if (object.location !== 'HAND' || object.ownerId !== this._localSessionId || object.handIndex === undefined) continue;
+      const alias = handSlots?.[object.ownerId]?.[object.handIndex];
+      if (alias) this._localHandAliases.set(alias, object.id);
+    }
     if (this._roundSpectator) {
       this._spectatorFlipIds.clear();
       for (const object of objects) {
@@ -1434,14 +1450,17 @@ export class SceneManager {
     const visible = [...objects];
     for (const player of players) {
       if (player.id === this._localSessionId || player.spectator) continue;
-      // Mesh úp chỉ là hình minh họa số lượng, không có ID lá thật.
+      // Mã ổn định từ máy chủ dùng để chọn đúng lá úp khi kéo.
       const count = handCounts[player.id] ?? 0;
       for (let index = 0; index < count; index++) {
-        visible.push({
-          id: getAnonymousHandSlotId(player.id, index),
+        const alias = handSlots?.[player.id]?.[index];
+        const card: SandboxObject = {
+          id: alias ?? getAnonymousHandSlotId(player.id, index),
           type: 'card', ownerId: player.id, location: 'HAND', handIndex: index,
           position: { x: 0, y: 0, z: 0 }, rotation: 0, faceUp: false, lockedBy: null,
-        });
+        };
+        visible.push(card);
+        if (alias) this._sharedHandCards.set(alias, card);
       }
     }
     const visibleIds = new Set(visible.map(object => object.id));
@@ -1449,6 +1468,21 @@ export class SceneManager {
       if (object instanceof CardObject3D && !id.startsWith(DECK_VIEW_PREFIX) && !visibleIds.has(id)) this._removeRoomCard(id, object);
     }
     this.syncRoomObjects(visible, players);
+    for (const player of players) {
+      const slots = handSlots?.[player.id];
+      const zone = this._handZoneManager.getHandZoneForPlayer(player.playerIndex ?? -1);
+      if (!slots || !zone) continue;
+      const local = player.id === this._localSessionId;
+      if (local) {
+        const previous = this._localHandSlotOrder;
+        this._localHandSlotOrder = slots;
+        // Chỉ ghi đè thứ tự fan cục bộ khi máy chủ đổi chỗ các lá đang có.
+        if (previous.length !== slots.length || !previous.every(id => this._localHandAliases.has(id)) ||
+          previous.every((id, index) => id === slots[index])) continue;
+      }
+      const ids = local ? slots.flatMap(id => this._localHandAliases.get(id) ?? []) : slots;
+      if (ids.some((id, index) => zone.getCards()[index]?.cardId !== id)) zone.reorderCards(ids);
+    }
   }
 
 
@@ -1505,7 +1539,9 @@ export class SceneManager {
           card.setMasked(this._shouldMask('HAND', obj.ownerId, obj.faceUp));
           this._cardRegistry.registerTableCard(card);
           this.addObject(obj.id, card);
-          if (!obj.id.startsWith(ANONYMOUS_HAND_PREFIX)) this._interactionManager.registerObject(obj.id, card);
+          if (!obj.id.startsWith(ANONYMOUS_HAND_PREFIX) || this._sharedHandCards.has(obj.id)) {
+            this._interactionManager.registerObject(obj.id, card);
+          }
         }
 
         // M1.7.4: an in-flight transfer is authoritative for its own transform.
@@ -2662,6 +2698,12 @@ export class SceneManager {
       for (const transferCard of transferCards.values()) {
         // M1.7.4.2: snapshot the authoritative rollback state. Preserve faceUp state.
         this._suppressDragEndIds.add(transferCard.cardId);
+        if (this._sharedHandCards.has(transferCard.cardId) && transferCard.getHandZoneId() === targetHandZone.zoneId) {
+          transferCard.setLayoutControlled(false);
+          targetHandZone.arrangeCards();
+          this.onCardTransferRequested?.(transferCard.cardId, targetHandZone.playerIndex, insertIdx);
+          continue;
+        }
         this._queuePendingHandTransfer(transferCard, targetHandZone.playerIndex);
         transferCard.setMasked(this._shouldMask('HAND', null, transferCard.isFaceUp()));
         this.onCardTransferRequested?.(transferCard.cardId, targetHandZone.playerIndex);

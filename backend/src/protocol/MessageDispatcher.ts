@@ -3,7 +3,6 @@
  */
 import { DEFAULT_TABLE_RADIUS, SHARED_CONFIG } from "../../../shared/constants/config.js";
 import type { ClientToServerMessage, CursorMovePayload, DragPreviewFrame, RemoteDragPreviewFrame, Vector3Like } from '../../../shared/types/protocol.js';
-import { getAnonymousHandSlotId } from '../../../shared/types/room.js';
 import type { RoomManager } from '../room/RoomManager.js';
 import type { PlayerSession } from '../player/PlayerSession.js';
 import type { Room } from '../room/Room.js';
@@ -32,7 +31,7 @@ function isValidDefaultTableDrop(x: number, y: number, z: number): boolean {
 
 export class MessageDispatcher {
   /** Tracks the last drag-move timestamp per sessionId to enforce throttle. */
-  private readonly _dragPreviews = new Map<string, { dragId: number; roomId: string; cards: Set<string>; anonymousIds: Map<string, string>; lastMove: number; frame?: RemoteDragPreviewFrame }>();
+  private readonly _dragPreviews = new Map<string, { dragId: number; roomId: string; cards: Set<string>; requestedIds: Map<string, string>; anonymousIds: Map<string, string>; lastMove: number; frame?: RemoteDragPreviewFrame }>();
   private readonly _dragMoveTimestamps = new Map<string, number>();
 
   constructor(
@@ -91,7 +90,7 @@ export class MessageDispatcher {
       }
       if ('payload' in msg && msg.payload) {
         const id = 'objectId' in msg.payload ? msg.payload.objectId : 'cardId' in msg.payload ? msg.payload.cardId : undefined;
-        if (id && !room.canAccessObject(room.getObject(id), sessionId)) {
+        if (id && !room.getInteractableObject(id, sessionId)) {
           session.sendError('Không thể thao tác lá bài này.', msg.type === 'object:flip' ? 'FLIP_REJECTED' : 'CARD_NOT_FOUND', id);
           return;
         }
@@ -414,7 +413,7 @@ export class MessageDispatcher {
     const { cardIds, cardsAbove, dragId } = msg.payload;
     const active = this._dragPreviews.get(id);
     const validDrag = dragId === undefined || (active?.dragId === dragId && cardIds.every(cardId =>
-      active.cards.has(cardId) && room.isLockedBy(cardId, id)));
+      active.requestedIds.has(cardId) && room.isLockedBy(active.requestedIds.get(cardId)!, id)));
     if (!validDrag || !room.insertDeckCards(id, cardIds, cardsAbove)) {
       for (const cardId of cardIds) session.sendError('Không thể chèn nhóm bài này.', 'DRAG_END_FAILED', cardId);
       return;
@@ -472,7 +471,7 @@ export class MessageDispatcher {
     const playerIndex = room.getPlayerIndex(sessionId);
     RoomBroadcaster.broadcastCardDrawn(this._sessions, room, drawnCard, playerIndex);
     if (room.phase) this._broadcastToRoom(room.id, '', { type: 'deck:count', payload: {
-      count: room.getDeckCount(), ownerId: sessionId, handCount: room.getHandCount(sessionId), deck: room.getPublicDeckState(),
+      count: room.getDeckCount(), ownerId: sessionId, handCount: room.getHandCount(sessionId), handSlots: room.getHandSlots(sessionId), deck: room.getPublicDeckState(),
     } });
     logger.info('Card drawn & distributed securely', { roomId: room.id, drawerSessionId: sessionId, cardId: drawnCard.id });
   }
@@ -486,7 +485,10 @@ export class MessageDispatcher {
     const room = this._roomManager.getRoom(session.roomId);
     if (!room) return;
 
-    room.playCardToTable(sessionId, payload.cardId, payload.position, payload.faceUp);
+    const card = room.getInteractableObject(payload.cardId, sessionId);
+    if (!card) return;
+    const faceUp = room.phase && card.ownerId !== sessionId ? false : payload.faceUp;
+    room.playCardToTable(sessionId, card.id, payload.position, faceUp);
     this._broadcastRoomState(room.id);
   }
 
@@ -544,7 +546,7 @@ export class MessageDispatcher {
     const room = this._roomManager.getRoom(session.roomId);
     if (!room) return;
 
-    const targetObj = room.getObject(payload.objectId);
+    const targetObj = room.getInteractableObject(payload.objectId, sessionId);
     if (!targetObj) {
       session.sendError('Object not found', 'OBJECT_NOT_FOUND', payload.objectId);
       return;
@@ -564,7 +566,7 @@ export class MessageDispatcher {
       session.sendError("Card locked by another player", "FLIP_REJECTED", payload.objectId);
       return;
     }
-    const flippedObj = room.flipObject(payload.objectId);
+    const flippedObj = room.flipObject(targetObj.id);
 
     const flipMessage = {
       type: 'object:flipped' as const,
@@ -577,7 +579,9 @@ export class MessageDispatcher {
         location: flippedObj.location,
       },
     };
-    if (flippedObj.privateViewerId || (room.phase && flippedObj.location === 'HAND')) session.sendRaw(flipMessage);
+    if (room.phase && flippedObj.location === 'HAND' && flippedObj.ownerId) {
+      this._sessions.get(flippedObj.ownerId)?.sendRaw(flipMessage);
+    } else if (flippedObj.privateViewerId) session.sendRaw(flipMessage);
     else this._broadcastToRoom(room.id, '', flipMessage);
     this._broadcastRoomState(room.id);
   }
@@ -615,27 +619,28 @@ export class MessageDispatcher {
 
     if (frame.phase === "start") {
       if (this._dragPreviews.has(sessionId)) return;
-      // Kiểm tra cả nhóm trước khi đặt khóa, tránh khóa nửa nhóm.
+
+      // Ánh xạ mã do người kéo gửi sang ID thật trước khi khóa cả nhóm.
+      const requestedIds = new Map<string, string>();
+      const cards = new Set<string>();
+      const anonymousIds = new Map<string, string>();
       for (const id of ids) {
-        const card = room.getObject(id);
-        if (!card || !room.canAccessObject(card, sessionId) || card.type !== "card" || card.location === "DECK" || (card.lockedBy && card.lockedBy !== sessionId)) {
-          session.sendError("Card unavailable for drag", "OBJECT_LOCKED", frame.cards[0]!.objectId);
+        const card = room.getInteractableObject(id, sessionId);
+        if (!card || card.type !== 'card' || card.location === 'DECK' || cards.has(card.id) ||
+          (card.lockedBy && card.lockedBy !== sessionId)) {
+          session.sendError('Lá bài đang bận hoặc không còn trên tay.', 'OBJECT_LOCKED', frame.cards[0]!.objectId);
           return;
         }
+        cards.add(card.id);
+        requestedIds.set(id, card.id);
+        const alias = room.phase ? room.getHandAlias(card) : undefined;
+        if (alias) anonymousIds.set(card.id, alias);
       }
-      for (const id of ids) room.dragLock(id, sessionId);
-
-      const anonymousIds = new Map<string, string>();
-      if (room.phase) {
-        let slot = room.getHandCount(sessionId) - 1;
-        for (const id of ids) {
-          if (room.getObject(id)?.location === 'HAND') anonymousIds.set(id, getAnonymousHandSlotId(sessionId, slot--));
-        }
-      }
-      this._dragPreviews.set(sessionId, { dragId: frame.dragId, roomId: room.id, cards: ids, anonymousIds, lastMove: 0 });
+      for (const id of cards) room.dragLock(id, sessionId);
+      this._dragPreviews.set(sessionId, { dragId: frame.dragId, roomId: room.id, cards, requestedIds, anonymousIds, lastMove: 0 });
     } else {
       const active = this._dragPreviews.get(sessionId);
-      if (!active || active.dragId !== frame.dragId || [...ids].some(id => !active.cards.has(id) || !room.isLockedBy(id, sessionId))) return;
+      if (!active || active.dragId !== frame.dragId || [...ids].some(id => !active.requestedIds.has(id) || !room.isLockedBy(active.requestedIds.get(id)!, sessionId))) return;
       const now = Date.now();
       if (now - active.lastMove < PREVIEW_MOVE_THROTTLE_MS) return;
       active.lastMove = now;
@@ -648,11 +653,12 @@ export class MessageDispatcher {
         playerName: player.name, playerIndex: room.getPlayerIndex(sessionId),
 
         cards: frame.cards.map(({ objectId, x, y, z, rotation }) => {
-          const anonymousId = active.anonymousIds.get(objectId);
+          const actualId = active.requestedIds.get(objectId)!;
+          const anonymousId = active.anonymousIds.get(actualId);
           if (anonymousId) return { objectId: anonymousId, x, y, z, rotation, faceUp: false, masked: true };
-          const card = room.getObject(objectId);
+          const card = room.getObject(actualId);
           const faceUp = card?.location !== "HAND" && !card?.privateViewerId && card?.faceUp === true;
-          return { objectId, x, y, z, rotation, faceUp, masked: !faceUp };
+          return { objectId: actualId, x, y, z, rotation, faceUp, masked: !faceUp };
         }),
     };
     if (preview.cards.length === 0) return;
@@ -743,7 +749,9 @@ export class MessageDispatcher {
     if (!room) return;
 
     const active = this._dragPreviews.get(sessionId);
-    if (payload.dragId !== undefined && (active?.dragId !== payload.dragId || !active.cards.has(payload.cardId) || !room.isLockedBy(payload.cardId, sessionId))) {
+    const cardObj = room.getInteractableObject(payload.cardId, sessionId);
+    if (payload.dragId !== undefined && (active?.dragId !== payload.dragId ||
+      !cardObj || active.requestedIds.get(payload.cardId) !== cardObj.id || !room.isLockedBy(cardObj.id, sessionId))) {
       session.sendError("Drag lock not granted", "OBJECT_LOCKED", payload.cardId);
       return;
     }
@@ -754,7 +762,6 @@ export class MessageDispatcher {
       return;
     }
 
-    const cardObj = room.getObject(payload.cardId);
     if (!cardObj) {
       session.sendError('Card not found', 'CARD_NOT_FOUND', payload.cardId);
       return;
@@ -767,7 +774,7 @@ export class MessageDispatcher {
     try {
       const fromIdx = cardObj.location === 'HAND' && cardObj.ownerId ? room.getPlayerIndex(cardObj.ownerId) : -1;
       const prevOwner = cardObj.ownerId;
-      const card = room.transferCard(sessionId, payload.cardId, targetSid, undefined, payload.handIndex);
+      const card = room.transferCard(sessionId, cardObj.id, targetSid, undefined, payload.handIndex);
       const toIdx = room.getPlayerIndex(targetSid);
       const ownerChanged = card.ownerId !== prevOwner;
       // Single ownership-change path: transfer event + filtered room state.
@@ -800,9 +807,12 @@ export class MessageDispatcher {
     const room = this._roomManager.getRoom(session.roomId);
     if (!room) return;
 
+
+    const prevObj = room.getInteractableObject(payload.objectId, sessionId);
     if (payload.dragId !== undefined) {
       const active = this._dragPreviews.get(sessionId);
-      if (active?.dragId !== payload.dragId || !active.cards.has(payload.objectId) || !room.isLockedBy(payload.objectId, sessionId)) {
+      if (active?.dragId !== payload.dragId || !prevObj ||
+        active.requestedIds.get(payload.objectId) !== prevObj.id || !room.isLockedBy(prevObj.id, sessionId)) {
         session.sendError("Drag lock not granted", "OBJECT_LOCKED", payload.objectId);
         return;
       }
@@ -812,7 +822,6 @@ export class MessageDispatcher {
         return;
       }
     }
-    const prevObj = room.getObject(payload.objectId);
     const prevOwner = prevObj?.ownerId ?? null;
     const prevLocation = prevObj?.location;
 
@@ -840,10 +849,11 @@ export class MessageDispatcher {
     let updated: ReturnType<Room['updateObjectAfterDrag']> | null = null;
     try {
       updated = room.updateObjectAfterDrag(
-        payload.objectId, sessionId,
+        prevObj.id, sessionId,
         { x: payload.x, y: payload.y, z: payload.z },
-        (prevObj.privateViewerId || (payload.dragId !== undefined && prevObj.location === "HAND"))
-          ? prevObj.faceUp : payload.faceUp,
+        room.phase && prevObj.location === 'HAND' && prevOwner !== sessionId && payload.targetPlayerIndex == null
+          ? false : (prevObj.privateViewerId || (payload.dragId !== undefined && prevObj.location === 'HAND'))
+            ? prevObj.faceUp : payload.faceUp,
         payload.targetPlayerIndex, payload.handIndex,
         payload.rotation
       );
@@ -889,6 +899,7 @@ export class MessageDispatcher {
       type: "object:drag-end" as const,
       payload: {
         ...payload,
+        objectId: updated.id,
         x: updated.position.x, y: updated.position.y, z: updated.position.z,
         playerId: sessionId,
         faceUp: broadcastFaceUp,

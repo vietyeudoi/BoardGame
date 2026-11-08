@@ -402,6 +402,21 @@ async function run() {
     await clientA.evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape' }))");
     for (const client of deckViewClients) await waitFor(client, '!' + row + '._state');
 
+
+    console.log('[Test] Bob kéo một lá úp trực tiếp từ tay Alice ra bàn...');
+    const opponentCard = "scene._handZoneManager.getHandZoneForPlayer(0).getCards().at(-1)";
+    const remoteStart = await projectWorld(clientB, opponentCard + '.position');
+    const publicTarget = await projectWorld(clientB, 'scene.getOriginalDeck().position.clone().set(5, 0, 1)');
+    const ownerCount = await clientA.evaluate("window.__app._store.getRoomState().handCounts[window.__app._store.getPlayerId()]");
+    const publicBefore = await clientB.evaluate("window.__app._store.getRoomState().objects.filter(card => card.location === 'TABLE').map(card => card.id)");
+    await clientB.mouseDrag(remoteStart.x, remoteStart.y, publicTarget.x, publicTarget.y, 18);
+    await waitFor(clientA, "window.__app._store.getRoomState().handCounts[window.__app._store.getPlayerId()] === " + (ownerCount - 1));
+    for (const client of [clientA, clientB, clientC]) {
+      const tableCard = await client.evaluate("window.__app._store.getRoomState().objects.find(card => card.location === 'TABLE' && !" + JSON.stringify(publicBefore) + ".includes(card.id))");
+      assert.equal(tableCard?.faceUp, false);
+      assert.equal(tableCard?.cardType, undefined);
+    }
+
     await clientA.evaluate("document.querySelector('#btn-round-reset').click()");
     for (const client of [clientA, clientB]) {
       await waitFor(client, "window.__app._store.getRoomState().round.phase === 'SETUP'");

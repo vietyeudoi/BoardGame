@@ -95,12 +95,13 @@ export class ClientStore {
     this._notify();
   }
 
-  updateDeckCount(count: number, ownerId?: string, handCount?: number, deck?: PublicDeckState): void {
+  updateDeckCount(count: number, ownerId?: string, handCount?: number, deck?: PublicDeckState, slots?: string[]): void {
     if (!this._roomState) return;
     const handCounts = ownerId && handCount !== undefined
       ? { ...this._roomState.handCounts, [ownerId]: handCount }
       : this._roomState.handCounts;
-    this._roomState = { ...this._roomState, deckCount: count, handCounts, deck: deck ?? this._roomState.deck };
+    const handSlots = ownerId && slots ? { ...this._roomState.handSlots, [ownerId]: slots } : this._roomState.handSlots;
+    this._roomState = { ...this._roomState, deckCount: count, handCounts, handSlots, deck: deck ?? this._roomState.deck };
     this._notify();
   }
 

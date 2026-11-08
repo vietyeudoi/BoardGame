@@ -1,7 +1,7 @@
 /**
  * Room.ts — Room state and player management (authoritative)
  */
-import { DEFAULT_DECK_AFFECTED_COUNT, DEFAULT_DECK_DRAW_END, type PublicDeckState, type DeckDrawEnd, type RoomState, type SandboxObject, type PlayerInfo, type DeckSetup, type RoundSetup } from '../../../shared/types/room.js';
+import { ANONYMOUS_HAND_PREFIX, DEFAULT_DECK_AFFECTED_COUNT, DEFAULT_DECK_DRAW_END, type PublicDeckState, type DeckDrawEnd, type RoomState, type SandboxObject, type PlayerInfo, type DeckSetup, type RoundSetup } from '../../../shared/types/room.js';
 import type { DeckViewMode, Vector3Like } from '../../../shared/types/protocol.js';
 import { getDefaultSeatPlacement, SHARED_CONFIG } from '../../../shared/constants/config.js';
 import { IdGenerator } from '../utils/IdGenerator.js';
@@ -24,6 +24,7 @@ export class Room {
   private readonly _drawHoverPlayers = new Set<string>();
   private readonly _players = new Map<string, PlayerRecord>();
   private readonly _objects = new Map<string, SandboxObject>();
+  private readonly _handAliases = new WeakMap<SandboxObject, { ownerId: string; id: string }>();
   private readonly _dynamicLocks = new Map<string, string>();
   private _hostSessionId: string;
   private _phase?: RoundSetup['phase'];
@@ -103,6 +104,31 @@ export class Room {
 
   getHandCount(ownerId: string): number {
     return [...this._objects.values()].filter(obj => obj.location === 'HAND' && obj.ownerId === ownerId).length;
+  }
+
+  getHandAlias(card: SandboxObject): string | undefined {
+    if (card.location !== 'HAND' || !card.ownerId) return;
+    const existing = this._handAliases.get(card);
+    if (existing?.ownerId === card.ownerId) return existing.id;
+    // Mã ổn định theo lá và tay bài, độc lập với ID thật và thứ tự trên tay.
+    const id = ANONYMOUS_HAND_PREFIX + IdGenerator.generate();
+    this._handAliases.set(card, { ownerId: card.ownerId, id });
+    return id;
+  }
+
+  getHandSlots(ownerId: string): string[] {
+    return [...this._objects.values()]
+      .filter(card => card.location === 'HAND' && card.ownerId === ownerId)
+      .sort((a, b) => (a.handIndex ?? 0) - (b.handIndex ?? 0))
+      .flatMap(card => this.getHandAlias(card) ?? []);
+  }
+
+  getInteractableObject(id: string, sessionId: string): SandboxObject | undefined {
+    const direct = this.getObject(id);
+    if (this.canAccessObject(direct, sessionId)) return direct;
+    if (!id.startsWith(ANONYMOUS_HAND_PREFIX)) return;
+    return [...this._objects.values()].find(card => card.location === 'HAND'
+      && this.getHandAlias(card) === id && (!card.privateViewerId || card.privateViewerId === sessionId));
   }
 
   canAccessObject(object: SandboxObject | undefined, sessionId: string): boolean {
@@ -311,10 +337,10 @@ export class Room {
   }
 
   insertDeckCards(sessionId: string, cardIds: string[], cardsAbove?: number): boolean {
-    const cards = cardIds.map(id => this._objects.get(id));
-    if (!cardIds.length || new Set(cardIds).size !== cardIds.length || !cards.every((card): card is SandboxObject =>
+    const cards = cardIds.map(id => this.getInteractableObject(id, sessionId));
+    if (!cardIds.length || new Set(cards).size !== cards.length || !cards.every((card): card is SandboxObject =>
       card?.type === 'card' && (card.location === 'HAND' || card.location === 'TABLE') &&
-      this.canAccessObject(card, sessionId) && (!card.privateViewerId || card.privateViewerId === sessionId) &&
+      (!card.privateViewerId || card.privateViewerId === sessionId) &&
       (!card.lockedBy || card.lockedBy === sessionId))) return false;
 
     const deck = this._getDeckCards();
@@ -322,7 +348,11 @@ export class Room {
       ? 0 : deck.length - Math.min(cardsAbove ?? 0, deck.length);
     const hands = new Set<string>();
     for (const card of cards) {
-      if (card.location === 'HAND' && card.ownerId) hands.add(card.ownerId);
+      if (card.location === 'HAND' && card.ownerId) {
+        hands.add(card.ownerId);
+        if (this._phase && card.ownerId !== sessionId) card.faceUp = false;
+      }
+      this._handAliases.delete(card);
       card.location = 'DECK';
       card.ownerId = null;
       card.handIndex = undefined;
@@ -410,6 +440,8 @@ export class Room {
     if (card.lockedBy && card.lockedBy !== sessionId) {
       throw new Error(`Room: Card ${cardId} is locked by another session`);
     }
+    const previousOwner = card.ownerId;
+    this._handAliases.delete(card);
     card.location = 'TABLE';
     card.ownerId = null;
     card.position = position;
@@ -418,6 +450,7 @@ export class Room {
     }
     card.handIndex = undefined;
 
+    if (previousOwner) this._reindexHands(previousOwner);
     logger.info('Card played to table', { roomId: this.id, sessionId, cardId, position, faceUp: card.faceUp });
     return card;
   }
@@ -607,9 +640,12 @@ export class Room {
     // current manual yaw) so every client renders the same orientation.
     if (rotation !== undefined) obj.rotation = rotation;
     if (obj.location === 'HAND' || obj.location === 'DISCARD') {
+      const previousOwner = obj.ownerId;
+      this._handAliases.delete(obj);
       obj.location = 'TABLE';
       obj.ownerId = null;
       obj.handIndex = undefined;
+      if (previousOwner) this._reindexHands(previousOwner);
     }
     return obj;
   }

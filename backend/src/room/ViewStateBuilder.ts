@@ -70,7 +70,8 @@ export class ViewStateBuilder {
         }
         return [this.filterObjectForClient(obj, viewingSessionId, true)];
       });
-      return { ...publicState, objects, handCounts, deckCount, deck: room.getPublicDeckState() };
+      const handSlots = Object.fromEntries(Object.keys(handCounts).map(id => [id, room.getHandSlots(id)]));
+      return { ...publicState, objects, handCounts, handSlots, deckCount, deck: room.getPublicDeckState() };
     }
     const filteredObjects = publicState.objects.map(obj => this.filterObjectForClient(obj, viewingSessionId));
 

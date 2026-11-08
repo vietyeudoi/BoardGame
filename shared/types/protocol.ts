@@ -46,7 +46,7 @@ export type ClientToServerMessage =
 export type ServerToClientMessage =
   | { type: 'room:state'; payload: RoomState }
   | { type: 'round:configured'; payload: RoundSetup }
-  | { type: 'deck:count'; payload: { count: number; ownerId?: string; handCount?: number; deck?: PublicDeckState } }
+  | { type: 'deck:count'; payload: { count: number; ownerId?: string; handCount?: number; handSlots?: string[]; deck?: PublicDeckState } }
   | { type: 'deck:view-state'; payload: DeckViewState | null }
   | { type: 'deck:shuffled'; payload: { deck: PublicDeckState; playerName: string } }
   | { type: 'deck:inserted'; payload: { count: number } }

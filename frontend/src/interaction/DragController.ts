@@ -658,11 +658,7 @@ export class DragController {
     this._requestRender();
     logger.debug('Drag activated', { id: this._draggedCard.cardId, groupCount: this._groupOffsets.size });
 
-    // M1.5.3 / M1.7.4.1: broadcast table drags to peers. Hand cards are private
-    // presentation data: the server rejects (and locks against) an opponent's
-    // hand drag-start, which would abort this purely visual gesture. The drop
-    // still travels through `object:drag-end` / `card:transfer` for
-    // authorization, so visual drag and gameplay permission stay separate.
+    // Tay bài đã dùng gói preview ẩn danh. Luồng cũ ở đây chỉ dành cho bài trên bàn.
     if (!this._draggedCard.isInHand()) {
       this.onDragStartBroadcast?.(this._draggedCard.cardId, {
         x: this._draggedCard.position.x,

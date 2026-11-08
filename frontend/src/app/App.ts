@@ -118,7 +118,9 @@ export class App {
       const room = this._store.getRoomState();
       if (!room) return;
       for (const card of dragCtrl.getDraggedCards()) {
-        if (room.objects.some(obj => obj.id === card.cardId && obj.type === "card")) previewCards.add(card.cardId);
+        if (room.objects.some(obj => obj.id === card.cardId && obj.type === 'card') || this._sceneManager.getSharedHandObject(card.cardId)) {
+          previewCards.add(card.cardId);
+        }
       }
       if (!previewCards.size) return;
       previewDragId = ++nextPreviewDragId;
@@ -388,11 +390,11 @@ export class App {
         payload.card.ownerId ?? undefined
       );
     };
-    this._sceneManager.onCardTransferRequested = (cardId, targetPlayerIndex) => {
+    this._sceneManager.onCardTransferRequested = (cardId, targetPlayerIndex, handIndex) => {
       if (this._store.getRoomId()) {
         this._networkClient.send({
           type: 'card:transfer',
-          payload: { cardId, targetPlayerIndex, seq: Date.now(), dragId: previewCards.has(cardId) ? previewDragId : undefined },
+          payload: { cardId, targetPlayerIndex, handIndex, seq: Date.now(), dragId: previewCards.has(cardId) ? previewDragId : undefined },
         });
       } else {
         // Single-player sandbox: no server exists, so commit locally.
@@ -411,8 +413,8 @@ export class App {
       // M1.7.5 Part 3: a rejected drag-end may have applied a local yaw the
       // server refused — restore the authoritative rotation from the store.
       const room = this._store.getRoomState();
-      const authoritative = room?.objects.find((o) => o.id === objectId);
-      if (room && authoritative?.location === "HAND" && (code === "DRAG_END_FAILED" || code === "OBJECT_LOCKED")) {
+      const authoritative = room?.objects.find((o) => o.id === objectId) ?? this._sceneManager.getSharedHandObject(objectId);
+      if (room && authoritative?.location === "HAND" && (code === "DRAG_END_FAILED" || code === "OBJECT_LOCKED" || code === "TRANSFER_FAILED" || code === "CARD_NOT_FOUND")) {
         this._sceneManager.restoreRejectedHandDrop(authoritative, room.players);
       }
       if (authoritative && authoritative.location === 'TABLE') {
@@ -570,11 +572,12 @@ export class App {
           if (card.isDisposed() || !this._sceneManager.canFlipCard(card)) continue;
 
           // M1.7.4.2: Free sandbox flip for any card in room (hand or table).
-          this._sceneManager.syncFlippedCard(card.cardId, !card.isFaceUp(), undefined, undefined, undefined, false);
+          const hiddenHand = this._sceneManager.getSharedHandObject(card.cardId);
+          if (!hiddenHand) this._sceneManager.syncFlippedCard(card.cardId, !card.isFaceUp(), undefined, undefined, undefined, false);
           if (dragCtrl.isDragging()) dragCtrl.onDragPreviewMove?.();
 
           if (this._store.getRoomId()) {
-            pendingFlips.add(card.cardId);
+            if (!hiddenHand) pendingFlips.add(card.cardId);
             this._networkClient.send({
               type: 'object:flip',
               payload: { objectId: card.cardId },
@@ -925,7 +928,7 @@ export class App {
 
         // 4. Synchronize all room state objects (cards on table, opponent/local hands)
         if (roomState?.objects) {
-          if (roomState.handCounts) this._sceneManager.syncPrivateRoundObjects(roomState.objects, roomState.players, roomState.handCounts);
+          if (roomState.handCounts) this._sceneManager.syncPrivateRoundObjects(roomState.objects, roomState.players, roomState.handCounts, roomState.handSlots);
           else this._sceneManager.syncRoomObjects(roomState.objects, roomState.players);
           const count = roomState.deckCount ?? roomState.objects.filter((obj) => obj.type === "card" && obj.location === "DECK").length;
 

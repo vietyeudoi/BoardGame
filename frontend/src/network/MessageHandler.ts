@@ -49,7 +49,7 @@ export class MessageHandler {
         this._sceneManager.animateDeckInsertion(msg.payload.count);
         break;
       case 'deck:count':
-        this._store.updateDeckCount(msg.payload.count, msg.payload.ownerId, msg.payload.handCount, msg.payload.deck);
+        this._store.updateDeckCount(msg.payload.count, msg.payload.ownerId, msg.payload.handCount, msg.payload.deck, msg.payload.handSlots);
         break;
       case 'room:state':
         this._store.updateRoomState(msg.payload);

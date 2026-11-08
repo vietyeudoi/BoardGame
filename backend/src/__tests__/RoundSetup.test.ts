@@ -184,7 +184,45 @@ describe('Bộ bài gốc và chia bài', () => {
       expect(privatePreview.cards[0]).toMatchObject({ faceUp: false, masked: true });
       expect(JSON.stringify(privatePreview)).not.toContain(privateId);
       host.send({ type: 'object:drag-preview-stop', payload: { dragId: 1 } });
+
       await peer.read('object:drag-preview-stop');
+
+      const foreignCard = forHost.objects[5]!;
+      const foreignAlias = forPeer.handSlots?.[a.playerId]?.[foreignCard.handIndex!]!;
+      expect(foreignAlias).toMatch(/^anonymous-hand:/);
+      expect(JSON.stringify(forPeer)).not.toContain(foreignCard.id);
+
+      peer.send({ type: 'card:transfer', payload: { cardId: foreignAlias, targetPlayerId: a.playerId, handIndex: 0 } });
+      for (const client of [host, peer]) {
+        const reordered = await client.read('room:state');
+        expect(reordered.handSlots?.[a.playerId]?.[0]).toBe(foreignAlias);
+      }
+      peer.send({ type: 'object:flip', payload: { objectId: foreignAlias } });
+      expect(await host.read('object:flipped')).toMatchObject({ objectId: foreignCard.id, faceUp: false });
+      await host.read('room:state');
+      await peer.read('room:state');
+      expect(peer.queue.some(message => message.type === 'object:flipped')).toBe(false);
+
+      const foreignFrame = { objectId: foreignAlias, x: 1, y: 1, z: 1 };
+      peer.send({ type: 'object:drag-preview', payload: { dragId: 11, phase: 'start', cards: [foreignFrame] } });
+      expect((await host.read('object:drag-preview')).cards[0]).toMatchObject({ objectId: foreignAlias, masked: true, faceUp: false });
+      host.send({ type: 'object:drag-preview', payload: { dragId: 12, phase: 'start', cards: [{ ...foreignFrame, objectId: foreignCard.id }] } });
+      expect((await host.read('error')).code).toBe('OBJECT_LOCKED');
+      peer.send({ type: 'object:drag-end', payload: { ...foreignFrame, dragId: 11, y: 0, faceUp: true } });
+      peer.send({ type: 'object:drag-preview-stop', payload: { dragId: 11 } });
+      for (const client of [host, peer]) {
+        const visible = (await client.read('room:state')).objects.find(card => card.id === foreignCard.id);
+        expect(visible).toMatchObject({ location: 'TABLE', faceUp: false });
+        expect(visible?.cardType).toBeUndefined();
+        expect((await client.read('object:drag-end')).objectId).toBe(foreignCard.id);
+      }
+      await host.read('object:drag-preview-stop');
+      host.send({ type: 'card:transfer', payload: { cardId: foreignCard.id, targetPlayerId: a.playerId } });
+      await host.read('hand:card-transferred');
+      await host.read('room:state');
+      const restored = await peer.read('room:state');
+      expect(restored.handSlots?.[a.playerId]).toHaveLength(6);
+      expect(restored.handSlots?.[a.playerId]).not.toContain(foreignAlias);
 
       host.send({ type: 'card:draw' });
       const drawn = (await host.read('hand:card-drawn')).card;
