@@ -4,6 +4,7 @@
  * Manages Renderer, CameraController, LightingManager, TableObject3D,
  * and the RaycastInteractionManager (M1.3.1).
  */
+import { TableRollEffects } from './TableRollEffects';
 import * as THREE from 'three';
 import { DEMO_TABLE_CARD_ID, DEMO_TABLE_CARD_X, SHARED_CONFIG } from '../../../shared/constants/config';
 
@@ -35,6 +36,7 @@ import { ZONE_VISUAL_CONFIG } from '../objects/TableZonesConfig';
 import { getTableOuterRadius, resolveTableSeatCount, PlayerCount } from '../objects/TableShapeConfig';
 import { getCardTitle } from '../objects/CardTypeHelper';
 import { computePlayerPerspective } from './PlayerPerspectiveHelper';
+import { SEAT_CHANGE } from '@shared/constants/config';
 import { ANONYMOUS_HAND_PREFIX, getAnonymousHandSlotId, type SandboxObject, type PlayerInfo } from '@shared/types/room';
 import {
   INTERACTION_CONFIG,
@@ -62,6 +64,7 @@ interface PendingHandTransfer {
 }
 
 export class SceneManager {
+  readonly tableRollEffects: TableRollEffects;
   private readonly _scene: THREE.Scene;
   private readonly _renderer: Renderer;
   private readonly _cameraController: CameraController;
@@ -175,6 +178,8 @@ export class SceneManager {
     // Initialize 3D Table Surface
     this._table = new TableObject3D();
     this.addObject('table', this._table);
+    this.tableRollEffects = new TableRollEffects(this._table.surfaceY,
+      (id, object) => this.addObject(id, object), id => this.removeObject(id), () => this.requestRender());
 
     // Initialize Centralized Card ID Registry (M1.3.3)
     this._cardRegistry = new CardRegistry();
@@ -1261,7 +1266,63 @@ export class SceneManager {
     }
   }
 
+  applyHandShuffle(order: string[]): void {
+
+    const hand = this.getLocalHandZone();
+    if (!hand) return;
+    const origins = new Map(hand.getCards().map(card => [card.cardId, card.position.clone()]));
+    hand.reorderCards(order);
+    for (const id of order) {
+      const start = origins.get(id);
+      if (start) {
+        start.y += 0.15;
+        this._animateCardFlight(id, undefined, start);
+      }
+    }
+    this.onLocalHandChanged?.();
+    this.requestRender();
+  }
+
+
+  syncTablePile(cardIds: string[]): void {
+    const cards = cardIds.flatMap(id => this._cardRegistry.getCardObject(id) ?? []);
+    if (cards.length < 2) return;
+    const current = this._stackManager.getStackForCard(cardIds[0]!);
+    const existing = current?.getCardIds();
+    if (existing?.length === cardIds.length && existing.every((id, index) => id === cardIds[index])) return;
+    const affected = new Set(cards.flatMap(card => this._stackManager.getStackForCard(card.cardId) ?? []));
+    const transforms = new Map([...cards, ...[...affected].flatMap(stack => stack.getCards())]
+      .map(card => [card, { position: card.position.clone(), quaternion: card.quaternion.clone() }]));
+
+    const wasDiscard = [...affected].some(stack => stack.stackId === this._discardStackId);
+    for (const stack of affected) this._stackManager.dissolveStack(stack.stackId);
+    const stack = this._stackManager.createStack(cards);
+    if (wasDiscard) this._discardStackId = stack.stackId;
+    for (const [card, transform] of transforms) {
+      card.position.copy(transform.position);
+      card.quaternion.copy(transform.quaternion);
+    }
+    this.requestRender();
+  }
+
+  animatePileShuffle(cardIds: string[]): void {
+    const lift = 0.32;
+    cardIds.forEach((id, index) => {
+      const card = this._cardRegistry.getCardObject(id);
+      if (!card || this.isCardTransferAnimating(id)) return;
+      const start = card.position.clone();
+      start.y += lift;
+      start.x += index % 2 ? lift : -lift;
+      this._animateCardFlight(id, undefined, start);
+    });
+  }
+
   animateDeckTake(cardId: string): void {
+    const deck = this.getOriginalDeck();
+    if (deck) this._animateCardFlight(cardId, deck);
+  }
+
+  private _animateCardFlight(cardId: string, source?: THREE.Object3D, start?: THREE.Vector3): void {
     const card = this._cardRegistry.getCardObject(cardId);
     const deck = this.getOriginalDeck();
     if (!card || !deck) return;
@@ -1271,10 +1332,12 @@ export class SceneManager {
       quaternion: card.quaternion.clone(),
       scale: card.scale.clone(),
     };
-    // Badge đã giảm trước khi chạy hiệu ứng, kể cả khi vừa lấy lá cuối.
-    deck.getWorldPosition(card.position);
-    card.position.y += DECK_CONFIG.CARD_THICKNESS;
-    deck.getWorldQuaternion(card.quaternion);
+
+    if (source) {
+      source.getWorldPosition(card.position);
+      card.position.y += DECK_CONFIG.CARD_THICKNESS;
+      source.getWorldQuaternion(card.quaternion);
+    } else if (start) card.position.copy(start);
     this._transferAnimator.start({ card, getTarget: () => target });
   }
 
@@ -1373,6 +1436,7 @@ export class SceneManager {
     this.tableActions.visible = !setup && !spectator;
     if (!resetCards) return;
     this.requestRender();
+    if (this._onlineCardRoomId !== roomId) this.tableRollEffects.clear();
     this._onlineCardRoomId = roomId;
     this.deckViewRow.clear();
     this._spectatorFlipIds.clear();
@@ -1509,7 +1573,20 @@ export class SceneManager {
   }
 
   syncRoomObjects(objects: SandboxObject[], players: PlayerInfo[]): void {
+
     this._playerAreaManager.updateOccupants(players);
+    const migrating = new Map<CardObject3D, CardSlotTransform>();
+    if (this._onlineCardRoomId && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      for (const object of objects) {
+        if (object.location !== 'HAND') continue;
+        const card = this._cardRegistry.getCardObject(object.id);
+        const owner = players.find(player => player.id === object.ownerId);
+        const zone = this._handZoneManager.getHandZoneForPlayer(owner?.playerIndex ?? -1);
+        if (!card?.isInHand() || !zone || card.getOwnerId() !== object.ownerId || card.getHandZoneId() === zone.zoneId ||
+          card.isLayoutControlled() || this.isCardTransferAnimating(card.cardId)) continue;
+        migrating.set(card, { position: card.position.clone(), quaternion: card.quaternion.clone(), scale: card.scale.clone() });
+      }
+    }
     let modified = false;
 
     for (const obj of objects) {
@@ -1622,9 +1699,16 @@ export class SceneManager {
       }
     }
 
-    if (modified) {
-      this.requestRender();
+
+    for (const [card, origin] of migrating) {
+      const zone = this._handZoneManager.getHandZone(card.getHandZoneId()!);
+      if (!zone) continue;
+      card.position.copy(origin.position);
+      card.quaternion.copy(origin.quaternion);
+      card.scale.copy(origin.scale);
+      this._transferAnimator.start({ card, getTarget: () => zone.getCardSlotTransform(card), durationMs: SEAT_CHANGE.animationMs });
     }
+    if (modified) this.requestRender();
   }
 
   syncFlippedCard(cardId: string, faceUp: boolean, cardType?: string, ownerId?: string | null, location?: string, notifyHand = true): void {
@@ -1676,6 +1760,10 @@ export class SceneManager {
 
   getDemoDeck(): DeckObject3D | undefined {
     return this._registeredObjects.get('demo_deck') as DeckObject3D | undefined;
+  }
+
+  getInputCanvas(): HTMLCanvasElement {
+    return this._renderer.getDomElement();
   }
 
   getCameraController(): CameraController {
@@ -2870,10 +2958,10 @@ export class SceneManager {
    * full felt area stays in frame. The camera keeps the Offline table-centre target;
    * only its azimuth changes by seat so the Online P1 framing matches Offline P1.
    */
-  setPlayerPerspective(playerIndex: number, playerCount: PlayerCount, animate = true): void {
+  setPlayerPerspective(playerIndex: number, playerCount: PlayerCount, animate = true, seatTransition = false): void {
     this._activePlayerIndex = playerIndex;
     this._activePlayerCount = playerCount;
-    this.applyLocalPlayerPerspective(animate);
+    this.applyLocalPlayerPerspective(animate, seatTransition);
   }
 
   /**
@@ -2881,7 +2969,7 @@ export class SceneManager {
    * Online entry path and the manual reset share one source of truth.
    * Applies the seated perspective from the current scene state.
    */
-  applyLocalPlayerPerspective(animate = true): void {
+  applyLocalPlayerPerspective(animate = true, seatTransition = false): void {
     const playerIndex = this._activePlayerIndex ?? 0;
     const playerCount = this._activePlayerCount;
     // M1.7.8: a seat change invalidates the old local-hand hover/fan state.
@@ -2893,7 +2981,7 @@ export class SceneManager {
     const cameraAspect = this._renderer.getCamera().aspect;
     const computedCameraRadius = this._cameraController.computeAdaptiveRadius(outerRadius, cameraAspect);
     this._cameraController.setAdaptiveRadius(computedCameraRadius);
-    this._cameraController.setPlayerPerspective(perspective.theta, true, animate);
+    this._cameraController.setPlayerPerspective(perspective.theta, true, animate && seatTransition, SEAT_CHANGE.animationMs);
     const actionAnchor = this._tableZoneManager.getDeckPosition();
     this.tableActions.setAnchor(actionAnchor.x, actionAnchor.z, perspective.theta);
     // Offline starts from the table centre. Preserve that framing online and
@@ -3077,6 +3165,15 @@ export class SceneManager {
    * Sets up mousemove and click listeners for PlayerArea hover/select.
    * Does NOT modify RaycastInteractionManager to avoid breaking Card/Deck interaction.
    */
+
+  describeSeat?: (index: number) => string | undefined;
+  onChooseSeat?: (index: number) => void;
+
+  getSeatAt(event: MouseEvent): number {
+    const area = this.findPlayerAreaAtScreenPos(event);
+    return area ? this._playerAreaManager.getAllAreas().indexOf(area) : -1;
+  }
+
   private _setupPlayerAreaInteraction(): void {
     const domEl = this._renderer.getDomElement();
     const signal = this._playerAreaAbortController.signal;
@@ -3085,12 +3182,18 @@ export class SceneManager {
     const CLICK_THRESHOLD = 5;
 
     domEl.addEventListener('mousemove', (e: MouseEvent) => {
-      if (this._interactionManager.getHoveredObject() !== null) {
+
+      if (this.isLocalHandPreviewOpen?.() || this._dragController.isDragging() || this._interactionManager.getHoveredObject() !== null) {
+        domEl.title = '';
         this._playerAreaManager.hoverArea(null);
         return;
       }
       const area = this.findPlayerAreaAtScreenPos(e);
-      this._playerAreaManager.hoverArea(area ? area.areaId : null);
+
+      const index = area ? this._playerAreaManager.getAllAreas().indexOf(area) : -1;
+      const title = index >= 0 ? this.describeSeat?.(index) : undefined;
+      domEl.title = title ?? '';
+      this._playerAreaManager.hoverArea(area && (title || !this._onlineCardRoomId) ? area.areaId : null);
     }, { signal });
 
     domEl.addEventListener('mousedown', (e: MouseEvent) => {
@@ -3102,9 +3205,15 @@ export class SceneManager {
       const dx = e.clientX - _clickStartX;
       const dy = e.clientY - _clickStartY;
       if (Math.sqrt(dx * dx + dy * dy) > CLICK_THRESHOLD) return;
-      if (this._interactionManager.getHoveredObject() !== null) return;
+
+      if (this.isLocalHandPreviewOpen?.() || this._dragController.isDragging() ||
+        this._interactionManager.getObjectAt(e.clientX, e.clientY) || this.tableActions.hitsAt(e) || this.deckViewRow.hitsAt(e)) return;
 
       const area = this.findPlayerAreaAtScreenPos(e);
+      if (this._onlineCardRoomId) {
+        if (area) this.onChooseSeat?.(this._playerAreaManager.getAllAreas().indexOf(area));
+        return;
+      }
       if (area) {
         this._playerAreaManager.selectArea(area.areaId);
       } else {
@@ -3316,6 +3425,7 @@ export class SceneManager {
     this.isPointOverLocalHandPreview = null;
     this.remoteDragPreview.clear();
     this.deckViewRow.dispose();
+    this.tableRollEffects.dispose();
     this._transferAnimator.dispose();
     this._pendingTransfers.clear();
     this._lastTransferSeq.clear();

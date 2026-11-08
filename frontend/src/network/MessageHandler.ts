@@ -1,6 +1,7 @@
 /**
  * MessageHandler.ts — Dispatches incoming server messages to appropriate handlers
  */
+import type { TableRollEvent } from '@shared/types/tableRoll';
 import type { DeckViewState, DrawHoverUpdatePayload, ServerToClientMessage } from '@shared/types/protocol';
 import type { SandboxObject } from '@shared/types/room';
 import type { ClientStore } from '../store/ClientStore';
@@ -15,7 +16,16 @@ export class MessageHandler {
   public onFlipConfirmed?: (cardId: string) => void;
   public onCardDrawn: ((card: SandboxObject, playerIndex: number) => void) | null = null;
   public onCardTransferred: ((payload: { cardId: string; fromPlayerIndex: number; toPlayerIndex: number; card: SandboxObject; seq?: number }) => void) | null = null;
+  onTableRolled?: (event: TableRollEvent) => void;
   public onDeckView?: (state: DeckViewState | null) => void;
+  onHandShuffled?: (payload: Extract<ServerToClientMessage, { type: 'hand:shuffled' }>['payload']) => void;
+
+  onSeatRequest?: (request: import('@shared/types/protocol').SeatRequest) => void;
+  onSeatResult?: (id: string, message: string) => void;
+  onSeatChanged?: (message: string) => void;
+  onStackFormed?: (payload: Extract<ServerToClientMessage, { type: 'stack:formed' }>['payload']) => void;
+  onGatherEmpty?: (message: string) => void;
+  onStackShuffled?: (payload: Extract<ServerToClientMessage, { type: 'stack:shuffled' }>['payload']) => void;
   public onDeckShuffled?: (playerName: string) => void;
   public onError: ((message: string) => void) | null = null;
   /** M1.7.4: server rejection tied to an object, used to restore optimistic UI. */
@@ -37,8 +47,23 @@ export class MessageHandler {
         this._store.updateRound(msg.payload);
         break;
 
+      case 'table:rolled':
+        this.onTableRolled?.(msg.payload);
+        break;
       case 'deck:view-state':
         this.onDeckView?.(msg.payload);
+        break;
+      case 'hand:shuffled':
+        this.onHandShuffled?.(msg.payload);
+        break;
+      case 'deck:gather-empty':
+        this.onGatherEmpty?.(msg.payload.message);
+        break;
+      case 'stack:formed':
+        this.onStackFormed?.(msg.payload);
+        break;
+      case 'stack:shuffled':
+        this.onStackShuffled?.(msg.payload);
         break;
       case 'deck:shuffled':
         this._store.updateDeckCount(msg.payload.deck.count, undefined, undefined, msg.payload.deck);
@@ -50,6 +75,16 @@ export class MessageHandler {
         break;
       case 'deck:count':
         this._store.updateDeckCount(msg.payload.count, msg.payload.ownerId, msg.payload.handCount, msg.payload.deck, msg.payload.handSlots);
+        break;
+
+      case 'seat:request':
+        this.onSeatRequest?.(msg.payload);
+        break;
+      case 'seat:result':
+        this.onSeatResult?.(msg.payload.id, msg.payload.message);
+        break;
+      case 'seat:changed':
+        this.onSeatChanged?.(msg.payload.message);
         break;
       case 'room:state':
         this._store.updateRoomState(msg.payload);

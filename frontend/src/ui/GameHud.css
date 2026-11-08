@@ -1,0 +1,237 @@
+/* Màu, kích thước và trạng thái chung của lớp điều khiển bàn. */
+#game-screen {
+  --hud-bg: #111827f5;
+  --hud-surface: #1e293b;
+  --hud-hover: #334155;
+  --hud-text: #f1f5f9;
+  --hud-muted: #bac9db;
+  --hud-line: #475569;
+  --hud-accent: #7dd3fc;
+  --hud-selected: #164e63;
+  --hud-local: #553071;
+  --hud-local-text: #f3dfff;
+  --hud-success: #86efac;
+  --hud-warn: #fde68a;
+  --hud-danger: #fecaca;
+  --hud-space: 4px;
+  --hud-gap: 8px;
+  --hud-edge: 12px;
+  --hud-radius: 12px;
+  --hud-control-radius: 7px;
+  --hud-font: 13px;
+  --hud-control: 32px;
+  --hud-shadow: 0 8px 24px #0006;
+  --hud-motion: 150ms;
+  color: var(--hud-text);
+  font: 600 var(--hud-font)/1.35 system-ui, sans-serif;
+}
+
+#game-screen [hidden],
+#game-screen [data-round-hidden] { display: none !important; }
+
+#hud-shell {
+  position: absolute;
+  inset: var(--hud-edge) var(--hud-edge) auto;
+  z-index: 3;
+  display: grid;
+  gap: var(--hud-gap);
+  pointer-events: none;
+}
+
+#hud-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hud-gap);
+  padding: var(--hud-gap);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: var(--hud-bg);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--hud-shadow);
+}
+
+.hud-group, .hud-brand, .hud-badge, #hud-deck-controls,
+#hud-insert-mode-group, .hud-stepper, #hud-deck-position-label {
+  display: flex;
+  align-items: center;
+  gap: var(--hud-space);
+  min-width: 0;
+}
+
+.hud-group { padding-inline-end: var(--hud-gap); border-inline-end: 1px solid var(--hud-line); }
+.hud-identity, .hud-deck { gap: var(--hud-gap); }
+.hud-system { margin-inline-start: auto; padding: 0; border: 0; }
+.hud-brand { gap: var(--hud-gap); white-space: nowrap; }
+#conn-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--hud-muted); }
+#conn-dot[data-state="connected"] { background: var(--hud-success); }
+#conn-dot[data-state="connecting"] { background: var(--hud-warn); }
+#conn-dot[data-state="error"] { background: var(--hud-danger); }
+
+#hud-top button, .hud-control, #hud-deck-view button, #seat-prompts button, #toggle-areas-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hud-space);
+  box-sizing: border-box;
+  min-width: var(--hud-control);
+  min-height: var(--hud-control);
+  padding: var(--hud-space) var(--hud-gap);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-control-radius);
+  background: var(--hud-surface);
+  color: var(--hud-text);
+  font: inherit;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background var(--hud-motion), border-color var(--hud-motion), transform var(--hud-motion);
+}
+
+#game-screen :is(#hud-top, #hud-deck-view, #seat-prompts) button:not(:disabled):hover,
+#game-screen :is(.hud-control, #toggle-areas-btn):hover { background: var(--hud-hover); border-color: var(--hud-accent); }
+#game-screen :is(#hud-top button, #hud-deck-view button, .hud-control, #seat-prompts button, #toggle-areas-btn):active { transform: translateY(1px); }
+#game-screen :is(button, input, summary):focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
+#game-screen :is(#hud-top, #hud-deck-view, #seat-prompts) :disabled { color: #a7b5c7; background: #192332; border-color: #3a495b; cursor: not-allowed; }
+#hud-top button[aria-pressed="true"] { background: var(--hud-selected); border-color: var(--hud-accent); }
+#hud-top #btn-insert-custom[aria-pressed="true"] { background: var(--hud-local); border-color: #d8b4fe; color: var(--hud-local-text); }
+#game-screen summary { list-style: none; }
+#game-screen summary::-webkit-details-marker { display: none; }
+
+.hud-action svg, .hud-badge svg, .hud-control svg { width: 16px; height: 16px; flex: none; }
+.hud-tools .hud-action svg { color: var(--hud-accent); }
+.hud-tools .hud-action:disabled svg { color: inherit; opacity: .65; }
+#game-screen kbd {
+  padding: 0 4px;
+  border: 1px solid var(--hud-line);
+  border-radius: 4px;
+  color: var(--hud-muted);
+  font: 650 12px/1.35 system-ui, sans-serif;
+}
+.hud-badge { gap: var(--hud-space); white-space: nowrap; }
+#hud-room-badge { color: var(--hud-accent); }
+#hud-room-capacity { color: var(--hud-muted); font-variant-numeric: tabular-nums; }
+#hud-player-badge { max-width: 144px; overflow: hidden; text-overflow: ellipsis; color: var(--hud-success); }
+#hud-deck-pill { color: var(--hud-accent); font-variant-numeric: tabular-nums; }
+.hud-field-label { color: var(--hud-muted); white-space: nowrap; }
+#hud-insert-mode-group, .hud-stepper { gap: 2px; }
+#hud-deck-position-label { white-space: nowrap; }
+#hud-shell input {
+  box-sizing: border-box;
+  width: 3ch;
+  min-height: var(--hud-control);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-control-radius);
+  background: var(--hud-surface);
+  color: var(--hud-text);
+  font: inherit;
+  text-align: center;
+  appearance: textfield;
+  pointer-events: auto;
+}
+#hud-shell input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+
+.hud-dock { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--hud-gap); }
+#hud-panels { min-width: 0; }
+#hud-panels #round-setup, #hud-panels #deck-alter-strip { position: static; max-width: 100%; }
+#hud-notifications { width: min(280px, 68vw); max-height: 40vh; }
+#seat-prompts, #hud-roll-notices { display: grid; gap: var(--hud-space); }
+#seat-prompts:not(:empty) { margin-block-end: var(--hud-space); }
+.hud-toast, #hud-game-error, #seat-prompts section, #hud-deck-view, .hud-popover {
+  padding: var(--hud-gap);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  box-shadow: var(--hud-shadow);
+  overflow-wrap: anywhere;
+}
+#hud-game-error { border-color: #b95f69; color: var(--hud-danger); }
+.hud-toast strong { color: var(--hud-accent); font-size: 1.15em; }
+#seat-prompts section { border-color: var(--hud-accent); }
+#seat-prompts p { margin: var(--hud-space) 0; color: var(--hud-muted); }
+#seat-prompts button:first-of-type { background: var(--hud-selected); }
+.seat-countdown { color: var(--hud-warn); }
+#hud-deck-view { justify-self: start; display: flex; align-items: center; flex-wrap: wrap; gap: var(--hud-space); color: var(--hud-warn); }
+
+#hud-system-menu, #player-area-hud, #hud-bottom-hint { position: relative; }
+.hud-popover {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  gap: var(--hud-space);
+}
+#hud-system-menu .hud-popover { inset: calc(100% + var(--hud-gap)) 0 auto auto; min-width: 135px; }
+#hud-system-menu .hud-popover button { justify-content: flex-start; }
+#game-screen #hud-bottom-hint, #game-screen #player-area-hud {
+  position: absolute;
+  z-index: 2;
+  bottom: var(--hud-edge);
+}
+#hud-bottom-hint { left: var(--hud-edge); }
+#player-area-hud { right: var(--hud-edge); }
+#hud-bottom-hint .hud-popover, #player-area-hud .hud-popover { bottom: calc(100% + var(--hud-gap)); }
+#hud-bottom-hint .hud-popover {
+  left: 0;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 24px));
+  max-height: min(50vh, 400px);
+  overflow: auto;
+  pointer-events: auto;
+}
+#hud-bottom-hint dl, #hud-bottom-hint dd { margin: 0; }
+#hud-bottom-hint dt { margin-top: var(--hud-space); color: var(--hud-accent); }
+#hud-bottom-hint dd, #hud-bottom-hint small { color: var(--hud-muted); }
+#player-area-hud .hud-popover { right: 0; }
+#selected-area-label:empty { display: none; }
+
+@media (max-width: 1600px) {
+  .hud-cards .hud-action-label, .hud-field-label { display: none; }
+}
+
+@media (max-width: 1220px) {
+  #conn-text, #hud-top .hud-action kbd { display: none; }
+  #hud-player-badge { max-width: 104px; }
+  .hud-group { gap: var(--hud-space); }
+}
+
+@media (max-width: 850px) {
+  .hud-tools .hud-action-label { display: none; }
+}
+
+@media (max-width: 640px) {
+  #game-screen { --hud-edge: 8px; }
+  #hud-top {
+    display: grid;
+    grid-template-areas: "identity identity system" "deck deck deck" "cards tools tools";
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    justify-items: start;
+    gap: var(--hud-space);
+  }
+  .hud-group { border: 0; padding: 0; }
+  .hud-identity { grid-area: identity; }
+  .hud-deck { grid-area: deck; flex-wrap: wrap; }
+  .hud-system { grid-area: system; justify-self: end; }
+  .hud-cards { grid-area: cards; }
+  .hud-tools { grid-area: tools; justify-self: end; }
+  #hud-top .hud-action { padding-inline: var(--hud-space); }
+  #hud-player-badge { max-width: 110px; }
+  #hud-notifications { width: min(224px, 60vw); }
+  #hud-notifications :is(.hud-toast, #hud-game-error) { padding-block: var(--hud-space); }
+  #seat-prompts section { padding-block: 6px; }
+  #seat-prompts button { min-height: 28px; }
+  .hud-dock:has(#round-setup:not([hidden]), #deck-alter-strip:not([hidden])) { grid-template-columns: minmax(0, 1fr); }
+  .hud-dock #hud-notifications { justify-self: end; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #game-screen { --hud-motion: 0ms; }
+  #game-screen :is(#hud-top button, #hud-deck-view button, .hud-control, #seat-prompts button, #toggle-areas-btn):active { transform: none; }
+}
+.seat-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--hud-space); }
+#seat-prompts [data-direction="outgoing"] { border-color: var(--hud-line); }
+#seat-prompts [data-direction="outgoing"] button { background: var(--hud-surface); }
+.hud-player-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#hud-player-badge[data-host]::before { content: '◆'; color: var(--hud-warn); font-size: 9px; }
+@media (max-width: 640px) {
+  #hud-room-badge svg { display: none; }
+}

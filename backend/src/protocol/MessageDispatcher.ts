@@ -6,6 +6,7 @@ import type { ClientToServerMessage, CursorMovePayload, DragPreviewFrame, Remote
 import type { RoomManager } from '../room/RoomManager.js';
 import type { PlayerSession } from '../player/PlayerSession.js';
 import type { Room } from '../room/Room.js';
+import { SeatRequests } from '../room/SeatRequests.js';
 import { ViewStateBuilder } from '../room/ViewStateBuilder.js';
 import { RoomBroadcaster } from './RoomBroadcaster.js';
 import { MessageValidator } from '../validation/MessageValidator.js';
@@ -30,6 +31,7 @@ function isValidDefaultTableDrop(x: number, y: number, z: number): boolean {
 }
 
 export class MessageDispatcher {
+  private readonly _seats = new SeatRequests((id, message) => this._sessions.get(id)?.sendRaw(message));
   /** Tracks the last drag-move timestamp per sessionId to enforce throttle. */
   private readonly _dragPreviews = new Map<string, { dragId: number; roomId: string; cards: Set<string>; requestedIds: Map<string, string>; anonymousIds: Map<string, string>; lastMove: number; frame?: RemoteDragPreviewFrame }>();
   private readonly _dragMoveTimestamps = new Map<string, number>();
@@ -68,9 +70,26 @@ export class MessageDispatcher {
 
     const room = session.roomId ? this._roomManager.getRoom(session.roomId) : undefined;
 
+
+    if (msg.type === 'seat:choose' || msg.type === 'seat:reply' || msg.type === 'seat:cancel' || msg.type === 'seat:busy') {
+      if (!room) return;
+      try {
+        const message = this._seats.handle(room, sessionId, msg);
+        if (message) {
+          this._broadcastRoomState(room.id);
+          this._broadcastToRoom(room.id, '', { type: 'seat:changed', payload: { message } });
+        }
+      } catch (error) {
+        session.sendError(error instanceof Error ? error.message : 'Không thể đổi ghế.', 'SEAT_UNAVAILABLE');
+      }
+      return;
+    }
+    if (msg.type === 'object:drag-start' || (msg.type === 'object:drag-preview' && msg.payload.phase === 'start')) {
+      this._seats.cancelFor(sessionId, 'Yêu cầu đổi ghế đã hủy vì người chơi đang kéo bài.');
+    }
     const deckView = room?.deckView;
     const requiresUnlockedDeck = msg.type === 'card:draw' || msg.type === 'deck:take'
-      || msg.type === 'deck:insert' || msg.type === 'deck:shuffle'
+      || msg.type === 'deck:insert' || msg.type === 'deck:shuffle' || msg.type === 'deck:gather-bombs'
       || msg.type === 'deck:set-affected-count' || msg.type === 'deck:view-open';
     if (deckView && requiresUnlockedDeck) {
       const message = deckView.viewerName + (deckView.mode === 'alter' ? ' đang xếp bài.' : ' đang xem bài.');
@@ -128,8 +147,27 @@ export class MessageDispatcher {
       case 'deck:view-close':
         this._handleDeckView(room, session, msg);
         break;
+      case 'table:roll': {
+        if (!room) {
+          session.sendError('Hãy vào bàn trước khi tung.', 'TABLE_ROLL_UNAVAILABLE');
+          return;
+        }
+        try {
+          const roll = room.rollTableItem(sessionId, msg.payload.kind);
+          this._broadcastToRoom(room.id, '', { type: 'table:rolled', payload: { roll, sentAt: Date.now() } });
+        } catch (error) {
+          session.sendError(error instanceof Error ? error.message : 'Không thể tung.', 'TABLE_ROLL_UNAVAILABLE');
+        }
+        return;
+      }
+      case 'hand:shuffle':
+      case 'stack:shuffle':
+      case 'stack:form':
+        this._handleTableShuffle(room, session, msg);
+        break;
       case 'deck:insert':
       case 'deck:shuffle':
+      case 'deck:gather-bombs':
       case 'deck:set-affected-count':
         this._handleDeckMutation(session, room, msg);
         break;
@@ -197,6 +235,10 @@ export class MessageDispatcher {
     session.sendRaw({ type: 'room:joined', payload: { roomId: room.id, playerId: sessionId, playerIndex, resumeToken: room.getPlayer(sessionId)?.resumeToken } });
     session.sendRaw({ type: 'room:state', payload: ViewStateBuilder.buildRoomState(room, sessionId) });
     if (room.deckView) this._sendDeckView(room, sessionId);
+    const now = Date.now();
+    for (const roll of room.tableRolls.inProgress(now)) {
+      session.sendRaw({ type: 'table:rolled', payload: { roll, sentAt: now } });
+    }
     for (const preview of this._dragPreviews.values()) {
       if (preview.roomId === room.id && preview.frame && preview.frame.playerId !== sessionId) {
 
@@ -272,6 +314,7 @@ export class MessageDispatcher {
   }
 
   public handleDisconnect(sessionId: string, intentional = false): void {
+    this._seats.disconnect(sessionId);
     const session = this._sessions.get(sessionId);
     if (!session || !session.roomId) return;
     const roomId = session.roomId;
@@ -330,6 +373,7 @@ export class MessageDispatcher {
       }
       if (msg.type === 'round:deal') {
         room.dealRound();
+        for (const id of room.getConnectedSessionIds()) this._seats.cancelFor(id, 'Yêu cầu đổi ghế đã hủy vì đang chia bài.');
       } else {
         const hadView = Boolean(room.deckView);
         room.resetRound();
@@ -364,7 +408,10 @@ export class MessageDispatcher {
     if (!room) return;
     const viewerId = session.sessionId;
     if (msg.type === 'deck:view-open') {
-      if (room.openDeckView(viewerId, msg.payload.mode)) this._broadcastDeckView(room);
+      if (room.openDeckView(viewerId, msg.payload.mode)) {
+        this._seats.cancelFor(viewerId, 'Yêu cầu đổi ghế đã hủy vì người chơi đang xem chồng.');
+        this._broadcastDeckView(room);
+      }
       else session.sendError('Không có lá để mở phiên xem.', 'DECK_VIEW_UNAVAILABLE');
       return;
     }
@@ -388,14 +435,64 @@ export class MessageDispatcher {
     this._broadcastDeckView(room);
   }
 
+
+  private _handleTableShuffle(
+    room: Room | undefined, session: PlayerSession,
+    msg: Extract<ClientToServerMessage, { type: 'hand:shuffle' | 'stack:shuffle' | 'stack:form' }>,
+  ): void {
+    const playerId = session.sessionId;
+    if (!room?.canShuffle(playerId)) {
+      session.sendError('Chỉ người đang chơi mới được thao tác.', 'SHUFFLE_FORBIDDEN');
+      return;
+    }
+    const playerName = room.getPlayer(playerId)!.name;
+    try {
+      if (msg.type === 'hand:shuffle') {
+        if (!room.shuffleHand(playerId)) return;
+        this._broadcastRoomState(room.id);
+        this._broadcastToRoom(room.id, '', { type: 'hand:shuffled', payload: { playerId, playerName, placedIds: [] } });
+      } else if (msg.type === 'stack:form') {
+        room.formTablePile(msg.payload.cardIds);
+        this._broadcastRoomState(room.id);
+        this._broadcastToRoom(room.id, '', { type: 'stack:formed', payload: { anchorId: msg.payload.cardIds[0]! } });
+      } else {
+        const { anchorId } = msg.payload;
+        if (!room.shuffleTablePile(anchorId)) {
+          session.sendError('Chồng cần ít nhất hai lá để xáo.', 'SHUFFLE_UNAVAILABLE');
+          return;
+        }
+        this._broadcastRoomState(room.id);
+        this._broadcastToRoom(room.id, '', { type: 'stack:shuffled', payload: { anchorId, playerName } });
+      }
+    } catch (error) {
+      session.sendError(error instanceof Error ? error.message : 'Không thể xáo bài.', 'SHUFFLE_UNAVAILABLE');
+    }
+  }
+
   private _handleDeckMutation(
     session: PlayerSession,
     room: Room | undefined,
-    msg: Extract<ClientToServerMessage, { type: 'deck:insert' | 'deck:shuffle' | 'deck:set-affected-count' }>,
+    msg: Extract<ClientToServerMessage, { type: 'deck:insert' | 'deck:shuffle' | 'deck:set-affected-count' | 'deck:gather-bombs' }>,
   ): void {
     const id = session.sessionId;
     const player = room?.getPlayer(id);
-    if (room?.phase !== 'PLAYING' || !player?.isConnected || player.spectator) return;
+    if (!room?.canShuffle(id) || !player) return;
+
+
+    if (msg.type === 'deck:gather-bombs') {
+      try {
+        const anchor = room.gatherDeckBombs(id);
+        if (!anchor) {
+          session.sendRaw({ type: 'deck:gather-empty', payload: { message: 'Chồng bốc không có bom thường.' } });
+          return;
+        }
+        this._broadcastRoomState(room.id);
+        this._broadcastToRoom(room.id, '', { type: 'stack:formed', payload: { anchorId: anchor.id, gatheredBy: player.name } });
+      } catch (error) {
+        session.sendError(error instanceof Error ? error.message : 'Không thể gom bom.', 'GATHER_UNAVAILABLE');
+      }
+      return;
+    }
 
     if (msg.type === 'deck:shuffle') {
       if (room.shuffleDeck()) this._broadcastToRoom(room.id, '', {

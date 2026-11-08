@@ -31,7 +31,9 @@ export class ContextMenu {
       border: 1px solid #3d3d5c;
       border-radius: 8px;
       padding: 6px 0;
-      min-width: 180px;
+      min-width: min(180px, calc(100vw - 16px));
+      max-height: calc(100dvh - 16px);
+      overflow-y: auto;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
       user-select: none;
       font-family: inherit;

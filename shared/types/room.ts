@@ -92,6 +92,16 @@ export interface RoomState {
   handSlots?: Record<string, string[]>;
 }
 
+// CardStack căn các lá tại cùng tọa độ ngang. Độ cao xác định lá trên cùng.
+export function cardsAtTablePile(objects: readonly SandboxObject[], anchorId: string): SandboxObject[] {
+  const anchor = objects.find(card => card.id === anchorId && card.type === 'card'
+    && (card.location === 'TABLE' || card.location === 'DISCARD'));
+  if (!anchor) return [];
+  return objects.filter(card => card.type === 'card' && (card.location === 'TABLE' || card.location === 'DISCARD')
+    && card.position.x === anchor.position.x && card.position.z === anchor.position.z)
+    .sort((a, b) => a.position.y - b.position.y);
+}
+
 export interface ObjectPosition {
   id: string;
   position: Vector3Like;

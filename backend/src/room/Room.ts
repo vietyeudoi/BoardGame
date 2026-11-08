@@ -1,9 +1,10 @@
 /**
  * Room.ts — Room state and player management (authoritative)
  */
-import { ANONYMOUS_HAND_PREFIX, DEFAULT_DECK_AFFECTED_COUNT, DEFAULT_DECK_DRAW_END, type PublicDeckState, type DeckDrawEnd, type RoomState, type SandboxObject, type PlayerInfo, type DeckSetup, type RoundSetup } from '../../../shared/types/room.js';
+import { cardsAtTablePile, ANONYMOUS_HAND_PREFIX, DEFAULT_DECK_AFFECTED_COUNT, DEFAULT_DECK_DRAW_END, type PublicDeckState, type DeckDrawEnd, type RoomState, type SandboxObject, type PlayerInfo, type DeckSetup, type RoundSetup } from '../../../shared/types/room.js';
 import type { DeckViewMode, Vector3Like } from '../../../shared/types/protocol.js';
-import { getDefaultSeatPlacement, SHARED_CONFIG } from '../../../shared/constants/config.js';
+import { isRegularBomb } from '../../../shared/constants/cardTypes.js';
+import { getDefaultSeatPlacement, SEAT_CHANGE, SHARED_CONFIG } from '../../../shared/constants/config.js';
 import { IdGenerator } from '../utils/IdGenerator.js';
 import { Logger } from '../utils/Logger.js';
 
@@ -11,8 +12,14 @@ import { buildRoundDeck, DEFAULT_DECK_SETUP, mergeDeckSetup, previewRound, shuff
 
 import { DeckViewSession } from './DeckViewSession.js';
 
+import { TableRolls } from './TableRolls.js';
+import { TABLE_ROLL, type TableRollKind } from '../../../shared/types/tableRoll.js';
+
 const logger = Logger.create('Room');
 const SEAT_CARD_LAYER_HEIGHT = 0.05;
+const SEAT_PILE_CLEARANCE = 3.5;
+const EXTRACTED_BOMBS_FACE_UP = false;
+const SHUFFLE_DECK_AFTER_GATHER = false;
 
 interface PlayerRecord extends PlayerInfo {
   sessionId: string;
@@ -21,6 +28,7 @@ interface PlayerRecord extends PlayerInfo {
 }
 
 export class Room {
+  readonly tableRolls = new TableRolls();
   private readonly _drawHoverPlayers = new Set<string>();
   private readonly _players = new Map<string, PlayerRecord>();
   private readonly _objects = new Map<string, SandboxObject>();
@@ -29,6 +37,7 @@ export class Room {
   private _hostSessionId: string;
   private _phase?: RoundSetup['phase'];
   private _deckSetup = DEFAULT_DECK_SETUP;
+  private _seatDealUntil = 0;
   private _deckView?: DeckViewSession;
   private _deckAffectedCount = DEFAULT_DECK_AFFECTED_COUNT;
   private _deckDrawEnd: DeckDrawEnd = DEFAULT_DECK_DRAW_END;
@@ -46,6 +55,8 @@ export class Room {
     this._phase = initialObjects ? undefined : 'SETUP';
     for (const object of initialObjects ?? []) this._objects.set(object.id, { ...object });
   }
+
+  get maxPlayers(): number { return this._maxPlayers; }
 
   get phase(): RoundSetup['phase'] | undefined { return this._phase; }
 
@@ -67,6 +78,7 @@ export class Room {
     const cards = buildRoundDeck(this._deckSetup, this._seatedPlayers().map(player => player.id), this._doubleDeck);
     for (const card of cards) this._objects.set(card.id, card);
     this._phase = 'PLAYING';
+    this._seatDealUntil = Date.now() + SEAT_CHANGE.dealLockMs;
     this.setDeckAffectedCount(this._deckAffectedCount);
   }
 
@@ -79,6 +91,7 @@ export class Room {
     this._deckDrawEnd = DEFAULT_DECK_DRAW_END;
     this._deckAffectedCount = DEFAULT_DECK_AFFECTED_COUNT;
     this._phase = 'SETUP';
+    this._seatDealUntil = 0;
     for (const [id, player] of this._players) {
       if (player.hasLeft) this._players.delete(id);
     }
@@ -89,6 +102,45 @@ export class Room {
       player.spectator = false;
       player.playerIndex = index;
     }
+  }
+
+
+  seatBlock(playerId: string): string | undefined {
+    if (!this.getPlayer(playerId)?.isConnected) return 'Người chơi đã rời bàn.';
+    if (this._phase === 'PLAYING' && !SEAT_CHANGE.allowDuringPlay) return 'Chỉ đổi ghế ở màn thiết lập.';
+    if (Date.now() < this._seatDealUntil) return 'Đang chia bài, hãy thử lại sau.';
+    if (this._deckView?.viewerId === playerId) return 'Hãy đóng phiên xem hoặc xếp bài trước khi đổi ghế.';
+    if (this._hasSeatDragLock(playerId)) return 'Người chơi đang kéo bài.';
+    return;
+  }
+
+  private _hasSeatDragLock(playerId: string): boolean {
+    for (const id of this._dynamicLocks.values()) if (id === playerId) return true;
+    for (const card of this._objects.values()) if (card.lockedBy && (card.lockedBy === playerId || (card.location === 'HAND' && card.ownerId === playerId))) return true;
+    return false;
+  }
+
+  changeSeat(playerId: string, index: number, expectedPlayerId: string | null): void {
+    const player = this._players.get(playerId);
+    const target = this.getPlayerByIndex(index);
+    if (!player || !Number.isInteger(index) || index < 0 || index >= this._maxPlayers) throw new Error('Ghế không hợp lệ.');
+    if ((target?.id ?? null) !== expectedPlayerId) throw new Error('Ghế đã có người hoặc vừa thay đổi.');
+    const blocked = this.seatBlock(playerId) ?? (target && this.seatBlock(target.id));
+    if (blocked) throw new Error(blocked);
+    if (target && (target.id === playerId || player.spectator)) throw new Error('Không thể đổi với ghế này.');
+    const previousIndex = player.playerIndex ?? -1;
+    if (SEAT_CHANGE.movePlacedCards && previousIndex >= 0) {
+      const previous = getDefaultSeatPlacement(previousIndex);
+      const next = getDefaultSeatPlacement(index);
+      for (const card of this._objects.values()) {
+        if (card.location !== 'TABLE') continue;
+        if (card.position.x === previous.x && card.position.z === previous.z) card.position = { ...card.position, x: next.x, z: next.z };
+        else if (target && card.position.x === next.x && card.position.z === next.z) card.position = { ...card.position, x: previous.x, z: previous.z };
+      }
+    }
+    player.playerIndex = index;
+    player.spectator = false;
+    if (target) target.playerIndex = previousIndex;
   }
 
   private _findFreeSeat(): number {
@@ -286,6 +338,22 @@ export class Room {
 
 
 
+  rollTableItem(sessionId: string, kind: TableRollKind, now = Date.now()) {
+    const player = this._players.get(sessionId);
+    if (!player?.isConnected || player.spectator || this.getPlayerIndex(sessionId) < 0) {
+      throw new Error('Chỉ người đang ngồi ở bàn mới được tung.');
+    }
+    if (TABLE_ROLL.blockDuringOwnDeckView && this._deckView?.viewerId === sessionId) {
+      throw new Error('Hãy đóng phiên See/Alter trước khi tung.');
+    }
+    const obstacles = [...this._objects.values()]
+      .filter(card => card.location === 'TABLE' || card.location === 'DISCARD')
+      .map(card => card.position);
+    return this.tableRolls.start(kind, {
+      playerId: sessionId, playerName: player.name, seat: this.getPlayerIndex(sessionId),
+    }, obstacles, now);
+  }
+
   get deckView(): DeckViewSession | undefined { return this._deckView; }
 
   openDeckView(sessionId: string, mode: DeckViewMode): boolean {
@@ -367,6 +435,96 @@ export class Room {
     return true;
   }
 
+
+  canShuffle(sessionId: string): boolean {
+    const player = this.getPlayer(sessionId);
+    return this._phase === 'PLAYING' && !!player?.isConnected && !player.spectator;
+  }
+
+  shuffleHand(sessionId: string): boolean {
+    const hand = [...this._objects.values()].filter(card => card.location === 'HAND' && card.ownerId === sessionId);
+    if (hand.some(card => card.lockedBy)) throw new Error('Tay bài đang có lá được kéo.');
+    if (hand.length < 2) return false;
+    shuffle(hand).forEach((card, index) => {
+      card.handIndex = index;
+      // Không để mã công khai cho phép theo dõi một lá qua lần xáo.
+      this._handAliases.delete(card);
+    });
+    return true;
+  }
+
+  gatherDeckBombs(sessionId: string): SandboxObject | undefined {
+    if (this._deckView) throw new Error('Cần đóng phiên xem hoặc xếp bài trước khi gom bom.');
+    const deck = this._getDeckCards();
+    const bombs = deck.filter(card => isRegularBomb(card.cardType));
+    if (!bombs.length) return;
+
+    const seat = this._seatCardPlacement(sessionId, true);
+    // Map duyệt từ đáy lên. Đặt theo cùng chiều để giữ thứ tự từ đỉnh xuống.
+    bombs.forEach((card, index) => {
+      this._placeSeatCard(card, seat, index, EXTRACTED_BOMBS_FACE_UP);
+    });
+    if (SHUFFLE_DECK_AFTER_GATHER) this.shuffleDeck();
+    this.setDeckAffectedCount(this._deckAffectedCount);
+    return bombs[0];
+  }
+
+  formTablePile(cardIds: string[]): void {
+    const cards = cardIds.map(id => this._objects.get(id));
+    if (cards.length < 2 || new Set(cards).size !== cards.length || !cards.every((card): card is SandboxObject =>
+      card?.type === 'card' && card.location === 'TABLE' && !card.lockedBy && !card.privateViewerId)) {
+      throw new Error('Chỉ xếp được các lá công khai trên bàn đang rảnh.');
+    }
+    const { x, z } = cards[0]!.position;
+    const existing = cardsAtTablePile([...this._objects.values()], cards[0]!.id);
+    if (existing.some(card => !cards.includes(card))) throw new Error('Hãy chọn cả chồng tại điểm đặt.');
+    cards.forEach((card, index) => { card.position = { x, y: index * SEAT_CARD_LAYER_HEIGHT, z }; });
+  }
+
+  shuffleTablePile(anchorId: string): boolean {
+    const cards = cardsAtTablePile([...this._objects.values()], anchorId);
+    if (cards.length < 2) return false;
+    if (cards.some(card => card.lockedBy || card.privateViewerId)) throw new Error('Chồng bài đang có lá được thao tác.');
+    const positions = cards.map(card => card.position);
+    shuffle(cards).forEach((card, index) => { card.position = positions[index]!; });
+    return true;
+  }
+
+  private _seatCardPlacement(sessionId: string, findEmpty = false) {
+    const seat = getDefaultSeatPlacement(this.getPlayerIndex(sessionId));
+    const table = [...this._objects.values()].filter(card => card.type === 'card'
+      && (card.location === 'TABLE' || card.location === 'DISCARD'));
+    if (findEmpty) {
+      const length = Math.hypot(seat.x, seat.z);
+
+      // Ưu tiên điểm trước ghế, hai bên ghế rồi dịch vào trong, tránh vùng chồng bốc ở tâm.
+      const tangentX = Math.cos(seat.rotationY);
+      const tangentZ = -Math.sin(seat.rotationY);
+      for (let radius = length; radius >= SEAT_PILE_CLEARANCE; radius -= SEAT_PILE_CLEARANCE) {
+        for (const offset of [0, -SEAT_PILE_CLEARANCE, SEAT_PILE_CLEARANCE]) {
+          const x = seat.x * radius / length + tangentX * offset;
+          const z = seat.z * radius / length + tangentZ * offset;
+          if (table.every(card => Math.hypot(card.position.x - x, card.position.z - z) >= SEAT_PILE_CLEARANCE)) {
+            return { ...seat, x, z, y: 0 };
+          }
+        }
+      }
+      throw new Error('Không còn chỗ trống trước ghế để đặt chồng bom.');
+    }
+    let y = 0;
+    for (const card of table) {
+      if (card.position.x === seat.x && card.position.z === seat.z) y = Math.max(y, card.position.y + SEAT_CARD_LAYER_HEIGHT);
+    }
+    return { ...seat, y };
+  }
+
+  private _placeSeatCard(card: SandboxObject, seat: ReturnType<Room['_seatCardPlacement']>, layer: number, faceUp: boolean): void {
+    card.location = 'TABLE';
+    card.position = { x: seat.x, y: seat.y + layer * SEAT_CARD_LAYER_HEIGHT, z: seat.z };
+    card.rotation = seat.rotationY;
+    card.faceUp = faceUp;
+  }
+
   takeDeckCard(sessionId: string, cardsAbove?: number): SandboxObject | undefined {
     const cards = this._getDeckCards();
     const index = cardsAbove === undefined && this._deckDrawEnd === 'BOTTOM'
@@ -375,19 +533,7 @@ export class Room {
     const card = cards[index];
     if (!card) return;
 
-    const { x, z, rotationY } = getDefaultSeatPlacement(this.getPlayerIndex(sessionId));
-    let y = 0;
-    for (const other of this._objects.values()) {
-      if (other.type === 'card' && other.location === 'TABLE' && other.position.x === x && other.position.z === z) {
-        y = Math.max(y, other.position.y + SEAT_CARD_LAYER_HEIGHT);
-      }
-    }
-
-    // Chọn và chuyển lá trong cùng lượt xử lý, trước khi gửi cho các máy.
-    card.location = 'TABLE';
-    card.position = { x, y, z };
-    card.rotation = rotationY;
-    card.faceUp = false;
+    this._placeSeatCard(card, this._seatCardPlacement(sessionId), 0, false);
     card.takenFromDeck = true;
     this.setDeckAffectedCount(this._deckAffectedCount);
     return card;

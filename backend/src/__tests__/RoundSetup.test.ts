@@ -452,7 +452,21 @@ describe('Bộ bài gốc và chia bài', () => {
       const zombieRound = await guest.read('room:state');
       expect(zombieRound.round).toMatchObject({ basePackId: 'zombie', phase: 'PLAYING' });
       expect(zombieRound.objects).toHaveLength(6);
+
       expect(zombieRound.objects.filter(card => card.cardType === CardType.ZombieKitten)).toHaveLength(1);
+      host.send({ type: 'deck:gather-bombs' });
+      guest.send({ type: 'deck:gather-bombs' });
+      const formed = await guest.read('stack:formed');
+      expect(formed.gatheredBy).toBeTruthy();
+      expect(Object.keys(formed).sort()).toEqual(['anchorId', 'gatheredBy']);
+      const gathered = await guest.read('room:state');
+      expect(gathered.deckCount).toBe(zombieRound.deckCount! - 5);
+      const bombs = gathered.objects.filter(card => card.location === 'TABLE');
+      expect(bombs).toHaveLength(5);
+      expect(new Set(bombs.map(card => card.id)).size).toBe(5);
+      expect(bombs.every(card => !card.faceUp && !card.cardType)).toBe(true);
+      await expect.poll(() => [host, guest].filter(client =>
+        client.queue.some(event => event.type === 'deck:gather-empty')).length).toBe(1);
       host.send({ type: 'round:reset' });
       expect((await guest.read('room:state')).round).toMatchObject({ basePackId: 'zombie', phase: 'SETUP', rescueCount: 8 });
     } finally {

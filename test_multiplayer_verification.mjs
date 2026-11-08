@@ -32,6 +32,11 @@ async function clickDeck(client) {
 }
 
 
+
+async function rightClickTable(client, point) {
+  await client.evaluate("window.__app._sceneManager._renderer.getDomElement().dispatchEvent(new MouseEvent('contextmenu', { bubbles:true, cancelable:true, button:2, clientX:" + point.x + ", clientY:" + point.y + " }))");
+}
+
 function projectWorld(client, worldExpression) {
   return client.evaluate(`(() => {
     const scene = window.__app._sceneManager;
@@ -390,6 +395,14 @@ async function run() {
       else assert.ok(hidden >= 2);
     }
 
+
+
+    await clientB.evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key:'g' }))");
+    await waitFor(clientB, "document.querySelector('#hud-game-error').textContent.includes('Alice đang xem bài')");
+    const bobDeck = await projectWorld(clientB, 'scene.getOriginalDeck().position');
+    await rightClickTable(clientB, bobDeck);
+    await clientB.evaluate("Array.from(document.querySelectorAll('#tabletop-context-menu > div')).find(item => item.textContent === 'Xáo').click()");
+    await waitFor(clientB, "document.querySelector('#hud-game-error').textContent.includes('Alice đang xem bài')");
     await clientB.evaluate("(() => { const input = document.querySelector('#hud-affected-count'); input.value = '1'; input.dispatchEvent(new Event('change')); })()");
     await waitFor(clientB, "document.querySelector('#hud-game-error').textContent.includes('Alice đang xem bài')");
     assert.equal(await clientB.evaluate("document.querySelector('#hud-affected-count').value"), '3');
@@ -437,12 +450,79 @@ async function run() {
       assert.equal(tableCard?.cardType, undefined);
     }
 
+
+    await clientB.evaluate("document.querySelector('#btn-shuffle-hand').click()");
+
+    await waitFor(clientA, "document.querySelector('#hud-deck-status').textContent.includes('Bob vừa xáo tay')");
+    await clientA.evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key:'s' }))");
+    await waitFor(clientB, "document.querySelector('#hud-deck-status').textContent.includes('Alice vừa xáo tay')");
+    const beforeTake = await clientA.evaluate("window.__app._store.getRoomState().deckCount");
+    const beforeTable = await clientA.evaluate("window.__app._store.getRoomState().objects.filter(card => card.location === 'TABLE').map(card => card.id)");
+    for (let i = 1; i <= 2; i++) {
+      await clickDeck(clientA);
+      await waitFor(clientA, 'window.__app._store.getRoomState().deckCount === ' + (beforeTake - i));
+    }
+    await waitFor(clientA, 'window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
+    const picked = await clientA.evaluate("window.__app._store.getRoomState().objects.filter(card => card.location === 'TABLE' && !" + JSON.stringify(beforeTable) + ".includes(card.id)).map(card => card.id)");
+    assert.equal(picked.length, 2);
+    await clientA.evaluate("window.__app._networkClient.send({ type:'object:move', payload:{ objectId:" + JSON.stringify(picked[0]) + ", position:{ x:-6,y:0,z:-2 }, rotation:0 } })");
+    await clientA.evaluate("(() => { const scene = window.__app._sceneManager; scene.getInteractionManager().selectObjects(" + JSON.stringify(picked) + ".map(id => scene.getObject(id))); document.querySelector('#btn-stack-cards').click(); })()");
+    await waitFor(clientB, 'Boolean(window.__app._sceneManager.getStackManager().getStackForCard(' + JSON.stringify(picked[0]) + '))');
+    const stackPoint = await projectWorld(clientA, 'scene.getObject(' + JSON.stringify(picked[1]) + ').position');
+    await rightClickTable(clientA, stackPoint);
+    await clientA.evaluate("Array.from(document.querySelectorAll('#tabletop-context-menu > div')).find(item => item.textContent === 'Xáo chồng').click()");
+    await waitFor(clientC, "document.querySelector('#hud-deck-status').textContent.includes('Alice vừa xáo chồng bài')");
+
+    await clientA.evaluate("document.querySelector('#btn-gather-bombs').click()");
+    await waitFor(clientA, "document.querySelector('#hud-deck-status').textContent.includes('Alice vừa gom') || document.querySelector('#hud-deck-status').textContent.includes('không có bom')");
+    const gatheredDeck = await clientA.evaluate("window.__app._store.getRoomState().deckCount");
+    for (const client of deckViewClients) await waitFor(client, 'window.__app._store.getRoomState().deckCount === ' + gatheredDeck);
+
+    await waitFor(clientA, 'window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
+    const seatHand = await clientA.evaluate("window.__app._store.getRoomState().objects.filter(card => card.location === 'HAND').map(card => [card.id, card.handIndex, card.faceUp])");
+    async function clickSeat(client, index) {
+      const point = await client.evaluate(`(() => {
+        const scene = window.__app._sceneManager;
+        const canvas = scene.getInputCanvas();
+        const rect = canvas.getBoundingClientRect();
+        const camera = scene.getCameraController().getCamera();
+        const area = scene.getPlayerAreaManager().getAllAreas()[${index}];
+        const pos = area.position.clone().project(camera);
+        const center = { x: rect.left + (pos.x + 1) * rect.width / 2, y: rect.top + (1 - pos.y) * rect.height / 2 };
+        for (let dy = -70; dy <= 70; dy += 5) {
+          for (let dx = -130; dx <= 130; dx += 5) {
+            const x = center.x + dx, y = center.y + dy;
+            const event = new MouseEvent('mousemove', {clientX:x, clientY:y});
+            if (document.elementFromPoint(x, y) === canvas && scene.getSeatAt(event) === ${index} &&
+                !scene.getInteractionManager().getObjectAt(x, y) && !scene.tableActions.hitsAt(event)) return {x,y};
+          }
+        }
+        return null;
+      })()`);
+      assert.ok(point, 'Có vùng bấm cho ghế ' + index);
+      await client.mouseMove(point.x, point.y);
+      // Fan chỉ nhả tương tác bàn sau khi trỏ đã rời tay và hết thời gian đóng.
+      await waitFor(client, '!window.__app._fullHandFanPreviewUI.isOpen()');
+      await client.mouseClick(point.x, point.y);
+    }
+    await clickSeat(clientA, 5);
+    await waitFor(clientA, 'window.__app._store.getPlayerIndex() === 5');
+    await sleep(600);
+    await clickSeat(clientA, 1);
+    await waitFor(clientB, "document.querySelector('#seat-prompts').textContent.includes('Alice muốn đổi chỗ')");
+    await clientB.evaluate("Array.from(document.querySelectorAll('#seat-prompts button')).find(button => button.textContent === 'Đồng ý').click()");
+    await waitFor(clientA, 'window.__app._store.getPlayerIndex() === 1');
+    await waitFor(clientB, 'window.__app._store.getPlayerIndex() === 5');
+    await waitFor(clientC, "document.querySelector('#hud-roll-notices').textContent.includes('Alice và Bob đã đổi chỗ')");
+
+    assert.deepEqual(await clientA.evaluate("window.__app._store.getRoomState().objects.filter(card => card.location === 'HAND').map(card => [card.id, card.handIndex, card.faceUp])"), seatHand);
     await clientA.evaluate("document.querySelector('#btn-round-reset').click()");
     for (const client of [clientA, clientB]) {
       await waitFor(client, "window.__app._store.getRoomState().round.phase === 'SETUP'");
       assert.equal(await client.evaluate("window.__app._sceneManager.getAllCards().length"), 0);
       assert.equal(await client.evaluate("window.__app._sceneManager.getOriginalDeck().visible"), false);
     }
+
     console.log('--- Multiplayer Verification Completed Successfully! ---');
   } catch (err) {
     console.error('[Test Error]:', err);

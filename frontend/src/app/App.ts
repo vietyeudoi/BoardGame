@@ -3,8 +3,10 @@
  * Coordinates: SceneManager, UIManager, NetworkClient
  */
 import type { DeckViewState } from '@shared/types/protocol';
-import { DEFAULT_DECK_DRAW_END } from '@shared/types/room';
+import { cardsAtTablePile, DEFAULT_DECK_DRAW_END } from '@shared/types/room';
+import { TABLE_ROLL, tableRollLabel, type TableRollKind } from '@shared/types/tableRoll';
 import { SceneManager } from '../scene/SceneManager';
+import { SeatPrompt } from '../ui/components/SeatPrompt';
 import { UIManager } from '../ui/UIManager';
 import { ContextMenu } from '../ui/ContextMenu';
 import { InsertionModal } from '../ui/components/InsertionModal';
@@ -12,7 +14,9 @@ import { PlayerAreaHUD } from '../ui/PlayerAreaHUD';
 import { NetworkClient } from '../network/NetworkClient';
 import { MessageHandler } from '../network/MessageHandler';
 import { ClientStore } from '../store/ClientStore';
+import type { DeckObject3D } from '../objects/DeckObject3D';
 import { CardObject3D } from '../objects/CardObject3D';
+import { MarqueeSelection, ScreenBoundsProjector, overlaps } from '../interaction/MarqueeSelection';
 import { HoverExpansionController } from '../interaction/HoverExpansionController';
 import { FullHandFanPreviewUI } from '../ui/components/FullHandFanPreviewUI';
 import type { FanCardData } from '../ui/components/FullHandFanPreviewUI';
@@ -27,6 +31,7 @@ import { Logger } from '../utils/Logger';
 const logger = Logger.create('App');
 
 export class App {
+  private _rollCooldownTimer?: ReturnType<typeof setTimeout>;
   private readonly _sceneManager: SceneManager;
   private readonly _uiManager: UIManager;
   private readonly _contextMenu: ContextMenu;
@@ -36,6 +41,8 @@ export class App {
   private readonly _messageHandler: MessageHandler;
   private readonly _store: ClientStore;
   private readonly _hoverExpansionController: HoverExpansionController;
+  private readonly _seatPrompt: SeatPrompt;
+  private readonly _marquee: MarqueeSelection<CardObject3D | DeckObject3D>;
   private readonly _fullHandFanPreviewUI: FullHandFanPreviewUI;
   private readonly _remoteCursorManager: RemoteCursorManager;
   private readonly _cursorPointerListeners = new AbortController();
@@ -173,7 +180,93 @@ export class App {
     };
 
     // M1.7.8: screen-space Full Hand Fan Preview (overlay only, 3D hand untouched)
+
+
     this._fullHandFanPreviewUI = new FullHandFanPreviewUI(uiContainer);
+    this._seatPrompt = new SeatPrompt(this._uiManager.getGameOverlay().querySelector<HTMLElement>('#hud-notifications')!);
+    this._seatPrompt.onAction = (id, accept) => {
+      if (accept === undefined) this._networkClient.send({ type: 'seat:cancel', payload: { id } });
+      else this._networkClient.send({ type: 'seat:reply', payload: { id, accept } });
+    };
+    this._messageHandler.onSeatRequest = request => {
+      const local = this._store.getPlayerId();
+      if (local) this._seatPrompt.show(request, local);
+    };
+    this._messageHandler.onSeatResult = (id, message) => {
+      this._seatPrompt.remove(id);
+      this._uiManager.showError(message);
+    };
+    this._messageHandler.onSeatChanged = message => this._uiManager.showInfo(message);
+    this._sceneManager.describeSeat = index => {
+      const room = this._store.getRoomState();
+      const local = room?.players.find(player => player.id === this._store.getPlayerId());
+      if (!room || !local || index === local.playerIndex) return;
+      const target = room.players.find(player => player.playerIndex === index);
+      if (!target) return 'Ngồi vào đây';
+      if (!local.spectator && target.isConnected) return 'Đổi chỗ với ' + target.name;
+    };
+    this._sceneManager.onChooseSeat = index => {
+      if (!this._sceneManager.describeSeat?.(index)) return;
+      const target = this._store.getRoomState()?.players.find(player => player.playerIndex === index);
+      this._networkClient.send({ type: 'seat:choose', payload: { index, expectedPlayerId: target?.id ?? null } });
+    };
+    const scene = this._sceneManager;
+    const interaction = scene.getInteractionManager();
+    const projector = new ScreenBoundsProjector();
+    const projected = { left: 0, top: 0, right: 0, bottom: 0 };
+    const canSelect = (card: CardObject3D): boolean =>
+      card.visible && !card.isDisposed() && (!card.isInHand() || scene.isLocalHandCard(card)) &&
+      (dragCtrl.canDragCard?.(card) ?? true);
+    this._marquee = new MarqueeSelection(_container, event => {
+      if (this._uiManager.getCurrentScreen() !== 'game' || scene.isRoundSpectator || dragCtrl.isDragging() ||
+        this._store.getRoomState()?.round?.phase === 'SETUP' || !(event.target instanceof Element)) return;
+      if (this._fullHandFanPreviewUI.isOpen()) {
+        const root = event.target.closest('.fhfp-root');
+        if (!root || event.target.closest('.fhfp-card, .fhfp-pager, button')) return;
+        const tiles = this._fullHandFanPreviewUI.getCardElements().flatMap(el => {
+          const card = scene.getObject(el.dataset.fanCardId ?? '');
+          return card instanceof CardObject3D ? [{ card, bounds: el.getBoundingClientRect() }] : [];
+        });
+        scene.setLocalHandFanDragActive(true);
+        return {
+          scope: root.getBoundingClientRect(),
+          hit: (bounds, hits) => {
+            for (const tile of tiles) if (canSelect(tile.card) && overlaps(bounds, tile.bounds)) hits.push(tile.card);
+          },
+          finish: () => scene.setLocalHandFanDragActive(false),
+        };
+      }
+      const canvas = scene.getInputCanvas();
+      const { clientX, clientY } = event;
+      if (event.target !== canvas || !scene.getTableIntersectionAtScreenPos(clientX, clientY) ||
+        interaction.getObjectAt(clientX, clientY) || scene.tableActions.hitsAt(event) || scene.deckViewRow.hitsAt(event) ||
+        scene.describeSeat?.(scene.getSeatAt(event))) return;
+      const scope = canvas.getBoundingClientRect();
+      const candidates = scene.getAllCards();
+      return {
+        scope,
+
+        hit: (bounds, hits) => {
+          projector.begin(scene.getCameraController().getCamera(), scope);
+          for (const card of candidates) {
+            if (!canSelect(card)) continue;
+            const mesh = card.getMesh();
+            if (mesh.visible && projector.project(mesh, projected) && overlaps(bounds, projected)) hits.push(card);
+          }
+        },
+      };
+    }, () => interaction.getSelectedObjects(), items => interaction.selectObjects(items));
+
+    this._marquee.onActiveChange = active => {
+      if (this._store.getRoomId()) this._networkClient.send({ type: 'seat:busy', payload: { active } });
+    };
+    const updateSelection = interaction.onSelectionChanged;
+    interaction.onSelectionChanged = () => {
+      updateSelection?.();
+      const selected = interaction.getSelectedCards();
+      this._marquee.showCount(selected.length);
+      this._fullHandFanPreviewUI.setSelectedSourceIds(selected.map(card => card.cardId));
+    };
 
     // M1.7.9 Part B: fan interactions delegate to the REAL card pipeline
     // (hover / select / drag) — no gameplay copy of the fan is created.
@@ -321,7 +414,7 @@ export class App {
     };
 
     // M1.4.0: Player Area HUD
-    this._playerAreaHUD = new PlayerAreaHUD(_container);
+    this._playerAreaHUD = new PlayerAreaHUD(this._uiManager.getGameOverlay());
     this._playerAreaHUD.onToggleVisibility = () => {
       this._sceneManager.togglePlayerAreas();
     };
@@ -330,6 +423,42 @@ export class App {
 
 
     let activeDeckView: DeckViewState | null = null;
+    let rollCooldownUntil = 0;
+    const rollDisabledReason = (): string | undefined => {
+      const localId = this._store.getPlayerId();
+      const player = this._store.getRoomState()?.players.find(entry => entry.id === localId);
+      if (this._store.getRoomId() === null || !player?.isConnected || player.spectator ||
+        (player.playerIndex ?? this._store.getPlayerIndex()) < 0) return 'Chỉ người đang ngồi ở bàn mới được tung';
+      if (performance.now() < rollCooldownUntil) return 'Chờ một chút trước khi tung tiếp';
+      if (TABLE_ROLL.blockDuringOwnDeckView && activeDeckView?.viewerId === localId) return 'Đóng See/Alter để tung';
+    };
+    const updateRollActions = (): void => {
+      const reason = rollDisabledReason();
+      this._uiManager.updateTableRollActions(!reason, reason);
+    };
+    const setRollCooldown = (ms: number): void => {
+      clearTimeout(this._rollCooldownTimer);
+      rollCooldownUntil = performance.now() + ms;
+      updateRollActions();
+      if (ms > 0) this._rollCooldownTimer = setTimeout(updateRollActions, ms + 1);
+    };
+    const requestRoll = (kind: TableRollKind): void => {
+      if (rollDisabledReason()) return;
+      setRollCooldown(TABLE_ROLL.cooldownMs);
+      this._networkClient.send({ type: 'table:roll', payload: { kind } });
+    };
+    this._uiManager.onTableRoll = requestRoll;
+    this._messageHandler.onTableRolled = event => {
+      if (!this._store.getRoomId()) return;
+      const { roll, sentAt } = event;
+      if (roll.playerId === this._store.getPlayerId()) {
+        setRollCooldown(Math.max(0, TABLE_ROLL.cooldownMs - (sentAt - roll.startedAt)));
+      }
+      this._sceneManager.tableRollEffects.show(event, () => {
+        const item = roll.kind === 'dice' ? 'xúc xắc' : 'đồng xu';
+        this._uiManager.showTableRollNotice(roll.playerName + ' tung ' + item + ': ' + tableRollLabel(roll));
+      });
+    };
     let pendingViewOrder: number[] | undefined;
     const applyDeckView = (view: DeckViewState | null): void => {
       activeDeckView = view;
@@ -337,6 +466,7 @@ export class App {
       const localId = this._store.getPlayerId();
       this._sceneManager.syncDeckView(view, localId);
       this._uiManager.updateDeckView(view, localId);
+      updateRollActions();
     };
     const submitViewOrder = (order: number[]): void => {
       if (!activeDeckView || pendingViewOrder || activeDeckView.viewerId !== this._store.getPlayerId()) return;
@@ -368,6 +498,7 @@ export class App {
       this._store.setConnectionStatus(status);
       if (status !== "connected") {
         applyDeckView(null);
+        this._seatPrompt.clear();
         this._sceneManager.tableActions.clearRemoteHover();
         this._sceneManager.remoteDragPreview.clear();
       }
@@ -454,9 +585,11 @@ export class App {
     this._uiManager.onToLobbyRequested = () => {
       customDrawRoomId = null;
       applyDeckView(null);
+      this._seatPrompt.clear();
       if (this._store.getRoomId()) {
         this._networkClient.send({ type: 'room:leave' });
         this._store.clearRoom();
+        setRollCooldown(0);
         this._sceneManager.setCardRoom(null);
         this._uiManager.updateRound(undefined, false);
         this._uiManager.updateDeckControls();
@@ -498,8 +631,64 @@ export class App {
       this._sceneManager.rotateSelectedCards(1);
     };
 
-    this._uiManager.onStackCardsRequested = () => {
-      this._sceneManager.stackSelectedCards();
+
+    const requestStack = (): void => {
+      if (this._store.getRoomState()?.round?.phase !== 'PLAYING') {
+        this._sceneManager.stackSelectedCards();
+        return;
+      }
+      const cardIds = this._sceneManager.getInteractionManager().getSelectedCards()
+        .filter(card => !card.isInHand()).map(card => card.cardId);
+      if (cardIds.length >= 2) this._networkClient.send({ type: 'stack:form', payload: { cardIds } });
+    };
+    this._uiManager.onStackCardsRequested = requestStack;
+
+    const canShuffleHand = (): boolean => {
+      const room = this._store.getRoomState();
+      const hand = room?.objects.filter(card => card.location === 'HAND' && card.ownerId === this._store.getPlayerId()) ?? [];
+      return room?.round?.phase === 'PLAYING' && !this._sceneManager.isRoundSpectator
+        && hand.length >= 2;
+    };
+    const requestHandShuffle = (): void => {
+      if (canShuffleHand()) this._networkClient.send({ type: 'hand:shuffle' });
+    };
+    this._uiManager.onShuffleHand = requestHandShuffle;
+
+    const requestGatherBombs = (): void => {
+      const room = this._store.getRoomState();
+      if (room?.round?.phase === 'PLAYING' && !this._sceneManager.isRoundSpectator && (room.deckCount ?? 0) > 0) {
+        this._networkClient.send({ type: 'deck:gather-bombs' });
+      }
+    };
+    this._uiManager.onGatherBombs = requestGatherBombs;
+    this._messageHandler.onGatherEmpty = message => this._uiManager.showShuffleNotice(message);
+    this._messageHandler.onHandShuffled = ({ playerId, playerName }) => {
+      const room = this._store.getRoomState();
+      if (!room) return;
+      if (playerId === this._store.getPlayerId()) {
+        const order = room.objects.filter(card => card.location === 'HAND' && card.ownerId === playerId)
+          .sort((a, b) => (a.handIndex ?? 0) - (b.handIndex ?? 0)).map(card => card.id);
+        this._sceneManager.applyHandShuffle(order);
+      }
+      this._uiManager.showShuffleNotice(playerName + ' vừa xáo tay');
+    };
+
+    const pileIds = (anchorId: string): string[] =>
+      cardsAtTablePile(this._store.getRoomState()?.objects ?? [], anchorId).map(card => card.id);
+
+    this._messageHandler.onStackFormed = ({ anchorId, gatheredBy }) => {
+      const ids = pileIds(anchorId);
+      this._sceneManager.syncTablePile(ids);
+      if (gatheredBy !== undefined) {
+        for (const id of ids) this._sceneManager.animateDeckTake(id);
+        this._uiManager.showShuffleNotice(gatheredBy + ' vừa gom ' + ids.length + ' lá bom');
+      }
+    };
+    this._messageHandler.onStackShuffled = ({ anchorId, playerName }) => {
+      const ids = pileIds(anchorId);
+      this._sceneManager.syncTablePile(ids);
+      this._sceneManager.animatePileShuffle(ids);
+      this._uiManager.showShuffleNotice(playerName + ' vừa xáo chồng bài');
     };
 
 
@@ -649,7 +838,8 @@ export class App {
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
+        e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
       ) {
         return;
       }
@@ -666,6 +856,12 @@ export class App {
           const dir = e.shiftKey ? -1 : 1;
           this._sceneManager.rotateSelectedCards(dir);
         }
+      } else if (key === 's' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        requestHandShuffle();
+      } else if (key === 'g' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        requestGatherBombs();
+      } else if ((key === 'd' || key === 'c') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        requestRoll(key === 'd' ? 'dice' : 'coin');
       } else if (key === 'h') {
         performDrawToHand();
       }
@@ -676,9 +872,28 @@ export class App {
       if (this._uiManager.getCurrentScreen() !== 'game') return;
 
       const fanCardId = e.target instanceof Element ? e.target.closest<HTMLElement>(".fhfp-card")?.dataset.fanCardId : undefined;
-      const hovered = fanCardId ? this._sceneManager.getObject(fanCardId) : this._sceneManager.getInteractionManager().getHoveredObject();
-      if (hovered && hovered instanceof CardObject3D && !hovered.isDisposed()) {
+
+      if (this._fullHandFanPreviewUI.isOpen() && !fanCardId) {
         e.preventDefault();
+        return;
+      }
+      if (!fanCardId && !(e.target instanceof HTMLCanvasElement)) return;
+      const hovered = fanCardId ? this._sceneManager.getObject(fanCardId)
+        : this._sceneManager.getInteractionManager().getObjectAt(e.clientX, e.clientY);
+      const room = this._store.getRoomState();
+      const canShufflePile = room?.round?.phase === 'PLAYING' && !this._sceneManager.isRoundSpectator;
+      const hitDeck = this._sceneManager.getOriginalDeck();
+      if (canShufflePile && hitDeck && hovered === hitDeck && hitDeck.getCount() >= 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._contextMenu.show(e.clientX, e.clientY, [{
+          label: 'Xáo', action: () => this._networkClient.send({ type: 'deck:shuffle' }),
+        }]);
+        return;
+      }
+      if (hovered instanceof CardObject3D && !hovered.isDisposed()) {
+        e.preventDefault();
+        e.stopPropagation();
 
         // Ensure the hovered card is selected (so actions apply to it)
         if (!this._sceneManager.getInteractionManager().isSelected(hovered)) {
@@ -705,7 +920,11 @@ export class App {
           stackObj !== null &&
           stackObj.getCards().every((c) => selectedCards.some((s) => s.cardId === c.cardId));
 
+
+        const publicPile = canShufflePile && !fanCardId ? cardsAtTablePile(room.objects, hovered.cardId) : [];
         this._contextMenu.show(e.clientX, e.clientY, [
+          ...(publicPile.length >= 2 ? [{ label: 'Xáo chồng', action: () =>
+            this._networkClient.send({ type: 'stack:shuffle', payload: { anchorId: hovered.cardId } }) }] : []),
           {
             label: 'Lật bài',
             icon: '🎴',
@@ -738,7 +957,7 @@ export class App {
             label: 'Xếp chồng bài',
             icon: '📦',
             disabled: selectedCards.length < 2,
-            action: () => this._sceneManager.stackSelectedCards(),
+            action: requestStack,
           },
           {
             label: 'Rút bài trên cùng',
@@ -867,6 +1086,7 @@ export class App {
     });
 
     let setupRoomId: string | null = null;
+    let lastDrawSetting: { roomId: string; end: 'TOP' | 'BOTTOM' } | undefined;
     // Subscribe to room state changes to show game screen when room is joined
     this._store.subscribe(() => {
       const roomId = this._store.getRoomId();
@@ -890,7 +1110,17 @@ export class App {
           this._sceneManager.tableActions.clearRemoteHover();
         }
         this._uiManager.updateRound(roomState.round, localPlayer.isHost, localPlayer.spectator);
+        updateRollActions();
+
+        const showHandActions = roomState.round?.phase === 'PLAYING' && !localPlayer.spectator;
+        this._uiManager.updateHandShuffle(showHandActions, canShuffleHand());
+        this._uiManager.updateGatherBombs(showHandActions, (roomState.deckCount ?? 0) > 0);
         const drawEnd = roomState.deckDrawEnd ?? DEFAULT_DECK_DRAW_END;
+        // Gói trạng thái hiện có chỉ mang chế độ chung, không mang tên người đã đổi.
+        if (!setup && lastDrawSetting?.roomId === roomId && lastDrawSetting.end !== drawEnd) {
+          this._uiManager.showDrawEndNotice(drawEnd);
+        }
+        lastDrawSetting = { roomId, end: drawEnd };
         if (customDrawRoomId !== roomId && this._sceneManager.getInsertionMode() !== drawEnd) {
           applyInsertionMode(drawEnd);
         }
@@ -912,11 +1142,16 @@ export class App {
         // centralised perspective application — guarantees the Online entry view is
         // correct from the first frame without waiting for a manual Reset Camera.
         const cameraKey = `${roomId}|${playerIndex}|${safeCount}`;
+
         const cameraKeyChanged = cameraKey !== this._lastConfiguredCameraKey;
+        const seatTransition = cameraKeyChanged && !countChanged && this._lastConfiguredCameraKey?.startsWith(roomId + '|');
+        const oldHandOrder = seatTransition ? this._sceneManager.getLocalHandCards().map(card => card.cardId) : [];
         if (cameraKeyChanged) {
           this._lastConfiguredPlayerCount = safeCount;
           this._lastConfiguredCameraKey = cameraKey;
-          this._sceneManager.setPlayerPerspective(playerIndex, safeCount, true);
+
+          if (seatTransition) this._sceneManager.setPlayerPerspective(playerIndex, safeCount, true, true);
+          else this._sceneManager.setPlayerPerspective(playerIndex, safeCount, true);
         }
 
         this._sceneManager.setLocalSessionId(this._store.getPlayerId() ?? '');
@@ -930,6 +1165,7 @@ export class App {
         if (roomState?.objects) {
           if (roomState.handCounts) this._sceneManager.syncPrivateRoundObjects(roomState.objects, roomState.players, roomState.handCounts, roomState.handSlots);
           else this._sceneManager.syncRoomObjects(roomState.objects, roomState.players);
+          if (oldHandOrder.length) this._sceneManager.getLocalHandZone()?.reorderCards(oldHandOrder);
           const count = roomState.deckCount ?? roomState.objects.filter((obj) => obj.type === "card" && obj.location === "DECK").length;
 
           this._sceneManager.setOnlineDeckCount(count, roomState.deck?.topCardType);
@@ -949,11 +1185,14 @@ export class App {
 
         this._uiManager.updateRoomInfo(
           roomId,
-          this._store.getPlayerName(),
+          localPlayer.name,
           localPlayer.spectator ? -1 : playerIndex,
-          roomState?.players.filter(player => !player.spectator).length,
-          roomState?.maxPlayers
+          roomState.players.filter(player => !player.spectator).length,
+          roomState.maxPlayers,
+          localPlayer.isHost
         );
+      } else {
+        lastDrawSetting = undefined;
       }
     });
   }
@@ -984,6 +1223,7 @@ export class App {
   }
 
   dispose(): void {
+    clearTimeout(this._rollCooldownTimer);
     this._cursorPointerListeners.abort();
     this._cursorBroadcaster.dispose();
     this._remoteCursorManager.dispose();
@@ -992,6 +1232,8 @@ export class App {
     this._insertionModal.dispose();
     this._contextMenu.dispose();
     this._playerAreaHUD.dispose();
+    this._seatPrompt.dispose();
+    this._marquee.dispose();
     this._sceneManager.dispose();
     this._fullHandFanPreviewUI.dispose();
     this._uiManager.dispose();

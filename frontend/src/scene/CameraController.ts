@@ -72,6 +72,7 @@ export class CameraController {
   private _spherical: SphericalCoords;
   private _target: THREE.Vector3;
 
+  private _seatFrame?: number;
   private readonly _abortController = new AbortController();
 
   /** Callback invoked when camera moves so SceneManager can trigger requestRender() */
@@ -178,6 +179,7 @@ export class CameraController {
   }
 
   private _onKeyDown(e: KeyboardEvent): void {
+    if (e.target instanceof HTMLElement && (e.target.isContentEditable || e.target.closest('input, textarea, select'))) return;
     // Press 'R' to reset camera (unless suppressed by active card selection / manipulation)
     if (e.key === 'r' || e.key === 'R') {
       if (!this.shouldHandleResetKey || this.shouldHandleResetKey()) {
@@ -192,6 +194,7 @@ export class CameraController {
    * Resets camera smoothly to its pristine initial tabletop perspective.
    */
   resetCamera(): void {
+    this._cancelSeatAnimation();
     this._spherical.theta = this._options.initialTheta;
     this._spherical.phi = this._options.initialPhi;
     this._spherical.radius = this._options.initialRadius;
@@ -265,15 +268,33 @@ export class CameraController {
     animate = false,
     durationMs = 500
   ): void {
+
+    this._cancelSeatAnimation();
     this._options.initialTheta = theta;
-    if (applyImmediately) {
+    if (!applyImmediately) return;
+    this._spherical.phi = this._options.initialPhi;
+    this._target.copy(this._defaultTarget);
+    const start = this._spherical.theta;
+    const distance = Math.atan2(Math.sin(theta - start), Math.cos(theta - start));
+    if (!animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || distance === 0) {
       this._spherical.theta = theta;
-      this._spherical.phi = this._options.initialPhi;
-      this._target.copy(this._defaultTarget);
       this._updateCamera();
+      return;
     }
-    void animate;
-    void durationMs;
+    const started = performance.now();
+    const frame = (now: number): void => {
+      const progress = Math.min(1, Math.max(0, (now - started) / durationMs));
+      const eased = progress * progress * (3 - 2 * progress);
+      this._spherical.theta = progress === 1 ? theta : start + distance * eased;
+      this._updateCamera();
+      this._seatFrame = progress < 1 ? requestAnimationFrame(frame) : undefined;
+    };
+    this._seatFrame = requestAnimationFrame(frame);
+  }
+
+  private _cancelSeatAnimation(): void {
+    if (this._seatFrame !== undefined) cancelAnimationFrame(this._seatFrame);
+    this._seatFrame = undefined;
   }
 
   /**
@@ -333,6 +354,7 @@ export class CameraController {
   }
 
   dispose(): void {
+    this._cancelSeatAnimation();
     this._abortController.abort();
     this.onChange = null;
     logger.info('CameraController disposed');

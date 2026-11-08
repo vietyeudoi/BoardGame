@@ -2,6 +2,7 @@
  * UIManager.ts — HTML Overlay UI Controller
  * Manages screen transitions. Completely independent from Three.js scene.
  */
+import type { TableRollKind } from '@shared/types/tableRoll';
 import type { DeckViewState } from '@shared/types/protocol';
 import type { DeckSetup, PublicDeckState, RoundSetup } from '@shared/types/room';
 import type { ClientStore } from '../store/ClientStore';
@@ -28,6 +29,9 @@ export class UIManager {
   public onConfigureRound?: (setup: DeckSetup) => void;
   public onDealRound?: () => void;
   public onResetRound?: () => void;
+  onTableRoll?: (kind: TableRollKind) => void;
+  onShuffleHand?: () => void;
+  onGatherBombs?: () => void;
   public onResetCameraRequested: (() => void) | null = null;
   public onFlipCardRequested: (() => void) | null = null;
   public onRotateCardRequested: (() => void) | null = null;
@@ -70,6 +74,9 @@ export class UIManager {
       this.show('lobby');
     };
 
+    this._game.onGatherBombs = () => this.onGatherBombs?.();
+    this._game.onTableRoll = kind => this.onTableRoll?.(kind);
+    this._game.onShuffleHand = () => this.onShuffleHand?.();
     this._game.onResetCamera = () => {
       this.onResetCameraRequested?.();
     };
@@ -127,8 +134,8 @@ export class UIManager {
     this._lobby.showError(msg);
   }
 
-  updateRoomInfo(roomId: string | null, playerName: string, playerIndex: number, playerCount?: number, maxPlayers?: number): void {
-    this._game.updateRoomInfo(roomId, playerName, playerIndex, playerCount, maxPlayers);
+  updateRoomInfo(roomId: string | null, playerName: string, playerIndex: number, playerCount?: number, maxPlayers?: number, isHost?: boolean): void {
+    this._game.updateRoomInfo(roomId, playerName, playerIndex, playerCount, maxPlayers, isHost);
   }
 
   updateRound(round: RoundSetup | undefined, isHost: boolean, spectator?: boolean): void {
@@ -142,6 +149,39 @@ export class UIManager {
 
   updateDeckView(view: DeckViewState | null, localId: string | null): void {
     this._game.updateDeckView(view, localId);
+  }
+
+
+  updateGatherBombs(visible: boolean, enabled: boolean): void {
+    this._game.updateGatherBombs(visible, enabled);
+  }
+
+  updateTableRollActions(enabled: boolean, reason?: string): void {
+    this._game.updateTableRollActions(enabled, reason);
+  }
+
+  getGameOverlay(): HTMLElement {
+    return this._game.getOverlayElement();
+  }
+
+  showInfo(message: string): void {
+    this._game.showInfo(message);
+  }
+
+  showDrawEndNotice(end: 'TOP' | 'BOTTOM'): void {
+    this._game.showDrawEndNotice(end);
+  }
+
+  showTableRollNotice(message: string): void {
+    this._game.showTableRollNotice(message);
+  }
+
+  updateHandShuffle(visible: boolean, enabled: boolean): void {
+    this._game.updateHandShuffle(visible, enabled);
+  }
+
+  showShuffleNotice(message: string): void {
+    this._game.showShuffleNotice(message);
   }
 
   showDeckShuffle(playerName: string): void {

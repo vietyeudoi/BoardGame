@@ -27,3 +27,12 @@ export const DEMO_TABLE_CARD_X = -3.6;
 
 export const WS_PORT = 4000;
 export const HTTP_PORT = 4000;
+
+export const SEAT_CHANGE = {
+  allowDuringPlay: true,
+  movePlacedCards: false,
+  requestMs: 15000,
+  cooldownMs: 3000,
+  animationMs: 500,
+  dealLockMs: 650,
+} as const;

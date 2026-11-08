@@ -4,6 +4,7 @@
  */
 
 import type { RoomState, PlayerInfo, ObjectPosition, SandboxObject, DeckDrawEnd, DeckSetup, RoundSetup, PublicDeckState } from './room.js';
+import type { TableRollEvent, TableRollKind } from './tableRoll.js';
 
 // ─── Client → Server Messages ───────────────────────────────────────────────
 
@@ -11,6 +12,11 @@ export type ClientToServerMessage =
   | { type: 'room:create'; payload: { roomName: string; playerName?: string; password?: string; doubleDeck?: boolean } }
   | { type: 'room:join'; payload: { roomId: string; playerName: string; password?: string } }
   | { type: 'room:resume'; payload: { roomId: string; playerId: string; token: string } }
+
+  | { type: 'seat:choose'; payload: { index: number; expectedPlayerId: string | null } }
+  | { type: 'seat:reply'; payload: { id: string; accept: boolean } }
+  | { type: 'seat:cancel'; payload: { id: string } }
+  | { type: 'seat:busy'; payload: { active: boolean } }
   | { type: 'room:leave' }
   | { type: 'round:configure'; payload: DeckSetup }
   | { type: 'round:deal' }
@@ -24,6 +30,11 @@ export type ClientToServerMessage =
   | { type: 'deck:insert'; payload: { cardIds: string[]; dragId?: number; cardsAbove?: number } }
   | { type: 'deck:set-affected-count'; payload: { count: number } }
   | { type: 'deck:shuffle' }
+  | { type: 'hand:shuffle' }
+  | { type: 'table:roll'; payload: { kind: TableRollKind } }
+  | { type: 'deck:gather-bombs' }
+  | { type: 'stack:shuffle'; payload: { anchorId: string } }
+  | { type: 'stack:form'; payload: { cardIds: string[] } }
   | { type: 'deck:take'; payload?: { cardsAbove: number } }
   | { type: 'card:draw'; payload?: { deckId?: string } }
   | { type: 'card:play-to-table'; payload: { cardId: string; position: Vector3Like; faceUp?: boolean } }
@@ -44,10 +55,19 @@ export type ClientToServerMessage =
 // ─── Server → Client Messages ───────────────────────────────────────────────
 
 export type ServerToClientMessage =
+
+  | { type: 'seat:request'; payload: SeatRequest }
+  | { type: 'seat:result'; payload: { id: string; message: string } }
+  | { type: 'seat:changed'; payload: { message: string } }
+  | { type: 'table:rolled'; payload: TableRollEvent }
   | { type: 'room:state'; payload: RoomState }
   | { type: 'round:configured'; payload: RoundSetup }
   | { type: 'deck:count'; payload: { count: number; ownerId?: string; handCount?: number; handSlots?: string[]; deck?: PublicDeckState } }
   | { type: 'deck:view-state'; payload: DeckViewState | null }
+  | { type: 'hand:shuffled'; payload: { playerId: string; playerName: string; placedIds: string[] } }
+  | { type: 'stack:formed'; payload: { anchorId: string; gatheredBy?: string } }
+  | { type: 'deck:gather-empty'; payload: { message: string } }
+  | { type: 'stack:shuffled'; payload: { anchorId: string; playerName: string } }
   | { type: 'deck:shuffled'; payload: { deck: PublicDeckState; playerName: string } }
   | { type: 'deck:inserted'; payload: { count: number } }
   | { type: 'room:joined'; payload: { roomId: string; playerId: string; playerIndex: number; resumeToken?: string } }
@@ -179,4 +199,15 @@ export interface ObjectDragEndPayload {
    * yaw. Stored authoritatively by the backend and broadcast to all clients.
    */
   rotation?: number;
+}
+
+export interface SeatRequest {
+  id: string;
+  fromId: string;
+  toId: string;
+  fromName: string;
+  toName: string;
+  fromIndex: number;
+  toIndex: number;
+  expiresAt: number;
 }

@@ -129,6 +129,10 @@ export class TableActions3D extends THREE.Group {
     this._paintDraw();
   }
 
+  hitsAt(event: MouseEvent): boolean {
+    return this._buttons.some((_, index) => this._hitsDraw(event, index));
+  }
+
   private _hitsDraw(event: MouseEvent, index = 0): boolean {
     if (!this.visible || this._isObstructed()) return false;
     const rect = this._canvas.getBoundingClientRect();

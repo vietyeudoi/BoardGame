@@ -113,6 +113,20 @@ export const MessageValidator = {
         return { success: true, data: raw as ClientToServerMessage };
       }
 
+
+      case 'seat:choose':
+      case 'seat:reply':
+      case 'seat:cancel':
+      case 'seat:busy': {
+        const p = msg['payload'] as Record<string, unknown> | undefined;
+        const valid = type === 'seat:choose' ? isNonNegativeInteger(p?.['index']) &&
+          (p?.['expectedPlayerId'] === null || isNonEmptyString(p?.['expectedPlayerId']))
+          : type === 'seat:busy' ? typeof p?.['active'] === 'boolean'
+          : isNonEmptyString(p?.['id']) && (type === 'seat:cancel' || typeof p?.['accept'] === 'boolean');
+        if (!valid) return { success: false, error: 'Thao tác ghế không hợp lệ.' };
+        return { success: true, data: raw as ClientToServerMessage };
+      }
+
       case 'round:deal':
       case 'round:reset':
       case 'room:leave':
@@ -131,6 +145,11 @@ export const MessageValidator = {
 
 
 
+      case 'table:roll': {
+        const p = msg['payload'] as Record<string, unknown> | null | undefined;
+        if (p?.['kind'] !== 'dice' && p?.['kind'] !== 'coin') return { success: false, error: 'table:roll: invalid kind' };
+        return { success: true, data: raw as ClientToServerMessage };
+      }
       case 'deck:view-open': {
         const p = msg['payload'] as Record<string, unknown> | undefined;
         if (p?.['mode'] !== 'see' && p?.['mode'] !== 'alter') return { success: false, error: 'deck:view-open: invalid mode' };
@@ -147,6 +166,21 @@ export const MessageValidator = {
         }
         return { success: true, data: raw as ClientToServerMessage };
       }
+      case 'stack:form': {
+        const p = msg['payload'] as Record<string, unknown> | undefined;
+        const ids = p?.['cardIds'];
+        if (!Array.isArray(ids) || ids.length < 2 || ids.length > MAX_DECK_VIEW_ORDER || !ids.every(isNonEmptyString)) {
+          return { success: false, error: 'Danh sách lá để xếp chồng không hợp lệ.' };
+        }
+        return { success: true, data: raw as ClientToServerMessage };
+      }
+      case 'stack:shuffle': {
+        const p = msg['payload'] as Record<string, unknown> | undefined;
+        if (!isNonEmptyString(p?.['anchorId'])) return { success: false, error: 'Chồng bài không hợp lệ.' };
+        return { success: true, data: raw as ClientToServerMessage };
+      }
+      case 'hand:shuffle':
+      case 'deck:gather-bombs':
       case 'deck:shuffle':
         return { success: true, data: raw as ClientToServerMessage };
       case 'deck:set-affected-count': {

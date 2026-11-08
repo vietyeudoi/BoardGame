@@ -113,6 +113,10 @@ export class DeckViewRow {
     return Math.abs(this._ndc.x) <= 1 && Math.abs(this._ndc.y) <= 1;
   }
 
+  hitsAt(event: MouseEvent): boolean {
+    return this._state !== null && this._pick(event) !== undefined;
+  }
+
   private _pick(event: MouseEvent, exclude?: number): number | undefined {
     if (!this._setRay(event)) return;
     const entries = [...this._cards.entries()].filter(([token]) => token !== exclude);

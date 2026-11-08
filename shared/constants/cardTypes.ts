@@ -130,3 +130,8 @@ export function getEditableCardLimit(type: CardType): number | undefined {
   if (pack?.kind === 'expansion') return MAX_EXPANSION_CARD_COUNT;
   if (card?.isBomb || card?.isRescue) return MAX_SETUP_CARD_COUNT;
 }
+
+export function isRegularBomb(type?: string): boolean {
+
+  return type === CardType.ExplodingKitten || type === CardType.ZombieExplodingKitten || type === CardType.StreakingExplodingKitten;
+}

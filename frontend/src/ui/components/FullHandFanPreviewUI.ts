@@ -184,7 +184,12 @@ function buildStylesheet(): string {
   position: absolute; inset: 0;
   background: radial-gradient(ellipse 62% 95% at 50% 100%, rgba(6,10,24,.38) 0%, rgba(6,10,24,.18) 45%, rgba(6,10,24,0) 78%);
 }
+
 .fhfp-stage { position: absolute; inset: 0; }
+.fhfp-marquee-start {
+  position:absolute;left:16px;top:6px;z-index:1;padding:4px 8px;border-radius:6px;
+  color:#dbeafe;background:#172554;font:12px system-ui;cursor:crosshair;user-select:none;
+}
 .fhfp-card {
   position: absolute;
   bottom: ${FAN_PREVIEW_LAYOUT.CARD_BOTTOM_OFFSET_PX}px;
@@ -490,7 +495,7 @@ export class FullHandFanPreviewUI {
   containsPoint(clientX: number, clientY: number): boolean {
     if (!this._open || !this._root) return false;
     // Hit-test theo lá bài đã xoay, cả khoảng trống trong overlay cũng tính là ngoài fan.
-    const card = document.elementFromPoint?.(clientX, clientY)?.closest(".fhfp-card, .fhfp-pager");
+    const card = document.elementFromPoint?.(clientX, clientY)?.closest(".fhfp-card, .fhfp-pager, .fhfp-marquee-start");
     return !!card && this._root.contains(card);
   }
 
@@ -592,7 +597,12 @@ export class FullHandFanPreviewUI {
     this._pageLabel = label;
     this._pagePrev = previous;
     this._pageNext = next;
-    root.append(style, glow, stage, pager);
+
+    const marqueeStart = document.createElement('div');
+    marqueeStart.className = 'fhfp-marquee-start';
+    marqueeStart.textContent = 'Kéo để chọn khung';
+    marqueeStart.title = 'Shift thêm lá, Ctrl đảo chọn, Esc hủy';
+    root.append(style, glow, stage, pager, marqueeStart);
     this._container.appendChild(root);
 
     this._root = root;

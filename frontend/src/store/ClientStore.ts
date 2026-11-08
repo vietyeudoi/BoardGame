@@ -46,6 +46,7 @@ export class ClientStore {
 
   updateRoomState(state: RoomState): void {
     this._roomState = state;
+    this._playerIndex = state.players.find(player => player.id === this._playerId)?.playerIndex ?? this._playerIndex;
     logger.debug('Room state updated');
     this._notify();
   }

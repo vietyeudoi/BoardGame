@@ -3,7 +3,7 @@
  * Handles layout setup, selection, hover state, and spatial queries.
  */
 import * as THREE from 'three';
-import { SHARED_CONFIG } from '../../../shared/constants/config';
+import { SEAT_CHANGE, SHARED_CONFIG } from '../../../shared/constants/config';
 
 import type { PlayerInfo } from '../../../shared/types/room';
 import { PlayerAreaObject3D } from './PlayerAreaObject3D';
@@ -21,6 +21,7 @@ export class PlayerAreaManager {
   private _playerCount = 0;
   private _visible = true;
   private _selectedAreaId: string | null = null;
+  private _previousSeats = new Map<string, number>();
   private _hoveredAreaId: string | null = null;
 
   constructor(scene: THREE.Scene, requestRender: () => void) {
@@ -71,14 +72,21 @@ export class PlayerAreaManager {
   updateOccupants(players: PlayerInfo[]): void {
     const occupants = new Map(players.map((player, index) => [player.playerIndex ?? index, player]));
     let changed = false;
-    this.getAllAreas().forEach((area, index) => {
+    const areas = this.getAllAreas();
+    areas.forEach((area, index) => {
       const player = occupants.get(index);
+
       if (area.setOccupant(player?.name ?? "", player !== undefined)) changed = true;
+      const oldIndex = player ? this._previousSeats.get(player.id) : undefined;
+      const oldArea = oldIndex !== undefined && oldIndex !== index ? areas[oldIndex] : undefined;
+      if (oldArea) area.animateOccupantFrom(oldArea.getWorldPosition(new THREE.Vector3()), SEAT_CHANGE.animationMs, this._requestRender);
     });
+    this._previousSeats = new Map([...occupants].map(([index, player]) => [player.id, index]));
     if (changed) this._requestRender();
   }
 
   clearLayout(): void {
+    this._previousSeats.clear();
     for (const area of this._areas.values()) {
       this._scene.remove(area);
       area.dispose();

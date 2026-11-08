@@ -388,6 +388,11 @@ export class RaycastInteractionManager {
     );
   }
 
+  getObjectAt(clientX: number, clientY: number): CardObject3D | DeckObject3D | null {
+    this._updateNDC(clientX, clientY);
+    return this._findIntersectedEntry()?.object ?? null;
+  }
+
   private _updateNDC(clientX: number, clientY: number): void {
     const rect = this._domElement.getBoundingClientRect();
     this._ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;

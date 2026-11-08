@@ -2,21 +2,38 @@
  * GameScreen.ts — In-game HUD Component
  * Displays top status, camera control buttons, and interactive tabletop hints.
  */
+import type { TableRollKind } from '@shared/types/tableRoll';
 import type { DeckViewState } from '@shared/types/protocol';
 import type { PublicDeckState, RoundSetup } from '@shared/types/room';
 import { DeckAlterStrip } from './components/DeckAlterStrip';
 import { RoundSetupPanel } from './RoundSetupPanel';
 import type { ConnectionStatus } from '../network/NetworkClient';
 import type { InsertionMode } from '../interaction/InteractionConfig';
+import { GAME_HUD_MARKUP, hudIcon } from './GameHudMarkup';
+import './GameHud.css';
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('GameScreen');
+const HUD_PREFS = { help: 'cat-boom:hud-help', seatHint: 'cat-boom:hud-seat-hint' } as const;
+const MAX_NOTICES = 3;
+const NOTICE_MS = 3500;
+
+function readPreference(key: string): boolean {
+  try { return localStorage.getItem(key) === 'true'; }
+  catch (error) { logger.debug('Không đọc được tùy chọn HUD', { key, error }); return false; }
+}
+
+function savePreference(key: string, value: boolean): void {
+  try { localStorage.setItem(key, String(value)); }
+  catch (error) { logger.debug('Không lưu được tùy chọn HUD', { key, error }); }
+}
+
 
 export class GameScreen {
   private readonly _element: HTMLElement;
   private _statusDot: HTMLElement | null = null;
   private _statusText: HTMLElement | null = null;
-  private _roomBadge: HTMLElement | null = null;
+  private _roomBadge: HTMLButtonElement | null = null;
   private _playerBadge: HTMLElement | null = null;
   private _resetCamBtn: HTMLButtonElement | null = null;
   private _flipCardBtn: HTMLButtonElement | null = null;
@@ -36,9 +53,14 @@ export class GameScreen {
   onDeckPosition?: (position: number) => void;
   private _deckState?: PublicDeckState;
   onResetRound?: () => void;
-  private _errorTimeout?: ReturnType<typeof setTimeout>;
+  private _seatHintShown = readPreference(HUD_PREFS.seatHint);
+  private _canShowSeatHint = false;
   private readonly _abortController = new AbortController();
 
+  onTableRoll?: (kind: TableRollKind) => void;
+  private readonly _notices = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
+  onShuffleHand?: () => void;
+  onGatherBombs?: () => void;
   public onResetCamera: (() => void) | null = null;
   public onFlipCard: (() => void) | null = null;
   public onRotateCard: (() => void) | null = null;
@@ -50,8 +72,9 @@ export class GameScreen {
   constructor(private readonly _container: HTMLElement) {
     this._element = this._buildDOM();
     this._container.appendChild(this._element);
-    this.roundSetup = new RoundSetupPanel(this._element);
-    this.deckAlterStrip = new DeckAlterStrip(this._element);
+    const panels = this._element.querySelector<HTMLElement>('#hud-panels')!;
+    this.roundSetup = new RoundSetupPanel(panels);
+    this.deckAlterStrip = new DeckAlterStrip(panels);
     this._setupEvents();
   }
 
@@ -59,129 +82,11 @@ export class GameScreen {
     const el = document.createElement('div');
     el.id = 'game-screen';
     el.style.cssText = 'display:none;width:100%;height:100%;position:relative;pointer-events:none;';
-    el.innerHTML = `
-      <style>#game-screen [data-round-hidden] { display: none !important; }</style>
-      <!-- Top Bar: Status and Navigation -->
-      <div id="hud-top" style="
-        position:absolute;top:14px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 36px);box-sizing:border-box;
-        background:rgba(18,18,32,0.85);backdrop-filter:blur(8px);
-        border:1px solid #3d3d5c;border-radius:24px;
-        padding:8px 20px;font-size:0.85rem;color:#e0e0f0;
-        display:flex;flex-wrap:wrap;align-items:center;gap:8px;
-        box-shadow:0 4px 16px rgba(0,0,0,0.4);pointer-events:auto;
-      ">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span id="conn-dot" style="width:8px;height:8px;border-radius:50%;background:#888;display:inline-block;"></span>
-          <span id="conn-text" style="font-weight:600;">Cat Boom Online</span>
-          <span id="hud-room-badge" style="background:#1e293b;border:1px solid #3b82f6;color:#93c5fd;border-radius:12px;padding:2px 8px;font-size:0.72rem;font-weight:600;display:none;"></span>
-          <span id="hud-player-badge" style="background:#1e293b;border:1px solid #10b981;color:#6ee7b7;border-radius:12px;padding:2px 8px;font-size:0.72rem;font-weight:600;display:none;"></span>
-        </div>
-        <div style="width:1px;height:16px;background:#3d3d5c;"></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0;">
-          <span id="hud-deck-pill" style="
-            background:#0f172a;color:#cbd5e1;border:1px solid #334155;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;font-weight:600;
-            display:flex;align-items:center;gap:4px;
-          ">📦 Chồng bài: 30 lá</span>
-
-          <!-- Insertion Mode Control Group (M1.3.4.5) -->
-          <div id="hud-insert-mode-group" style="
-            display:flex;flex-wrap:wrap;align-items:center;gap:3px;background:#0f172a;border:1px solid #334155;
-            border-radius:6px;padding:2px 4px;font-size:0.75rem;
-          ">
-            <span style="color:#94a3b8;font-weight:600;padding:0 4px;font-size:0.7rem;">Chèn:</span>
-            <button id="btn-insert-top" aria-pressed="true" title="Chèn lên đỉnh (Mặc định)" style="
-              background:#1d4ed8;color:#eff6ff;border:1px solid #3b82f6;border-radius:4px;
-              padding:3px 6px;font-size:0.7rem;cursor:pointer;font-weight:600;
-            ">Đỉnh (Top)</button>
-            <button id="btn-insert-bottom" aria-pressed="false" title="Chèn xuống đáy" style="
-              background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;
-              padding:3px 6px;font-size:0.7rem;cursor:pointer;font-weight:600;
-            ">Đáy (Bottom)</button>
-            <button id="btn-insert-custom" aria-pressed="false" title="Chèn vào vị trí tùy chọn..." style="
-              background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;
-              padding:3px 6px;font-size:0.7rem;cursor:pointer;font-weight:600;
-            ">Tùy chọn...</button>
-          </div>
-
-
-          <div id="hud-deck-controls" hidden style="font-size:.75rem;color:#cbd5e1">
-            <label id="hud-deck-position-label" hidden>Vị trí chèn
-              <input id="hud-deck-position" type="number" min="1" step="1" style="width:3rem">
-            </label>
-            <label for="hud-affected-count">Số lá tác động</label>
-            <button id="hud-affected-minus" aria-label="Giảm số lá tác động" type="button">−</button>
-            <input id="hud-affected-count" type="number" min="1" step="1" style="width:3rem">
-            <button id="hud-affected-plus" aria-label="Tăng số lá tác động" type="button">+</button>
-            <output id="hud-deck-status" aria-live="polite"></output>
-          </div>
-
-          <div id="hud-deck-view" hidden style="font-size:.78rem;color:#fcd34d">
-            <span id="hud-deck-view-lock" role="status"></span>
-            <span id="hud-deck-view-swap" hidden>
-              <input id="deck-view-from" type="number" min="1" value="1" aria-label="Vị trí thứ nhất" style="width:3rem">
-              <input id="deck-view-to" type="number" min="1" value="2" aria-label="Vị trí thứ hai" style="width:3rem">
-              <button id="btn-deck-view-swap" type="button">Đổi chỗ</button>
-            </span>
-            <button id="btn-deck-view-confirm" hidden type="button">Xác nhận</button>
-            <button id="btn-deck-view-close" hidden type="button">Xong</button>
-          </div>
-          <button id="btn-flip-card" title="Lật bài (Phím F)" style="
-            background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
-            display:flex;align-items:center;gap:4px;font-weight:600;
-          ">🎴 Lật bài (F)</button>
-          <button id="btn-rotate-card" title="Xoay bài 90° (Phím R)" style="
-            background:#2e1065;color:#c084fc;border:1px solid #7c3aed;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
-            display:flex;align-items:center;gap:4px;font-weight:600;
-          ">🔄 Xoay 90° (R)</button>
-          <button id="btn-stack-cards" title="Xếp chồng các lá bài đang chọn" style="
-            background:#14532d;color:#86efac;border:1px solid #16a34a;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
-            display:flex;align-items:center;gap:4px;font-weight:600;
-          ">📦 Xếp chồng</button>
-          <button id="btn-reset-cam" title="Reset Camera góc nhìn mặc định" style="
-            background:#334155;color:#e2e8f0;border:1px solid #475569;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
-            display:flex;align-items:center;gap:4px;
-          ">🎥 Reset Camera</button>
-          <button id="btn-round-reset" hidden type="button" style="pointer-events:auto">Làm lại ván</button>
-          <button id="btn-to-lobby" title="Return to Main Lobby" style="
-            background:#1e293b;color:#94a3b8;border:1px solid #334155;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
-          ">🚪 Sảnh</button>
-        </div>
-      </div>
-
-
-      <div id="hud-game-error" role="alert" hidden style="
-        position:absolute;top:88px;left:50%;transform:translateX(-50%);
-        max-width:85%;padding:8px 14px;border-radius:8px;background:#450a0a;
-        border:1px solid #b91c1c;color:#fee2e2;font-size:0.85rem;
-      "></div>
-      <!-- Bottom Helper Pill -->
-      <div id="hud-bottom-hint" style="
-        position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
-        background:rgba(15,15,28,0.85);backdrop-filter:blur(6px);
-        border:1px solid #2e2e48;border-radius:20px;
-        padding:6px 18px;font-size:0.75rem;color:#cbd5e1;
-        box-shadow:0 2px 10px rgba(0,0,0,0.3);pointer-events:none;user-select:none;
-        white-space:nowrap;max-width:80%;overflow:hidden;
-      ">
-        🖱️ <b>Kéo trái:</b> Di chuyển bài &nbsp;|&nbsp; 
-        ⌨️ <b>R / Shift+R:</b> Xoay 90° &nbsp;|&nbsp; 
-        🖱️ <b>Lăn chuột:</b> Xoay tự do (Shift = 1°) &nbsp;|&nbsp; 
-        ⌨️ <b>Ctrl + Click:</b> Chọn nhiều &nbsp;|&nbsp; 
-        ⌨️ <b>F:</b> Lật bài &nbsp;|&nbsp; 
-        ⌨️ <b>H:</b> Rút vào tay &nbsp;|&nbsp; 
-        🖱️ <b>Chuột phải:</b> Menu thao tác
-      </div>
-    `;
+    el.innerHTML = GAME_HUD_MARKUP;
 
     this._statusDot = el.querySelector<HTMLElement>('#conn-dot');
     this._statusText = el.querySelector<HTMLElement>('#conn-text');
-    this._roomBadge = el.querySelector<HTMLElement>('#hud-room-badge');
+    this._roomBadge = el.querySelector<HTMLButtonElement>('#hud-room-badge');
     this._playerBadge = el.querySelector<HTMLElement>('#hud-player-badge');
     this._resetCamBtn = el.querySelector<HTMLButtonElement>('#btn-reset-cam');
     this._flipCardBtn = el.querySelector<HTMLButtonElement>('#btn-flip-card');
@@ -200,6 +105,48 @@ export class GameScreen {
 
 
     const opts = { signal: this._abortController.signal };
+    const help = this._element.querySelector<HTMLDetailsElement>('#hud-bottom-hint')!;
+    const system = this._element.querySelector<HTMLDetailsElement>('#hud-system-menu')!;
+    help.open = readPreference(HUD_PREFS.help);
+    help.addEventListener('toggle', () => savePreference(HUD_PREFS.help, help.open), opts);
+    window.addEventListener('keydown', event => {
+      if (this._element.style.display === 'none') return;
+      if (event.target instanceof HTMLElement && (event.target.isContentEditable ||
+        event.target.closest('input, textarea, select, [contenteditable="true"]'))) return;
+      if (event.key === 'Escape') {
+        for (const id of ['hud-bottom-hint', 'hud-system-menu', 'player-area-hud']) {
+          const panel = this._element.querySelector<HTMLDetailsElement>('#' + id);
+          if (!panel?.open) continue;
+          panel.open = false;
+          if (panel.contains(document.activeElement)) panel.querySelector('summary')?.focus();
+        }
+      }
+      if (event.key !== '?' || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+      event.preventDefault();
+      help.open = !help.open;
+    }, opts);
+    document.addEventListener('pointerdown', event => {
+      if (event.target instanceof Node && !system.contains(event.target)) system.open = false;
+    }, opts);
+    system.addEventListener('click', event => {
+      if (event.target instanceof Element && event.target.closest('button:not(:disabled)')) system.open = false;
+    }, opts);
+    this._roomBadge?.addEventListener('click', async () => {
+      const roomId = this._roomBadge?.dataset.roomId;
+      if (!roomId) return;
+      try {
+        await navigator.clipboard.writeText(roomId);
+        if (this._roomBadge?.dataset.roomId === roomId) this._showNotice('Đã sao chép mã phòng ' + roomId);
+      } catch (error) {
+        logger.warn('Không sao chép được mã phòng', { error });
+        this._showNotice('Không sao chép được. Mã phòng: ' + roomId);
+      }
+    }, opts);
+
+    this._element.querySelector('#btn-gather-bombs')?.addEventListener('click', () => this.onGatherBombs?.(), opts);
+    this._element.querySelector('#btn-roll-dice')?.addEventListener('click', () => this.onTableRoll?.('dice'), opts);
+    this._element.querySelector('#btn-roll-coin')?.addEventListener('click', () => this.onTableRoll?.('coin'), opts);
+    this._element.querySelector('#btn-shuffle-hand')?.addEventListener('click', () => this.onShuffleHand?.(), opts);
     this._element.querySelector('#btn-deck-view-confirm')?.addEventListener('click', () => this.onCloseDeckView?.(true), opts);
     this._element.querySelector('#btn-deck-view-close')?.addEventListener('click', () => this.onCloseDeckView?.(false), opts);
     this._element.querySelector('#btn-deck-view-swap')?.addEventListener('click', () => {
@@ -287,8 +234,13 @@ export class GameScreen {
 
   updateRound(round: RoundSetup | undefined, isHost: boolean, spectator = false): void {
     this.roundSetup.update(round, isHost);
+    this._canShowSeatHint = round?.phase === 'PLAYING' && !spectator;
+    if (round?.phase !== 'PLAYING' || spectator) {
+      this.updateHandShuffle(false, false);
+      this.updateGatherBombs(false, false);
+    }
     const inactive = round?.phase === 'SETUP' || spectator;
-    for (const id of ['hud-insert-mode-group', 'btn-rotate-card', 'btn-stack-cards', 'hud-bottom-hint']) {
+    for (const id of ['hud-insert-mode-group', 'btn-rotate-card', 'btn-stack-cards']) {
       this._element.querySelector('#' + id)?.toggleAttribute('data-round-hidden', inactive);
     }
     this._flipCardBtn?.toggleAttribute('data-round-hidden', round?.phase === 'SETUP');
@@ -335,62 +287,98 @@ export class GameScreen {
     }
   }
 
+
+  updateGatherBombs(visible: boolean, enabled: boolean): void {
+    const button = this._element.querySelector<HTMLButtonElement>('#btn-gather-bombs')!;
+    button.hidden = !visible;
+    button.disabled = !enabled;
+  }
+
+  updateTableRollActions(enabled: boolean, reason?: string): void {
+    for (const [id, title] of [
+      ['btn-roll-dice', 'Tung xúc xắc 6 mặt (D)'],
+      ['btn-roll-coin', 'Tung đồng xu Ngửa hoặc Sấp (C)'],
+    ] as const) {
+      const button = this._element.querySelector<HTMLButtonElement>('#' + id)!;
+      button.disabled = !enabled;
+      button.title = reason ? title + ' · ' + reason : title;
+    }
+  }
+
+  showTableRollNotice(message: string): void {
+    const split = message.lastIndexOf(': ');
+    if (split < 0) { this._showNotice(message); return; }
+    const result = document.createElement('strong');
+    result.textContent = message.slice(split + 2);
+    this._showNotice(message.slice(0, split + 2), result);
+  }
+
+  private _showNotice(message: string, result?: HTMLElement): void {
+    const notice = document.createElement('div');
+    notice.className = 'hud-toast';
+    notice.append(message);
+    if (result) notice.append(result);
+    this._pushNotice(notice);
+  }
+
+  private _pushNotice(notice: HTMLElement): void {
+    this._removeNotice(notice);
+    if (this._notices.size >= MAX_NOTICES) {
+      const oldest = this._notices.keys().next().value;
+      if (oldest) this._removeNotice(oldest);
+    }
+    notice.hidden = false;
+    this._element.querySelector('#hud-roll-notices')!.append(notice);
+    this._notices.set(notice, setTimeout(() => this._removeNotice(notice), NOTICE_MS));
+  }
+
+  private _removeNotice(notice: HTMLElement): void {
+    clearTimeout(this._notices.get(notice));
+    this._notices.delete(notice);
+    if (notice.id === 'hud-game-error') notice.hidden = true;
+    else notice.remove();
+  }
+
+  showInfo(message: string): void {
+    this._showNotice(message);
+  }
+
+  showDrawEndNotice(end: 'TOP' | 'BOTTOM'): void {
+    this._showNotice(end === 'TOP' ? 'Vị trí chèn chung: Đỉnh' : 'Vị trí chèn chung: Đáy');
+  }
+
+  getOverlayElement(): HTMLElement {
+    return this._element;
+  }
+
+  updateHandShuffle(visible: boolean, enabled: boolean): void {
+    const button = this._element.querySelector<HTMLButtonElement>('#btn-shuffle-hand')!;
+    button.hidden = !visible;
+    button.disabled = !enabled;
+  }
+
+  showShuffleNotice(message: string): void {
+    this._element.querySelector('#hud-deck-status')!.textContent = message;
+    this._showNotice(message);
+  }
+
   showDeckShuffle(playerName: string): void {
-    this._element.querySelector('#hud-deck-status')!.textContent = playerName + ' vừa xáo bài';
+    this.showShuffleNotice(playerName + ' vừa xáo bài');
   }
 
   showError(message: string): void {
-    const alert = this._element.querySelector<HTMLElement>('#hud-game-error');
-    if (!alert) return;
-    clearTimeout(this._errorTimeout);
+    const alert = this._element.querySelector<HTMLElement>('#hud-game-error')!;
     alert.textContent = message;
-    alert.hidden = false;
-    this._errorTimeout = setTimeout(() => { alert.hidden = true; }, 3200);
+    this._pushNotice(alert);
   }
 
   setInsertionModeState(mode: InsertionMode, customVal?: number): void {
-    if (!this._btnInsertTop || !this._btnInsertBottom || !this._btnInsertCustom) return;
-
-    this._btnInsertTop.setAttribute('aria-pressed', String(mode === 'TOP'));
-    this._btnInsertBottom.setAttribute('aria-pressed', String(mode === 'BOTTOM'));
-    this._btnInsertCustom.setAttribute('aria-pressed', String(mode === 'CUSTOM'));
-
-    // Reset styles
-    const defaultBg = '#1e293b';
-    const defaultColor = '#94a3b8';
-    const defaultBorder = '#334155';
-    const activeBg = '#1d4ed8';
-    const activeColor = '#eff6ff';
-    const activeBorder = '#3b82f6';
-
-    this._btnInsertTop.style.background = defaultBg;
-    this._btnInsertTop.style.color = defaultColor;
-    this._btnInsertTop.style.borderColor = defaultBorder;
-
-    this._btnInsertBottom.style.background = defaultBg;
-    this._btnInsertBottom.style.color = defaultColor;
-    this._btnInsertBottom.style.borderColor = defaultBorder;
-
-    this._btnInsertCustom.style.background = defaultBg;
-    this._btnInsertCustom.style.color = defaultColor;
-    this._btnInsertCustom.style.borderColor = defaultBorder;
-    this._btnInsertCustom.textContent = 'Tùy chọn...';
-
-    if (mode === 'TOP') {
-      this._btnInsertTop.style.background = activeBg;
-      this._btnInsertTop.style.color = activeColor;
-      this._btnInsertTop.style.borderColor = activeBorder;
-    } else if (mode === 'BOTTOM') {
-      this._btnInsertBottom.style.background = activeBg;
-      this._btnInsertBottom.style.color = activeColor;
-      this._btnInsertBottom.style.borderColor = activeBorder;
-    } else if (mode === 'CUSTOM') {
-      this._btnInsertCustom.style.background = activeBg;
-      this._btnInsertCustom.style.color = activeColor;
-      this._btnInsertCustom.style.borderColor = activeBorder;
-      if (customVal !== undefined) {
-        this._btnInsertCustom.textContent = `Tùy chọn (${customVal})...`;
-      }
+    this._btnInsertTop?.setAttribute('aria-pressed', String(mode === 'TOP'));
+    this._btnInsertBottom?.setAttribute('aria-pressed', String(mode === 'BOTTOM'));
+    this._btnInsertCustom?.setAttribute('aria-pressed', String(mode === 'CUSTOM'));
+    if (this._btnInsertCustom) {
+      this._btnInsertCustom.textContent = mode === 'CUSTOM' && customVal !== undefined
+        ? 'Riêng (' + customVal + ')' : 'Tùy chọn';
     }
   }
 
@@ -400,46 +388,70 @@ export class GameScreen {
   }
 
   hide(): void {
+    for (const notice of this._notices.keys()) this._removeNotice(notice);
     this._element.style.display = 'none';
   }
 
   updateConnectionStatus(status: ConnectionStatus): void {
     if (!this._statusDot || !this._statusText) return;
-    const colors: Record<ConnectionStatus, string> = {
-      connecting:   '#f0c040',
-      connected:    '#40c040',
-      disconnected: '#94a3b8',
-      error:        '#c04040',
+    const labels: Record<ConnectionStatus, string> = {
+      connecting: 'Đang kết nối', connected: 'Đã kết nối', disconnected: 'Mất kết nối', error: 'Lỗi kết nối',
     };
-    this._statusDot.style.background = colors[status];
+    this._statusDot.dataset.state = status;
+    this._statusDot.setAttribute('aria-label', labels[status]);
+    this._statusDot.title = labels[status];
   }
 
-  updateRoomInfo(roomId: string | null, playerName: string, playerIndex: number, playerCount?: number, maxPlayers?: number): void {
+  updateRoomInfo(roomId: string | null, playerName: string, playerIndex: number, playerCount?: number, maxPlayers?: number, isHost = false): void {
     if (this._roomBadge) {
       if (roomId) {
-        const capacity = playerCount !== undefined && maxPlayers !== undefined ? ` • ${playerCount} / ${maxPlayers} Players` : '';
-        this._roomBadge.textContent = `🏠 Phòng: ${roomId}${capacity}`;
-        this._roomBadge.style.display = 'inline-flex';
+        const capacity = document.createElement('span');
+        capacity.id = 'hud-room-capacity';
+        capacity.textContent = playerCount !== undefined && maxPlayers !== undefined ? playerCount + '/' + maxPlayers : '';
+        this._roomBadge.replaceChildren(roomId, capacity);
+        this._roomBadge.insertAdjacentHTML('afterbegin', hudIcon('copy'));
+        this._roomBadge.dataset.roomId = roomId;
+        this._roomBadge.disabled = false;
+        this._roomBadge.title = 'Sao chép mã phòng · Bấm vào ghế để đổi chỗ';
+        if (this._canShowSeatHint && !this._seatHintShown) {
+          this._seatHintShown = true;
+          savePreference(HUD_PREFS.seatHint, true);
+          this._showNotice('Bấm vào ghế để đổi chỗ.');
+        }
       } else {
-        this._roomBadge.textContent = '🕹️ Offline Sandbox';
-        this._roomBadge.style.display = 'inline-flex';
+        this._roomBadge.textContent = 'Offline Sandbox';
+        delete this._roomBadge.dataset.roomId;
+        this._roomBadge.disabled = true;
+        this._roomBadge.title = 'Chế độ offline';
       }
+      this._roomBadge.style.display = 'inline-flex';
     }
     if (this._playerBadge) {
       const seat = playerIndex < 0 ? 'Khán giả' : 'P' + (playerIndex + 1);
-      this._playerBadge.textContent = '👤 ' + playerName + ' (' + seat + ')';
+      const name = document.createElement('span');
+      name.className = 'hud-player-name';
+      name.textContent = playerName;
+      const position = document.createElement('span');
+      position.textContent = ' (' + seat + ')';
+      this._playerBadge.replaceChildren(name, position);
+      const role = playerIndex < 0 ? seat : (isHost ? 'Chủ phòng · ' : '') + 'Ghế ' + (playerIndex + 1);
+      this._playerBadge.title = playerName + ' · ' + role;
+      this._playerBadge.setAttribute('aria-label', this._playerBadge.title);
+      this._playerBadge.toggleAttribute('data-host', isHost && playerIndex >= 0);
       this._playerBadge.style.display = 'inline-flex';
     }
   }
 
   updateDeckCount(count: number): void {
     if (!this._deckPill) return;
-    this._deckPill.textContent = count > 0 ? `📦 Chồng bài: ${count} lá` : '📦 Chồng bài: Hết bài';
+    this._deckPill.innerHTML = hudIcon('deck');
+    this._deckPill.append(String(count) + ' lá');
+    this._deckPill.setAttribute('aria-label', 'Chồng bài: ' + count + ' lá');
     logger.debug(`HUD deck count updated to ${count}`);
   }
 
   dispose(): void {
-    clearTimeout(this._errorTimeout);
+    for (const notice of this._notices.keys()) this._removeNotice(notice);
     this.roundSetup.dispose();
     this.deckAlterStrip.dispose();
     this._abortController.abort();

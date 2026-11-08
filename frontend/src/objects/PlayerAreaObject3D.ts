@@ -38,6 +38,7 @@ export class PlayerAreaObject3D extends THREE.Group {
   private _borderLine: THREE.LineLoop | null = null;
   private _slotLine: THREE.LineLoop | null = null;
   private _labelMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
+  private _occupantFrame?: number;
   private _avatar: THREE.Mesh | null = null;
 
   // Reusable materials (kept for dispose & color updates)
@@ -195,7 +196,32 @@ export class PlayerAreaObject3D extends THREE.Group {
     this._updateVisuals();
   }
 
+
+  animateOccupantFrom(previous: THREE.Vector3, duration: number, render: () => void): void {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    this._stopOccupantAnimation();
+    const offset = this.worldToLocal(previous.clone());
+    const started = performance.now();
+    const frame = (now: number): void => {
+      const t = Math.min(1, Math.max(0, (now - started) / duration));
+      const weight = 1 - t * t * (3 - 2 * t);
+      if (this._labelMesh) this._labelMesh.position.set(offset.x * weight, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, PLAYER_AREA_VISUAL_CONFIG.LABEL_OUTSET + offset.z * weight);
+      if (this._avatar) this._avatar.position.set(offset.x * weight, PLAYER_AREA_VISUAL_CONFIG.AVATAR_Y, PLAYER_AREA_VISUAL_CONFIG.AVATAR_OUTSET + offset.z * weight);
+      render();
+      this._occupantFrame = t < 1 ? requestAnimationFrame(frame) : undefined;
+    };
+    frame(started);
+  }
+
+  private _stopOccupantAnimation(): void {
+    if (this._occupantFrame !== undefined) cancelAnimationFrame(this._occupantFrame);
+    this._occupantFrame = undefined;
+    if (this._labelMesh) this._labelMesh.position.set(0, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, PLAYER_AREA_VISUAL_CONFIG.LABEL_OUTSET);
+    if (this._avatar) this._avatar.position.set(0, PLAYER_AREA_VISUAL_CONFIG.AVATAR_Y, PLAYER_AREA_VISUAL_CONFIG.AVATAR_OUTSET);
+  }
+
   setOccupant(label: string, occupied: boolean): boolean {
+    if (this._label !== label || this._occupied !== occupied) this._stopOccupantAnimation();
     if (this._label === label && this._occupied === occupied) return false;
     this._occupied = occupied;
     if (this._label !== label) this.setLabel(label);
@@ -276,6 +302,7 @@ export class PlayerAreaObject3D extends THREE.Group {
   }
 
   dispose(): void {
+    this._stopOccupantAnimation();
     // Border
     if (this._borderLine) {
       this._borderLine.geometry.dispose();

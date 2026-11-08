@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { startBrowser } from 'file:///D:/BoardGame/run_visual_debug.mjs';
 
 async function main() {
@@ -12,8 +13,57 @@ async function main() {
   await browser.mouseDrag(100, 100, 200, 200, 5);
   const evs = await browser.evaluate(`window.__events`);
   console.log("Captured events:", evs);
-  await browser.close();
+
+  try {
+    await browser.evaluate("document.querySelector('#btn-enter-sandbox').click()");
+    const points = await browser.evaluate(`(() => {
+      const scene = window.__app._sceneManager;
+      const canvas = scene.getInputCanvas();
+      const card = scene.getAllCards()[0];
+      const rect = canvas.getBoundingClientRect();
+      const point = card.position.clone().project(scene.getCameraController().getCamera());
+      const x = rect.left + (point.x + 1) * rect.width / 2;
+      const y = rect.top + (1 - point.y) * rect.height / 2;
+      for (const [dx, dy] of [[-70,-50], [70,-50], [-70,50], [70,50], [-40,-45], [40,-45]]) {
+        if (document.elementFromPoint(x + dx, y + dy) !== canvas ||
+          !scene.getTableIntersectionAtScreenPos(x + dx, y + dy) ||
+          scene.getInteractionManager().getObjectAt(x + dx, y + dy)) continue;
+        return { fromX: x + dx, fromY: y + dy, toX: x - dx, toY: y - dy, cardId: card.cardId };
+      }
+      return null;
+    })()`);
+    assert.ok(points, 'Có vùng trống để bắt đầu chọn khung');
+    await browser.mouseDrag(points.fromX, points.fromY, points.toX, points.toY);
+    const selected = await browser.evaluate("window.__app._sceneManager.getInteractionManager().getSelectedCards().map(card => card.cardId)");
+    assert.ok(selected.includes(points.cardId));
+    assert.equal(await browser.evaluate("document.querySelector('#marquee-count').textContent"), 'Đã chọn: 1');
+    await browser.mouseClick(points.fromX, points.fromY);
+    assert.equal(await browser.evaluate("document.querySelector('#marquee-count').hidden"), true);
+
+    await browser.evaluate("(() => { const app = window.__app; const scene = app._sceneManager; scene.drawCardToHand('demo_deck_1', 0); scene.drawCardToHand('demo_deck_1', 0); })()");
+    await new Promise(resolve => setTimeout(resolve, 700));
+    const fan = await browser.evaluate(`(() => {
+      const app = window.__app;
+      const hand = app._sceneManager.getLocalHandCards();
+      app._fullHandFanPreviewUI.show(hand.map(card => ({ id: card.cardId, cardType: card.getCardType(), title: 'Lá thử' })));
+      return hand.map(card => card.cardId);
+    })()`);
+    assert.equal(fan.length, 2);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const fanPoints = await browser.evaluate(`(() => {
+      const start = document.querySelector('.fhfp-marquee-start').getBoundingClientRect();
+      const cards = Array.from(document.querySelectorAll('.fhfp-card')).map(card => card.getBoundingClientRect());
+      return { x: start.left + start.width / 2, y: start.top + start.height / 2,
+        endX: Math.max(...cards.map(card => card.right)) + 4, endY: Math.max(...cards.map(card => card.bottom)) };
+    })()`);
+    await browser.mouseDrag(fanPoints.x, fanPoints.y, fanPoints.endX, fanPoints.endY);
+    const fanSelected = await browser.evaluate("window.__app._sceneManager.getInteractionManager().getSelectedCards().map(card => card.cardId)");
+    assert.deepEqual(fanSelected.sort(), fan.sort());
+    console.log('Đã kiểm tra kéo khung trên bàn, trong fan và click vùng trống bằng Chrome.');
+  } finally {
+    await browser.close();
+  }
 }
 
-main().catch(console.error);
+main().catch(error => { console.error(error); process.exitCode = 1; });
 

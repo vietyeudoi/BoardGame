@@ -1,14 +1,14 @@
 /**
- * gridRemoval1754.test.ts — M1.7.5 Part 4: Snap-to-Grid & "G" key removal
+ * gridRemoval1754.test.ts — M1.7.5 Part 4: Snap-to-Grid removal
  *
- * The Snap-to-Grid feature (HUD button, G shortcut, context-menu entry, drag
+ * The Snap-to-Grid feature (HUD button, grid shortcut, context-menu entry, drag
  * snapping, config constants) must be GONE entirely — not disabled. These are
  * source-scan assertions over the production files (loaded as raw text via
  * Vite's import.meta.glob), so a reintroduction of any grid wiring fails the
  * suite immediately:
  *
  * 1. No grid identifiers anywhere in frontend/src production code.
- * 2. App.ts: no G shortcut, no grid context-menu wiring (F/R/H preserved).
+ * 2. App.ts: G chỉ dùng để gom bom, không có menu căn lưới.
  * 3. HUD toolbar HTML no longer renders the "Lưới" button (other buttons kept).
  * 4. UIManager has no grid delegation left.
  * 5. DragController exposes no grid API but keeps clamp + drag-end rotation.
@@ -56,7 +56,7 @@ function read(relPath: string): string {
   return text;
 }
 
-describe('M1.7.5 Part 4 — Snap-to-Grid & G key removal', () => {
+describe('M1.7.5 Part 4 — Snap-to-Grid removal', () => {
   it('source scan covers the expected production surface', () => {
     expect(SOURCES.length).toBeGreaterThan(20);
     const rel = SOURCES.map(([p]) => p.replace(/^\.\.\//, '').replace(/\\/g, '/'));
@@ -96,9 +96,9 @@ describe('M1.7.5 Part 4 — Snap-to-Grid & G key removal', () => {
     expect(violations).toEqual([]);
   });
 
-  it('2. App.ts has no G shortcut and no grid context-menu wiring', () => {
+  it('2. G dùng để gom bom và menu căn lưới đã được gỡ', () => {
     const app = read('app/App.ts');
-    expect(app).not.toMatch(/key === 'g'/);
+    expect(app).toMatch(/key === 'g'[^\n]+\{\s+requestGatherBombs\(\);/);
     expect(app).not.toMatch(/Phím G/);
     expect(app).not.toMatch(/Tắt Căn Lưới/);
     expect(app).not.toMatch(/Bật Căn Lưới/);
@@ -109,7 +109,7 @@ describe('M1.7.5 Part 4 — Snap-to-Grid & G key removal', () => {
   });
 
   it('3. GameScreen HUD no longer renders the Lưới button', () => {
-    const game = read('ui/GameScreen.ts');
+    const game = read('ui/GameScreen.ts') + read('ui/GameHudMarkup.ts');
     expect(game).not.toContain('btn-snap-grid');
     expect(game).not.toContain('📐 Lưới');
     // Sibling toolbar buttons survive (spec: keep the other buttons).
@@ -117,9 +117,9 @@ describe('M1.7.5 Part 4 — Snap-to-Grid & G key removal', () => {
     expect(game).toContain('btn-rotate-card');
     expect(game).toContain('btn-stack-cards');
     expect(game).toContain('btn-reset-cam');
-    // The help hint advertises wheel rotation instead of the G grid toggle.
+    // G hiện là phím Gom bom.
     expect(game).toContain('Lăn chuột');
-    expect(game).not.toMatch(/<b>G:<\/b>/);
+    expect(game).toContain('<kbd>G</kbd> Gom bom');
   });
 
   it('4. UIManager has no grid delegation left', () => {

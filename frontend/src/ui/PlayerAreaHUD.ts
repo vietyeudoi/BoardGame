@@ -7,11 +7,13 @@
 
 // ─── PlayerAreaHUD ────────────────────────────────────────────────────────────
 
+import { hudIcon } from './GameHudMarkup';
+
 export class PlayerAreaHUD {
-  private readonly _container: HTMLElement;
-  private readonly _panel: HTMLDivElement;
+  private readonly _panel: HTMLDetailsElement;
   private readonly _toggleBtn: HTMLButtonElement;
   private readonly _areaLabel: HTMLDivElement;
+  private readonly _events = new AbortController();
   private _panelVisible = true;
 
   /** Callback: show/hide toggle button pressed */
@@ -20,70 +22,28 @@ export class PlayerAreaHUD {
   public onAreaSelected: ((areaId: string | null) => void) | null = null;
 
   constructor(container: HTMLElement) {
-    this._container = container;
-
-    this._panel = document.createElement('div');
+    this._panel = document.createElement('details');
     this._panel.id = 'player-area-hud';
-    Object.assign(this._panel.style, {
-      position: 'absolute',
-      bottom: '14px',
-      right: '14px',
-      background: 'rgba(10,14,28,0.82)',
-      border: '1px solid #00ccff55',
-      borderRadius: '8px',
-      padding: '10px 14px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '8px',
-      color: '#cceeff',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '13px',
-      zIndex: '200',
-      minWidth: '160px',
-      backdropFilter: 'blur(4px)',
-      userSelect: 'none',
-    } as CSSStyleDeclaration);
 
-    // Row: title
-    const title = document.createElement('span');
-    title.textContent = '⬡ Khu vực người chơi';
-    title.style.fontWeight = 'bold';
-    title.style.fontSize = '12px';
-    title.style.opacity = '0.7';
+    const title = document.createElement('summary');
+    title.className = 'hud-control';
+    title.title = 'Khu vực người chơi';
+    title.setAttribute('aria-label', title.title);
+    title.innerHTML = hudIcon('area');
 
-    // Row: toggle button
+    const controls = document.createElement('div');
+    controls.className = 'hud-popover';
     this._toggleBtn = document.createElement('button');
     this._toggleBtn.id = 'toggle-areas-btn';
-    this._toggleBtn.textContent = '👁 Ẩn/Hiện Khu vực';
-    Object.assign(this._toggleBtn.style, {
-      background: '#0a1428',
-      color: '#00ccff',
-      border: '1px solid #00ccff55',
-      borderRadius: '4px',
-      padding: '4px 8px',
-      fontSize: '12px',
-      cursor: 'pointer',
-    } as CSSStyleDeclaration);
+    this._toggleBtn.type = 'button';
+    this._toggleBtn.textContent = 'Ẩn/Hiện khu vực';
+    this._toggleBtn.addEventListener('click', () => this.onToggleVisibility?.(), { signal: this._events.signal });
 
-    this._toggleBtn.addEventListener('click', () => {
-      this.onToggleVisibility?.();
-    });
-
-    // Row: selected area label
     this._areaLabel = document.createElement('div');
     this._areaLabel.id = 'selected-area-label';
-    this._areaLabel.textContent = '';
-    Object.assign(this._areaLabel.style, {
-      fontSize: '12px',
-      opacity: '0.75',
-      minHeight: '16px',
-    } as CSSStyleDeclaration);
-
-    this._panel.appendChild(title);
-    this._panel.appendChild(this._toggleBtn);
-    this._panel.appendChild(this._areaLabel);
-
-    this._container.appendChild(this._panel);
+    controls.append(this._toggleBtn, this._areaLabel);
+    this._panel.append(title, controls);
+    container.append(this._panel);
   }
 
   // ─── Public Methods ───────────────────────────────────────────────────────
@@ -94,7 +54,7 @@ export class PlayerAreaHUD {
 
   setVisible(visible: boolean): void {
     this._panelVisible = visible;
-    this._panel.style.display = visible ? 'flex' : 'none';
+    this._panel.hidden = !visible;
   }
 
   isVisible(): boolean {
@@ -102,9 +62,8 @@ export class PlayerAreaHUD {
   }
 
   dispose(): void {
-    if (this._panel.parentNode) {
-      this._panel.parentNode.removeChild(this._panel);
-    }
+    this._events.abort();
+    this._panel.remove();
     this.onToggleVisibility = null;
     this.onAreaSelected = null;
   }

@@ -2626,3 +2626,49 @@ vitest@^2.1.4           — testing
 
 - Chủ phòng chọn đúng một bộ gốc trước khi chia. Số lá bom và lá cứu được lưu riêng theo mã loại bài của từng bộ. Làm lại ván giữ bộ gốc và toàn bộ cấu hình.
 - Máy chủ chia lá cứu theo cờ của bộ đã chọn và loại mọi lá bom khỏi nhóm bài chia tay. Bộ Zombie có mặt chữ và nội dung chức năng, chưa có cơ chế người chết hoặc hồi sinh.
+
+## 2026-11-08 — Xáo tay và xáo chồng công khai
+
+- Phím S và HUD yêu cầu máy chủ lấy bom thường, đặt úp trước ghế rồi xáo phần tay còn lại. Đổi mã ẩn danh sau khi xáo tay để tránh theo dõi thứ tự.
+- Menu chuột phải xáo chồng bốc qua luồng hiện có, hoặc xáo các lá công khai cùng tọa độ ngang trên bàn.
+
+## 2026-11-08 — Tách Xáo tay và Gom bom
+
+- S chỉ xáo thứ tự tay. G gom bom thường từ chồng bốc, giữ thứ tự tương đối của cả hai nhóm, cập nhật số lá và dùng chung hiệu ứng đặt chồng. Phiên See/Alter khóa thao tác Gom bom.
+
+## 2026-11-08 — Chọn khung trên bàn và fan
+
+- Kéo trái từ vùng trống để chọn các lá giao với khung. Shift thêm, Ctrl đảo, Esc hủy. Trên bàn dùng hộp bao chiếu qua camera, trong fan dùng vùng thẻ đang hiển thị.
+- Khung dùng cùng danh sách chọn với Ctrl+Click và chỉ tồn tại ở máy người thao tác.
+
+## 2026-11-08 — Chuyển và đổi ghế
+
+- Ghế trống chuyển ngay. Hai người chỉ đổi ghế sau khi người nhận đồng ý. Máy chủ kiểm tra chỗ ngồi, khóa kéo, phiên xem, thời hạn và tần suất gửi.
+- Tay bài theo người, bài trên bàn giữ tọa độ mặc định. Camera, tên và avatar chuyển động theo ghế mới với tùy chọn giảm chuyển động của hệ thống.
+
+## 2026-11-08 — Tung xúc xắc và đồng xu
+
+- HUD dùng D và C. Máy chủ dùng crypto.randomInt, kiểm tra ghế, phiên See/Alter của người tung và thời gian chờ chung cho hai loại.
+- Sự kiện tung mang kết quả và tọa độ bàn đã chọn. Tab vào sau chỉ nhận lượt còn đang chuyển động. Hiệu ứng dùng hình học và texture chung, chỉ đăng ký hiển thị trong SceneManager.
+- Thêm kiểm thử cho phân bố RNG, quyền, khoảng cách, giới hạn, mặt kết quả và đồng bộ ba trình duyệt.
+
+## 2026-11-08 — HUD bàn chơi gọn theo kích thước cửa sổ
+
+- Chia thanh công cụ theo nhóm, giữ ID và callback thao tác. Mã phòng hỗ trợ sao chép, bảng phím tắt nhớ trạng thái, Reset Camera và Sảnh nằm trong menu hệ thống.
+- Thẻ đổi ghế và thông báo dùng một vùng chung. Thẻ hành động luôn ở trên cùng. Các toast tự ẩn và giới hạn ba mục.
+- Dùng chung biến CSS cho nền, cỡ chữ, viền, trạng thái và bố cục responsive. HUD nền và toast cho chuột đi qua.
+
+| Thành phần trước khi đổi bố cục | Nơi dựng và đường xử lý |
+| --- | --- |
+| Tên game, chấm kết nối, mã phòng, sức chứa và ghế | GameScreen dựng nhãn HTML. UIManager chuyển trạng thái qua updateConnectionStatus và updateRoomInfo. Các nhãn cũ chỉ hiển thị thông tin. |
+| Badge chồng bốc, Chèn Đỉnh/Đáy/Tùy chọn, vị trí và số lá tác động −/+ | GameScreen nhận updateDeckCount và updateDeckControls. Các điều khiển đi qua onSetInsertionMode, onRequestCustomModal, onDeckPosition và onDeckAffectedCount. |
+| Trạng thái khóa See/Alter, ô chọn hai vị trí, Đổi chỗ, Xác nhận, Xong/Hủy, hàng thẻ Alter | GameScreen nhận updateDeckView. Nút đi qua onSwapDeckView và onCloseDeckView. DeckAlterStrip gửi thứ tự kéo thả qua onOrder. |
+| Lật, Xoay 90°, Xếp chồng, Gom bom, Xáo tay | Nút GameScreen gọi onFlipCard, onRotateCard, onStackCards, onGatherBombs và onShuffleHand. |
+| Xúc xắc và đồng xu | Nút GameScreen dùng onTableRoll, nhãn kết quả đi qua showTableRollNotice. |
+| Reset Camera, Làm lại ván, Sảnh | Nút GameScreen đi qua onResetCamera, onResetRound và onToLobby. |
+| Thanh gợi ý phím | GameScreen dựng nhãn tĩnh. App và CameraController xử lý phím của bàn. |
+| Bảng thiết lập bộ bài, số lượng, cảnh báo và Chia bài | RoundSetupPanel nhận update và gọi onConfigure hoặc onDeal. |
+| Hộp vị trí chèn tùy chọn | InsertionModal gọi onConfirm hoặc onCancel từ App. |
+| Khung khu vực người chơi | PlayerAreaHUD hiển thị nhãn chọn và nút onToggleVisibility. |
+| Yêu cầu đổi chỗ gửi/nhận, đồng hồ, Đồng ý/Từ chối/Hủy | SeatPrompt nhận show/remove và chuyển nút qua onAction. App nối tới các yêu cầu ghế hiện có. |
+| Lỗi, thông báo xáo/gom và kết quả tung | GameScreen dựng hud-game-error, hud-deck-status và hud-roll-notices qua showError, showShuffleNotice, showDeckShuffle và showTableRollNotice. |
