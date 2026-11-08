@@ -1,9 +1,9 @@
-import { CardType, type CardDefinition, type CardPack } from '../types/gameObjects.js';
+import { CardType, type CardDefinition, type CardPack, type BaseCardPack, type BaseCardPackId } from '../types/gameObjects.js';
 
 const baseCards: readonly CardDefinition[] = [
-  { type: CardType.ExplodingKitten, name: 'Mèo Nổ', englishName: 'Exploding Kitten', count: 4, isNormalCat: false,
+  { type: CardType.ExplodingKitten, name: 'Mèo Nổ', englishName: 'Exploding Kitten', count: 4, isNormalCat: false, isBomb: true,
     description: 'Khi rút, lật cho mọi người thấy. Nếu không dùng được Gỡ Bom, bạn bị loại.' },
-  { type: CardType.Defuse, name: 'Gỡ Bom', englishName: 'Defuse', count: 6, isNormalCat: false,
+  { type: CardType.Defuse, name: 'Gỡ Bom', englishName: 'Defuse', count: 6, isNormalCat: false, isRescue: true,
     description: 'Bỏ lá này để sống sót, rồi bí mật đặt Mèo Nổ vào vị trí tùy ý trong chồng.' },
   { type: CardType.Attack, name: 'Tấn công', englishName: 'Attack (2x)', count: 4, isNormalCat: false,
     description: 'Kết thúc lượt không rút. Người kế tiếp chơi 2 lượt. Nếu đánh tiếp Tấn công, cộng 2 vào số lượt còn lại và chuyển sang người kế.' },
@@ -29,20 +29,61 @@ const baseCards: readonly CardDefinition[] = [
 
 
 export const BASE_CARD_DEFINITIONS: readonly CardDefinition[] = baseCards.map(card => ({
-  ...card, pack: 'base', isBomb: card.type === CardType.ExplodingKitten,
+  ...card, pack: 'base', isBomb: card.isBomb ?? false, isRescue: card.isRescue ?? false,
 }));
 
-type ExpansionCard = [CardType, string, string, number, string, { bomb?: boolean; cat?: boolean }?];
+type PackCard = [CardType, string, string, number, string, { bomb?: boolean; rescue?: boolean; cat?: boolean }?];
 
-function expansion(id: CardPack['id'], name: string, description: string, color: string, cards: ExpansionCard[]): CardPack {
-  return { id, name, description, color, kind: 'expansion', cards: cards.map(([type, englishName, name, count, description, flags]) => ({
-    type, englishName, name, count, description, pack: id, isBomb: flags?.bomb ?? false, isNormalCat: flags?.cat ?? false,
-  })) };
+
+function defineCards(id: CardPack['id'], cards: PackCard[]): CardDefinition[] {
+  return cards.map(([type, englishName, name, count, description, flags]) => ({
+    type, englishName, name, count, description, pack: id, isBomb: flags?.bomb ?? false,
+    isRescue: flags?.rescue ?? false, isNormalCat: flags?.cat ?? false,
+  }));
+}
+
+function expansion(id: CardPack['id'], name: string, description: string, color: string, cards: PackCard[]): CardPack {
+  return { id, name, description, color, kind: 'expansion', cards: defineCards(id, cards) };
+}
+
+function base(id: BaseCardPackId, name: string, description: string, color: string, cards: readonly CardDefinition[]): BaseCardPack {
+  return { id, name, description, color, kind: 'base', cards,
+    bomb: cards.find(card => card.isBomb)!, rescue: cards.find(card => card.isRescue)! };
+}
+
+const zombieCards = defineCards('zombie', [
+  [CardType.ZombieExplodingKitten, 'Exploding Kitten', 'Mèo Nổ', 4, 'Lật khi rút. Nếu không dùng Zombie Kitten, bạn chết, đặt bom ngửa trước mặt và giữ bài trên tay.', { bomb: true }],
+  [CardType.ZombieKitten, 'Zombie Kitten', 'Mèo Thây Ma', 5, 'Gỡ bom. Nếu có người đã chết, phải hồi sinh một người. Bí mật chèn lại bom vừa rút và bom của người hồi sinh, rồi hết lượt.', { rescue: true }],
+  [CardType.ZombieAttack, 'Attack (2x)', 'Tấn công', 2, 'Kết thúc lượt không rút. Người kế tiếp chơi 2 lượt. Attack đánh tiếp có thể cộng dồn lượt còn lại.'],
+  [CardType.AttackOfTheDead, 'Attack of the Dead', 'Tấn công của người chết', 3, 'Kết thúc lượt không rút. Người kế tiếp chơi 3 lượt cho mỗi người đang chết. Chỉ dùng khi có người chết.'],
+  [CardType.ZombieSkip, 'Skip', 'Bỏ lượt', 3, 'Bỏ một lượt mà không rút bài.'],
+  [CardType.ZombieSuperSkip, 'Super Skip', 'Siêu bỏ lượt', 2, 'Bỏ toàn bộ lượt còn phải chơi mà không rút.'],
+  [CardType.ZombieSeeTheFuture, 'See the Future (3x)', 'Xem tương lai (3x)', 4, 'Xem riêng 3 lá đầu chồng rút rồi trả lại đúng thứ tự.'],
+  [CardType.ZombieShuffle, 'Shuffle ⚡ NOW', 'Xáo bài ngay', 2, 'Xáo toàn bộ chồng rút. Có thể đánh ngoài lượt hoặc khi đã chết.'],
+  [CardType.Clairvoyance, 'Clairvoyance ⚡ NOW', 'Thấu thị ngay', 2, 'Khi người khác gỡ bom, xem họ đặt bom lại ở đâu. Nếu họ đặt hai lá bom, bạn được xem cả hai vị trí.'],
+  [CardType.FeedTheDead, 'Feed the Dead ⚡ NOW', 'Nuôi người chết ngay', 2, 'Chọn một người đã chết. Mỗi người sống còn bài, trừ người đánh, chọn một lá đưa cho người đó.'],
+  [CardType.GraveRobber, 'Grave Robber', 'Đào mộ', 1, 'Mỗi người đã chết còn bài chọn một lá trên tay để xáo vào chồng rút. Chỉ dùng khi có người chết.'],
+  [CardType.Clone, 'Clone', 'Sao chép', 3, 'Sao chép lá ngay dưới trên chồng bỏ, trừ Clone khác. Chỉ đánh trong lượt của mình khi còn sống.'],
+  [CardType.DigDeeper, 'Dig Deeper', 'Đào sâu', 4, 'Xem lá đầu. Giữ lá đó hoặc rút lá kế và đặt lá đã từ chối lại trên đầu chồng. Sau đó kết thúc lượt.'],
+  [CardType.ZombieFavor, 'Favor', 'Xin bài', 3, 'Chọn một người còn sống. Họ tự chọn một lá đưa cho bạn.'],
+  [CardType.ZombieNope, 'Nope', 'Hủy hành động', 5, 'Hủy hành động trước khi diễn ra, kể cả ngoài lượt hoặc khi đã chết. Có thể phản Nope, trừ Exploding Kitten và Zombie Kitten.'],
+  [CardType.CatOLantern, 'Cat-O-Lantern', 'Mèo bí ngô', 4, 'Mèo thường, dùng để ghép combo.', { cat: true }],
+  [CardType.DeCatIpated, 'De-Cat-Ipated', 'Mèo mất đầu', 4, 'Mèo thường, dùng để ghép combo.', { cat: true }],
+  [CardType.Electrocat, 'Electrocat', 'Mèo điện', 4, 'Mèo thường, dùng để ghép combo.', { cat: true }],
+  [CardType.VampireCat, 'Vampire Cat', 'Mèo ma cà rồng', 4, 'Mèo thường, dùng để ghép combo.', { cat: true }],
+]);
+
+export const DEFAULT_BASE_PACK = base('base', 'Exploding Kittens', 'Bộ gốc mặc định.', '#475569', BASE_CARD_DEFINITIONS);
+export const BASE_CARD_PACKS = [
+  DEFAULT_BASE_PACK, base('zombie', 'Zombie Kittens', 'Bộ gốc dùng Zombie Kitten làm lá cứu.', '#3f6212', zombieCards),
+];
+
+export function getBasePack(id?: BaseCardPackId): BaseCardPack {
+  return BASE_CARD_PACKS.find(pack => pack.id === id) ?? DEFAULT_BASE_PACK;
 }
 
 export const CARD_PACKS: readonly CardPack[] = [
-  { id: 'base', name: 'Bộ gốc', description: 'Bộ bài luôn có mặt trong mỗi ván.', color: '#475569',
-    kind: 'base', cards: BASE_CARD_DEFINITIONS },
+  ...BASE_CARD_PACKS,
   expansion('imploding', 'Imploding Kittens', 'Mèo Nổ Lõm và các lá đổi hướng chơi hoặc rút bài.', '#9a3412', [
     [CardType.ImplodingKitten, 'Imploding Kitten', 'Mèo Nổ Lõm', 1, 'Rút lúc úp: bí mật chèn lại ngửa. Rút lúc ngửa: bị loại. Defuse và Nope không cứu được.', { bomb: true }],
     [CardType.Reverse, 'Reverse', 'Đảo chiều', 4, 'Đảo chiều chơi và kết thúc một lượt không rút. Khi có hai người, dùng như Skip.'],
@@ -83,7 +124,9 @@ export const MAX_SETUP_CARD_COUNT = 40;
 export const STARTING_OTHER_CARDS = 5;
 
 export function getEditableCardLimit(type: CardType): number | undefined {
-  if (type === CardType.ExplodingKitten || type === CardType.Defuse) return MAX_SETUP_CARD_COUNT;
+
   const card = CARD_DEFINITIONS.get(type);
-  return card && card.pack !== 'base' ? MAX_EXPANSION_CARD_COUNT : undefined;
+  const pack = card?.pack ? CARD_PACK_BY_ID.get(card.pack) : undefined;
+  if (pack?.kind === 'expansion') return MAX_EXPANSION_CARD_COUNT;
+  if (card?.isBomb || card?.isRescue) return MAX_SETUP_CARD_COUNT;
 }

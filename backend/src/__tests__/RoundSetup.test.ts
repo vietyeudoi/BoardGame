@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import { BASE_CARD_DEFINITIONS, CARD_DEFINITIONS, CARD_PACKS  } from '../../../shared/constants/cardTypes.js';
+import { BASE_CARD_DEFINITIONS, CARD_DEFINITIONS, CARD_PACKS, getBasePack } from '../../../shared/constants/cardTypes.js';
 import { CardType } from '../../../shared/types/gameObjects.js';
 import type { ClientToServerMessage, ServerToClientMessage } from '../../../shared/types/protocol.js';
 import { RoomManager } from '../room/RoomManager.js';
@@ -47,7 +47,7 @@ describe('Bộ bài gốc và chia bài', () => {
   });
 
   it('có đúng số lượng mặc định và mã loại riêng cho từng bộ', () => {
-    expect(CARD_PACKS.map(pack => pack.cards.reduce((sum, card) => sum + card.count, 0))).toEqual([56, 20, 15, 20]);
+    expect(CARD_PACKS.map(pack => pack.cards.reduce((sum, card) => sum + card.count, 0))).toEqual([56, 61, 20, 15, 20]);
     const definitions = CARD_PACKS.flatMap(pack => pack.cards);
     expect(CARD_DEFINITIONS.size).toBe(definitions.length);
     for (const pack of CARD_PACKS) expect(pack.cards.every(card => card.pack === pack.id)).toBe(true);
@@ -75,6 +75,43 @@ describe('Bộ bài gốc và chia bài', () => {
         expect(hand).toHaveLength(6);
         expect(hand.filter(card => card.cardType === CardType.Defuse)).toHaveLength(1);
         expect(hand.some(card => CARD_DEFINITIONS.get(card.cardType as CardType)?.isBomb)).toBe(false);
+      }
+    }
+  });
+
+
+  it('bộ Zombie có 61 lá và 116 lá khi kết hợp ba bộ mở rộng', () => {
+    const setup = { basePackId: 'zombie' as const, explodingKittens: 4, defuses: 6 };
+    expect(previewRound(setup, 2, 'SETUP')).toMatchObject({
+      enabledPacks: ['zombie'], totalCards: 61, bombCount: 4, rescueCount: 5, remainingRescues: 3,
+    });
+    expect(previewRound({ ...setup, enabledPacks: ['base', 'imploding', 'streaking', 'barking'] }, 6, 'SETUP')).toMatchObject({
+      enabledPacks: ['zombie', 'imploding', 'streaking', 'barking'], totalCards: 116,
+      bombCount: 6, streakingWarning: false, validationError: expect.stringContaining('thiếu 1 lá Mèo Thây Ma (Zombie Kitten)'),
+    });
+    expect(() => buildRoundDeck(setup, Array.from({ length: 10 }, (_, i) => String(i))))
+      .toThrow('Zombie Kittens thiếu 5 lá Mèo Thây Ma (Zombie Kitten)');
+  });
+
+  it.each([2, 5, 10])('chia đúng lá cứu Zombie cho %i người', seated => {
+    const players = Array.from({ length: seated }, (_, i) => String(i));
+    const base = getBasePack('zombie');
+    for (const enabledPacks of [[], ['imploding'], ['imploding', 'streaking', 'barking']] as const) {
+      const setup = { basePackId: base.id, explodingKittens: 4, defuses: 6,
+        enabledPacks: [...enabledPacks], cardCounts: { [base.rescue.type]: Math.max(seated, 5) } };
+      const plan = previewRound(setup, seated, 'SETUP');
+      const cards = buildRoundDeck(setup, players);
+      const definitions = (objects: typeof cards) => objects.map(card => CARD_DEFINITIONS.get(card.cardType as CardType)!);
+      expect(definitions(cards).every(card => card.pack !== 'base')).toBe(true);
+      const deck = definitions(cards.filter(card => card.location === 'DECK'));
+      expect(deck).toHaveLength(plan.remainingCards);
+      expect(deck.filter(card => card.isBomb)).toHaveLength(plan.remainingBombs!);
+      expect(deck.filter(card => card.isRescue)).toHaveLength(plan.remainingRescues!);
+      for (const id of players) {
+        const hand = definitions(cards.filter(card => card.ownerId === id));
+        expect(hand[0]?.type).toBe(base.rescue.type);
+        expect(hand.filter(card => card.isRescue)).toHaveLength(1);
+        expect(hand.filter(card => !card.isBomb && !card.isRescue)).toHaveLength(5);
       }
     }
   });
@@ -138,14 +175,23 @@ describe('Bộ bài gốc và chia bài', () => {
       expect((await host.read('round:configured')).seatedCount).toBe(2);
 
       for (const payload of [
-        { enabledPacks: ['ghost'] }, { enabledPacks: ['imploding', 'imploding'] },
+        { basePackId: 'imploding' }, { enabledPacks: ['ghost'] }, { enabledPacks: ['imploding', 'imploding'] },
         { cardCounts: { [CardType.Mark]: 21 } }, { cardCounts: { [CardType.Skip]: 1 } },
         { cardCounts: { [CardType.Mark]: 1.5 } },
       ]) {
         host.send({ type: 'round:configure', payload: { explodingKittens: 4, defuses: 6, ...payload } } as ClientToServerMessage);
         expect((await host.read('error')).code).toBe('INVALID_FORMAT');
       }
-      host.send({ type: 'round:configure', payload: { explodingKittens: 4, defuses: 6,
+
+      const zombieSetup = { basePackId: 'zombie' as const, explodingKittens: 4, defuses: 6,
+        cardCounts: { [CardType.ZombieKitten]: 8 } };
+      peer.send({ type: 'round:configure', payload: zombieSetup });
+      expect((await peer.read('error')).code).toBe('ROUND_HOST_REQUIRED');
+      host.send({ type: 'round:configure', payload: zombieSetup });
+      for (const client of [host, peer]) expect(await client.read('round:configured')).toMatchObject({
+        basePackId: 'zombie', totalCards: 64, rescueCount: 8,
+      });
+      host.send({ type: 'round:configure', payload: { basePackId: 'base', explodingKittens: 4, defuses: 6,
         enabledPacks: ['imploding', 'streaking'], cardCounts: { [CardType.Mark]: 0 } } });
       for (const client of [host, peer]) expect(await client.read('round:configured')).toMatchObject({
         totalCards: 88, enabledPacks: ['base', 'imploding', 'streaking'],
@@ -177,6 +223,9 @@ describe('Bộ bài gốc và chia bài', () => {
         expect(snapshot.objects.every(card => card.location === 'HAND' && card.ownerId === id && card.cardType)).toBe(true);
       }
 
+
+      host.send({ type: 'round:configure', payload: zombieSetup });
+      expect((await host.read('error')).code).toBe('ROUND_INVALID');
       const privateId = forHost.objects[0]!.id;
       host.send({ type: 'object:drag-preview', payload: { dragId: 1, phase: 'start',
         cards: [{ objectId: privateId, x: 1, y: 1, z: 1 }] } });
@@ -388,14 +437,28 @@ describe('Bộ bài gốc và chia bài', () => {
       expect(expanded.objects).toHaveLength(6);
       expect(expanded.objects.every(card => card.location === 'HAND' && card.ownerId === watcher.playerId && card.cardType)).toBe(true);
       host.send({ type: 'round:reset' });
+
       expect((await guest.read('room:state')).round).toMatchObject({
         phase: 'SETUP', enabledPacks: ['base', 'imploding', 'streaking', 'barking'],
-        cardCounts: { [CardType.Mark]: 0 },
+        cardCounts: { [CardType.Mark]: 0, [CardType.ZombieKitten]: 8 },
       });
+      host.send({ type: 'round:configure', payload: { ...zombieSetup, cardCounts: undefined } });
+      expect(await guest.read('round:configured')).toMatchObject({ basePackId: 'zombie', rescueCount: 8 });
+      const late = await connect(address.port);
+      late.send({ type: 'room:join', payload: { roomId: a.roomId, playerName: 'Vào muộn' } });
+      await late.read('room:joined');
+      expect((await late.read('room:state')).round).toMatchObject({ basePackId: 'zombie', rescueCount: 8 });
+      host.send({ type: 'round:deal' });
+      const zombieRound = await guest.read('room:state');
+      expect(zombieRound.round).toMatchObject({ basePackId: 'zombie', phase: 'PLAYING' });
+      expect(zombieRound.objects).toHaveLength(6);
+      expect(zombieRound.objects.filter(card => card.cardType === CardType.ZombieKitten)).toHaveLength(1);
+      host.send({ type: 'round:reset' });
+      expect((await guest.read('room:state')).round).toMatchObject({ basePackId: 'zombie', phase: 'SETUP', rescueCount: 8 });
     } finally {
       for (const socket of sockets) socket.terminate();
       server.shutdown();
       http.stop();
     }
-  });
+  }, 10000);
 });

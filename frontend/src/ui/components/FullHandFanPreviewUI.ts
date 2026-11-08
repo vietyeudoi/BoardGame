@@ -11,7 +11,7 @@
  */
 import { getCardFaceRules, RULE_FONT, RULE_PANEL } from '../../objects/CardFaceRules';
 import { CARD_CONFIG } from '../../objects/CardConfig';
-import { getExpansionCardArt } from '../../utils/CardArt';
+import { getPackCardArt } from '../../utils/CardArt';
 import {
   FAN_CARD_ART,
   FAN_CARD_BACK,
@@ -601,7 +601,7 @@ export class FullHandFanPreviewUI {
 
   private _paintCardFace(el: HTMLElement, card: FanCardData): void {
     const doc = this._container.ownerDocument;
-    const expansion = card.masked ? undefined : getExpansionCardArt(card.cardType);
+    const expansion = card.masked ? undefined : getPackCardArt(card.cardType);
     const art: FanCardArt = card.masked
       ? FAN_CARD_BACK
       : (card.cardType ? FAN_CARD_ART[card.cardType] : undefined) ?? FAN_CARD_FALLBACK;

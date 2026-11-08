@@ -2,14 +2,14 @@
  * MessageValidator.ts — Validates ALL incoming client messages
  * Per PROJECT_RULES.md Section D: Never trust client data.
  */
-import { BASE_CARD_DEFINITIONS, CARD_PACKS, CARD_PACK_BY_ID, getEditableCardLimit, MAX_EXPANSION_CARD_COUNT, MAX_SETUP_CARD_COUNT } from '../../../shared/constants/cardTypes.js';
-import { CardType, type CardPackId } from '../../../shared/types/gameObjects.js';
+import { BASE_CARD_PACKS, CARD_PACKS, CARD_PACK_BY_ID, getEditableCardLimit, MAX_EXPANSION_CARD_COUNT, MAX_SETUP_CARD_COUNT } from '../../../shared/constants/cardTypes.js';
+import type { CardType, CardPackId } from '../../../shared/types/gameObjects.js';
 import type { ClientToServerMessage } from '../../../shared/types/protocol.js';
 
 // Giới hạn theo bộ bài thiết lập lớn nhất có thể tạo.
-const MAX_DECK_VIEW_ORDER = 2 * (MAX_SETUP_CARD_COUNT + BASE_CARD_DEFINITIONS
-  .filter(card => card.type !== CardType.ExplodingKitten && card.type !== CardType.Defuse)
-  .reduce((sum, card) => sum + card.count, 0))
+
+const MAX_DECK_VIEW_ORDER = Math.max(...BASE_CARD_PACKS.map(pack => pack.cards.reduce((sum, card) =>
+  sum + (getEditableCardLimit(card.type) ?? card.count * 2), 0)))
   + CARD_PACKS.reduce((sum, pack) => sum + (pack.kind === 'expansion' ? pack.cards.length * MAX_EXPANSION_CARD_COUNT : 0), 0);
 
 type ValidationResult<T> =
@@ -91,6 +91,11 @@ export const MessageValidator = {
         const isCount = (value: unknown) => isNonNegativeInteger(value) && Number(value) <= MAX_SETUP_CARD_COUNT;
         if (!isCount(p?.['explodingKittens']) || !isCount(p?.['defuses'])) {
           return { success: false, error: 'Số lượng Mèo Nổ hoặc Gỡ Bom không hợp lệ.' };
+        }
+
+        const basePackId = p?.['basePackId'];
+        if (basePackId !== undefined && !BASE_CARD_PACKS.some(pack => pack.id === basePackId)) {
+          return { success: false, error: 'Bộ gốc được chọn không hợp lệ.' };
         }
         const packs = p?.['enabledPacks'];
         if (packs !== undefined && (!Array.isArray(packs) || new Set(packs).size !== packs.length

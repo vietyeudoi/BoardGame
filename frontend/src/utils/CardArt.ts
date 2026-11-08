@@ -1,4 +1,4 @@
-import { CARD_DEFINITIONS, CARD_PACK_BY_ID } from '@shared/constants/cardTypes';
+import { CARD_DEFINITIONS, CARD_PACK_BY_ID, DEFAULT_BASE_PACK } from '@shared/constants/cardTypes';
 import type { CardType } from '@shared/types/gameObjects';
 
 /** Visual identity for one card face in the fan preview. */
@@ -100,9 +100,9 @@ export const FAN_CARD_ART: Readonly<Record<string, FanCardArt>> = {
 };
 
 // Dùng nhãn chữ và màu bộ cho các lá chưa có hình.
-export function getExpansionCardArt(type?: string | null) {
+export function getPackCardArt(type?: string | null) {
   const card = CARD_DEFINITIONS.get(type as CardType);
   const pack = card?.pack ? CARD_PACK_BY_ID.get(card.pack) : undefined;
-  if (!card || pack?.kind !== 'expansion') return;
+  if (!card || !pack || pack.id === DEFAULT_BASE_PACK.id) return;
   return { name: card.englishName, pack: pack.name, color: pack.color };
 }

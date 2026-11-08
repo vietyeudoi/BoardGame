@@ -2,7 +2,7 @@ import { CARD_DEFINITIONS } from '@shared/constants/cardTypes';
 import type { CardType } from '@shared/types/gameObjects';
 import type { DeckViewState } from '@shared/types/protocol';
 import { getCardTitle } from '../../objects/CardTypeHelper';
-import { FAN_CARD_ART, getExpansionCardArt } from '../../utils/CardArt';
+import { FAN_CARD_ART, getPackCardArt } from '../../utils/CardArt';
 
 const CARD_SELECTOR = '[data-alter-token]';
 const MIN_DRAG_DISTANCE = 5;
@@ -68,7 +68,7 @@ export class DeckAlterStrip {
       const card = document.createElement('div');
       const art = cardType ? FAN_CARD_ART[cardType] : undefined;
       const title = getCardTitle(cardType);
-      const expansion = getExpansionCardArt(cardType);
+      const expansion = getPackCardArt(cardType);
       card.className = 'deck-alter-card';
       card.dataset['alterToken'] = String(token);
       card.title = title;

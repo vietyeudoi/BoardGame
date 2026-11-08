@@ -43,13 +43,34 @@ export enum CardType {
   IllTakeThat = 'barking:ill-take-that',
   BarkingSuperSkip = 'barking:super-skip',
   Potluck = 'barking:potluck',
+  ZombieExplodingKitten = 'zombie:exploding-kitten',
+  ZombieKitten = 'zombie:zombie-kitten',
+  ZombieAttack = 'zombie:attack',
+  AttackOfTheDead = 'zombie:attack-of-the-dead',
+  ZombieSkip = 'zombie:skip',
+  ZombieSuperSkip = 'zombie:super-skip',
+  ZombieSeeTheFuture = 'zombie:see-the-future',
+  ZombieShuffle = 'zombie:shuffle',
+  Clairvoyance = 'zombie:clairvoyance',
+  FeedTheDead = 'zombie:feed-the-dead',
+  GraveRobber = 'zombie:grave-robber',
+  Clone = 'zombie:clone',
+  DigDeeper = 'zombie:dig-deeper',
+  ZombieFavor = 'zombie:favor',
+  ZombieNope = 'zombie:nope',
+  CatOLantern = 'zombie:cat-o-lantern',
+  DeCatIpated = 'zombie:de-cat-ipated',
+  Electrocat = 'zombie:electrocat',
+  VampireCat = 'zombie:vampire-cat',
 }
 
-export type CardPackId = 'base' | 'imploding' | 'streaking' | 'barking';
+export type BaseCardPackId = 'base' | 'zombie';
+export type CardPackId = BaseCardPackId | 'imploding' | 'streaking' | 'barking';
 
 export interface CardDefinition {
   pack?: CardPackId;
   isBomb?: boolean;
+  isRescue?: boolean;
   type: CardType;
   name: string;
   englishName: string;
@@ -65,4 +86,11 @@ export interface CardPack {
   kind: 'base' | 'expansion';
   color: string;
   cards: readonly CardDefinition[];
+}
+
+export interface BaseCardPack extends CardPack {
+  id: BaseCardPackId;
+  kind: 'base';
+  bomb: CardDefinition;
+  rescue: CardDefinition;
 }

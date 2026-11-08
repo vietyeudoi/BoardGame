@@ -2621,3 +2621,8 @@ vitest@^2.1.4           — testing
 - Các lá mở rộng dùng mặt chữ kèm màu và nhãn của bộ. Tower of Power có dữ liệu lá bài, chưa có kho dự trữ.
 
 - Khôi phục tương tác với tay bài của người khác bằng mã lá ẩn danh. Máy chủ giữ khóa theo lá thật. Kéo lá từ tay người khác ra bàn hoặc chèn vào chồng vẫn giữ mặt úp.
+
+## 2026-11-08 — Bộ gốc Zombie Kittens
+
+- Chủ phòng chọn đúng một bộ gốc trước khi chia. Số lá bom và lá cứu được lưu riêng theo mã loại bài của từng bộ. Làm lại ván giữ bộ gốc và toàn bộ cấu hình.
+- Máy chủ chia lá cứu theo cờ của bộ đã chọn và loại mọi lá bom khỏi nhóm bài chia tay. Bộ Zombie có mặt chữ và nội dung chức năng, chưa có cơ chế người chết hoặc hồi sinh.

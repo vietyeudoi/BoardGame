@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { getCardFaceRules, RULE_FONT, RULE_PANEL } from './CardFaceRules';
 import { getCardTitle } from './CardTypeHelper';
 import { CARD_CONFIG } from './CardConfig';
-import { FAN_CARD_ART, getExpansionCardArt } from '../utils/CardArt';
+import { FAN_CARD_ART, getPackCardArt } from '../utils/CardArt';
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('CardTextureGenerator');
@@ -101,7 +101,7 @@ export class CardTextureGenerator {
     const bgColor = content?.backgroundColor ?? CARD_CONFIG.DEFAULT_BG_FRONT;
     const textColor = content?.textColor ?? CARD_CONFIG.DEFAULT_TEXT_COLOR;
     const art = cardType ? FAN_CARD_ART[cardType] : undefined;
-    const expansion = getExpansionCardArt(cardType);
+    const expansion = getPackCardArt(cardType);
     const accentColor = content?.accentColor ?? art?.accent ?? expansion?.color ?? CARD_CONFIG.DEFAULT_ACCENT_COLOR;
     const title = content?.title ?? 'Card';
     const description = content?.description ?? '';

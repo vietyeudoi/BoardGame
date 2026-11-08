@@ -1,10 +1,12 @@
-import { CARD_PACKS, getEditableCardLimit } from '@shared/constants/cardTypes';
-import { CardType, type CardDefinition, type CardPack, type CardPackId } from '@shared/types/gameObjects';
+import { CARD_PACKS, DEFAULT_BASE_PACK, getBasePack, getEditableCardLimit } from '@shared/constants/cardTypes';
+import type { BaseCardPackId, CardType, CardDefinition, CardPack, CardPackId } from '@shared/types/gameObjects';
 import type { DeckSetup, RoundSetup } from '@shared/types/room';
 
 interface PackControls {
   count: HTMLElement;
-  toggle?: HTMLInputElement;
+  toggle: HTMLInputElement;
+  details: HTMLDetailsElement;
+  settings: HTMLElement;
 }
 
 export class RoundSetupPanel {
@@ -19,6 +21,7 @@ export class RoundSetupPanel {
   private readonly _editControls: (HTMLInputElement | HTMLButtonElement)[] = [];
   private _setup?: DeckSetup;
   private _isHost = false;
+  private _selectedBase?: BaseCardPackId;
   onConfigure?: (setup: DeckSetup) => void;
   onDeal?: () => void;
 
@@ -50,43 +53,51 @@ export class RoundSetupPanel {
     row.dataset['packId'] = pack.id;
     row.style.cssText = 'margin-top:9px;padding:8px;border:1px solid #334155;border-left:4px solid ' + pack.color + ';border-radius:6px';
     const details = document.createElement('details');
-    details.open = pack.kind === 'base';
+
     const summary = document.createElement('summary');
     summary.style.cssText = 'cursor:pointer;font-weight:650';
     summary.append(pack.name + ' · ');
     const count = document.createElement('span');
     summary.append(count);
     details.append(summary);
-    const controls: PackControls = { count };
-    if (pack.kind === 'expansion') {
-      const toggleLabel = document.createElement('label');
-      toggleLabel.style.cssText = 'float:right;margin-left:5px';
-      const toggle = document.createElement('input');
-      toggle.type = 'checkbox';
-      toggle.setAttribute('aria-label', 'Bật ' + pack.name);
-      toggleLabel.append(toggle, ' Bật');
-      row.append(toggleLabel);
-      controls.toggle = toggle;
-      this._editControls.push(toggle);
-      toggle.addEventListener('change', () => {
-        const enabledPacks = CARD_PACKS.filter(item => item.kind === 'base' || this._packs.get(item.id)?.toggle?.checked).map(item => item.id);
+
+    const settings = document.createElement('div');
+    const toggleLabel = document.createElement('label');
+    toggleLabel.style.cssText = 'float:right;margin-left:5px';
+    const toggle = document.createElement('input');
+    const isBase = pack.kind === 'base';
+    toggle.type = isBase ? 'radio' : 'checkbox';
+    if (isBase) toggle.name = 'setup-base-pack';
+    toggle.setAttribute('aria-label', (isBase ? 'Chọn ' : 'Bật ') + pack.name);
+    toggleLabel.append(toggle, isBase ? ' Chọn' : ' Bật');
+    row.append(toggleLabel);
+    this._packs.set(pack.id, { count, toggle, details, settings });
+    this._editControls.push(toggle);
+    const options = { signal: this._abort.signal };
+    toggle.addEventListener('change', () => {
+      if (isBase) {
+        if (toggle.checked) this._change({ basePackId: getBasePack(pack.id as BaseCardPackId).id });
+      } else {
+        const enabledPacks = CARD_PACKS.filter(item => item.kind === 'expansion' && this._packs.get(item.id)?.toggle.checked)
+          .map(item => item.id);
         this._change({ enabledPacks });
-      }, { signal: this._abort.signal });
-    }
-    this._packs.set(pack.id, controls);
+      }
+    }, options);
+    if (isBase) summary.addEventListener('click', event => {
+      if (toggle.checked) return;
+      event.preventDefault();
+      toggle.click();
+    }, options);
     const description = document.createElement('p');
-    description.textContent = pack.kind === 'base' ? 'Các lá còn lại giữ số mặc định theo tùy chọn của phòng.' : pack.description;
+    description.textContent = isBase ? 'Các lá còn lại giữ số mặc định theo tùy chọn của phòng.' : pack.description;
     description.style.cssText = 'color:#cbd5e1;font-size:12px;margin:7px 0';
-    details.append(description);
-    for (const card of pack.cards) {
-      const limit = getEditableCardLimit(card.type);
-      if (limit !== undefined) details.append(this._buildCount(card, limit));
-    }
-    if (pack.kind === 'expansion') {
-      details.append(this._button('Đặt lại mặc định', () => {
-        this._setCounts(Object.fromEntries(pack.cards.map(card => [card.type, card.count])));
-      }));
-    }
+    settings.append(description);
+    const editable = pack.cards.filter(card => getEditableCardLimit(card.type) !== undefined);
+    for (const card of editable) settings.append(this._buildCount(card, getEditableCardLimit(card.type)!));
+    settings.append(this._button('Đặt lại mặc định', () => {
+      this._setCounts(Object.fromEntries(editable.map(card => [card.type, card.count])));
+    }));
+    details.append(settings);
     row.append(details);
     return row;
   }
@@ -116,8 +127,8 @@ export class RoundSetupPanel {
     input.step = '1';
     input.required = true;
     input.style.width = '3.1rem';
-    input.id = card.type === CardType.ExplodingKitten ? 'setup-exploding-kittens'
-      : card.type === CardType.Defuse ? 'setup-defuses' : 'setup-' + card.type.replace(':', '-');
+    input.id = card.type === DEFAULT_BASE_PACK.bomb.type ? 'setup-exploding-kittens'
+      : card.type === DEFAULT_BASE_PACK.rescue.type ? 'setup-defuses' : 'setup-' + card.type.replace(':', '-');
     label.htmlFor = input.id;
     this._inputs.set(card.type, input);
     this._editControls.push(input);
@@ -139,8 +150,8 @@ export class RoundSetupPanel {
   private _count(card: CardDefinition): number {
     const configured = this._setup?.cardCounts?.[card.type];
     if (configured !== undefined) return configured;
-    if (card.type === CardType.ExplodingKitten) return this._setup?.explodingKittens ?? card.count;
-    if (card.type === CardType.Defuse) return this._setup?.defuses ?? card.count;
+    if (card.type === DEFAULT_BASE_PACK.bomb.type) return this._setup?.explodingKittens ?? card.count;
+    if (card.type === DEFAULT_BASE_PACK.rescue.type) return this._setup?.defuses ?? card.count;
     return card.count;
   }
 
@@ -148,8 +159,8 @@ export class RoundSetupPanel {
     if (!this._setup || !counts) return;
     this._change({
       cardCounts: { ...this._setup.cardCounts, ...counts },
-      explodingKittens: counts[CardType.ExplodingKitten] ?? this._setup.explodingKittens,
-      defuses: counts[CardType.Defuse] ?? this._setup.defuses,
+      explodingKittens: counts[DEFAULT_BASE_PACK.bomb.type] ?? this._setup.explodingKittens,
+      defuses: counts[DEFAULT_BASE_PACK.rescue.type] ?? this._setup.defuses,
     });
   }
 
@@ -164,17 +175,28 @@ export class RoundSetupPanel {
     this._isHost = isHost;
     this._setup = undefined;
     if (this._root.hidden || !round) return;
+
     const { explodingKittens, defuses, enabledPacks, cardCounts } = round;
-    this._setup = { explodingKittens, defuses, enabledPacks, cardCounts };
+    const base = getBasePack(round.basePackId);
+    const selectionChanged = this._selectedBase !== base.id;
+    this._selectedBase = base.id;
+    this._setup = { basePackId: base.id, explodingKittens, defuses, enabledPacks, cardCounts };
     for (const control of this._editControls) control.disabled = !isHost;
     const included: string[] = [];
     for (const pack of CARD_PACKS) {
       const controls = this._packs.get(pack.id)!;
-      const enabled = pack.kind === 'base' || enabledPacks?.includes(pack.id) === true;
-      const configured = pack.cards.reduce((sum, card) => sum + this._count(card), 0);
-      const activeTotal = round.packTotals?.[pack.id] ?? (pack.kind === 'base' ? round.totalCards : configured);
-      controls.count.textContent = (enabled ? activeTotal : configured) + (enabled ? ' lá' : ' lá · đang tắt');
-      if (controls.toggle) controls.toggle.checked = enabled;
+
+      const isBase = pack.kind === 'base';
+      const enabled = isBase ? pack.id === base.id : enabledPacks?.includes(pack.id) === true;
+      const configured = pack.cards.reduce((sum, card) => sum + this._count(card) *
+        (isBase && !card.isBomb && !card.isRescue ? round.ordinaryMultiplier : 1), 0);
+      const activeTotal = round.packTotals?.[pack.id] ?? configured;
+      controls.count.textContent = (enabled ? activeTotal : configured) + (enabled || isBase ? ' lá' : ' lá · đang tắt');
+      controls.toggle.checked = enabled;
+      if (isBase) {
+        controls.settings.hidden = !enabled;
+        if (selectionChanged) controls.details.open = enabled;
+      }
       if (enabled) included.push(pack.name + ' ' + activeTotal);
       for (const card of pack.cards) {
         const input = this._inputs.get(card.type);
@@ -182,13 +204,16 @@ export class RoundSetupPanel {
       }
     }
     const remaining = round.validationError ? '—' : String(round.remainingCards);
-    const remainingDefuses = round.validationError ? '—' : String(round.remainingDefuses);
+
+    const rescueName = base.rescue.englishName;
+    const rescueCount = round.rescueCount ?? this._count(base.rescue);
+    const remainingRescues = round.validationError ? '—' : String(round.remainingRescues ?? round.remainingDefuses);
     const remainingBombs = round.validationError ? '—' : String(round.remainingBombs ?? explodingKittens);
     this._preview.textContent = [
       'Tổng ' + round.totalCards + ' lá · ' + round.seatedCount + ' người đang ngồi',
       included.join(' · '),
-      (round.bombCount ?? explodingKittens) + ' bom · ' + defuses + ' Gỡ Bom',
-      'Sau khi chia: ' + remaining + ' lá · ' + remainingBombs + ' bom · ' + remainingDefuses + ' Gỡ Bom',
+      (round.bombCount ?? this._count(base.bomb)) + ' bom · ' + rescueCount + ' ' + rescueName,
+      'Sau khi chia: ' + remaining + ' lá · ' + remainingBombs + ' bom · ' + remainingRescues + ' ' + rescueName,
     ].join('\n');
     this._validation.textContent = round.validationError ?? '';
     this._warning.textContent = round.streakingWarning ? 'Streaking Kittens: số bom trong chồng nên bằng số người chơi.' : '';

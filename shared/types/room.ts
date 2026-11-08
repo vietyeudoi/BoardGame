@@ -2,7 +2,7 @@
  * room.ts — Room and Player Types
  * Shared between frontend and backend.
  */
-import type { CardPackId, CardType } from './gameObjects.js';
+import type { BaseCardPackId, CardPackId, CardType } from './gameObjects.js';
 import type { Vector3Like } from './protocol.js';
 
 export interface PlayerInfo {
@@ -46,6 +46,7 @@ export function getAnonymousHandSlotId(playerId: string, slot: number): string {
 }
 
 export interface DeckSetup {
+  basePackId?: BaseCardPackId;
   enabledPacks?: CardPackId[];
   cardCounts?: Partial<Record<CardType, number>>;
   explodingKittens: number;
@@ -59,6 +60,8 @@ export interface RoundSetup extends DeckSetup {
   totalCards: number;
   remainingCards: number;
   remainingDefuses: number;
+  rescueCount?: number;
+  remainingRescues?: number;
   packTotals?: Partial<Record<CardPackId, number>>;
   bombCount?: number;
   remainingBombs?: number;

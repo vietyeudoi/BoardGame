@@ -49,7 +49,7 @@ async function run() {
     // 1. Launch Player A
     console.log('[Test] Launching Browser A (Alice)...');
     clientA = await startBrowser(9222);
-    await sleep(2500);
+    await waitFor(clientA, 'window.__app?._networkClient?.getStatus() === "connected"', 15000);
 
     // Alice creates a room
     console.log('[Test] Alice creating room "MultiRoom"...');
@@ -62,7 +62,7 @@ async function run() {
       const createBtn = document.querySelector('#btn-create-room');
       if (createBtn) createBtn.click();
     `);
-    await sleep(2000);
+    await waitFor(clientA, 'Boolean(window.__app?._store?.getRoomId())', 10000);
 
     const roomId = await clientA.evaluate(`
       window.__app?._store?.getRoomId() || null
@@ -73,7 +73,7 @@ async function run() {
     // 2. Launch Player B
     console.log('[Test] Launching Browser B (Bob)...');
     clientB = await startBrowser(9223);
-    await sleep(2500);
+    await waitFor(clientB, 'window.__app?._networkClient?.getStatus() === "connected"', 15000);
 
     // Bob joins the room
     console.log(`[Test] Bob joining room "${roomId}"...`);
@@ -85,7 +85,8 @@ async function run() {
       const joinBtn = document.querySelector('#btn-join-room');
       if (joinBtn) joinBtn.click();
     `);
-    await sleep(3000);
+    await waitFor(clientB, 'Boolean(window.__app?._store?.getRoomId())', 10000);
+    await waitFor(clientA, 'window.__app?._store?.getRoomState()?.players?.length === 2', 10000);
 
     // Verify both are in room
     const stateA = await clientA.evaluate(`({
@@ -112,6 +113,25 @@ async function run() {
     await clientA.evaluate("(() => { const input = document.querySelector('#setup-defuses'); input.value = '7'; input.dispatchEvent(new Event('change')); })()");
     await waitFor(clientB, "document.querySelector('#setup-defuses').value === '7'");
 
+
+    const zombie = "document.querySelector('[data-pack-id=zombie]')";
+    const base = "document.querySelector('[data-pack-id=base]')";
+    await clientA.evaluate(zombie + ".querySelector('input[type=radio]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.basePackId === "zombie"');
+    assert.equal(await clientB.evaluate(zombie + ".querySelector('input[type=radio]').disabled"), true);
+    assert.equal(await clientA.evaluate(zombie + ".querySelectorAll('input[type=number]').length"), 2);
+    assert.equal(await clientA.evaluate(zombie + ".querySelector('summary span').textContent"), '113 lá');
+    await clientA.evaluate("(() => { const input = document.querySelector('#setup-zombie-zombie-kitten'); input.value = '8'; input.dispatchEvent(new Event('change')); })()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.rescueCount === 8');
+    await clientA.evaluate(base + ".querySelector('input[type=radio]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.basePackId === "base"');
+    assert.equal(await clientA.evaluate("document.querySelector('#setup-defuses').value"), '7');
+    await clientA.evaluate(zombie + ".querySelector('input[type=radio]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.rescueCount === 8');
+    await clientA.evaluate(zombie + ".querySelector('details > div > button').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.rescueCount === 5');
+    await clientA.evaluate(base + ".querySelector('input[type=radio]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.basePackId === "base"');
     const streaking = "document.querySelector('[data-pack-id=streaking]')";
     await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
     await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 118');
@@ -123,7 +143,7 @@ async function run() {
     await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 103');
     await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
     await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 115');
-    await clientA.evaluate(streaking + ".querySelector('details > button').click()");
+    await clientA.evaluate(streaking + ".querySelector('details > div > button').click()");
     await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 118');
     await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
     await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 103');
