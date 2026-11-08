@@ -129,6 +129,8 @@ export class MarqueeSelection<T> {
   private _move = (event: MouseEvent): void => {
     const gesture = this._gesture;
     if (!gesture) return;
+    // Khung giữ con trỏ đến lúc nhả, tránh kích hoạt hover mở fan giữa chừng.
+    event.stopImmediatePropagation();
     gesture.endX = event.clientX;
     gesture.endY = event.clientY;
 

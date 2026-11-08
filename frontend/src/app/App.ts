@@ -200,7 +200,7 @@ export class App {
     this._sceneManager.describeSeat = index => {
       const room = this._store.getRoomState();
       const local = room?.players.find(player => player.id === this._store.getPlayerId());
-      if (!room || !local || index === local.playerIndex) return;
+      if (index < 0 || !room || !local || index === local.playerIndex) return;
       const target = room.players.find(player => player.playerIndex === index);
       if (!target) return 'Ngồi vào đây';
       if (!local.spectator && target.isConnected) return 'Đổi chỗ với ' + target.name;
@@ -215,7 +215,7 @@ export class App {
     const projector = new ScreenBoundsProjector();
     const projected = { left: 0, top: 0, right: 0, bottom: 0 };
     const canSelect = (card: CardObject3D): boolean =>
-      card.visible && !card.isDisposed() && (!card.isInHand() || scene.isLocalHandCard(card)) &&
+      card.visible && !card.isDisposed() &&
       (dragCtrl.canDragCard?.(card) ?? true);
     this._marquee = new MarqueeSelection(_container, event => {
       if (this._uiManager.getCurrentScreen() !== 'game' || scene.isRoundSpectator || dragCtrl.isDragging() ||
@@ -238,7 +238,8 @@ export class App {
       }
       const canvas = scene.getInputCanvas();
       const { clientX, clientY } = event;
-      if (event.target !== canvas || !scene.getTableIntersectionAtScreenPos(clientX, clientY) ||
+      // Khung đo theo màn hình nên có thể bắt đầu cả từ nền trống ngoài mép bàn.
+      if (event.target !== canvas ||
         interaction.getObjectAt(clientX, clientY) || scene.tableActions.hitsAt(event) || scene.deckViewRow.hitsAt(event) ||
         scene.describeSeat?.(scene.getSeatAt(event))) return;
       const scope = canvas.getBoundingClientRect();

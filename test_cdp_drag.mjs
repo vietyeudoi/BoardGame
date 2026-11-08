@@ -42,6 +42,23 @@ async function main() {
 
     await browser.evaluate("(() => { const app = window.__app; const scene = app._sceneManager; scene.drawCardToHand('demo_deck_1', 0); scene.drawCardToHand('demo_deck_1', 0); })()");
     await new Promise(resolve => setTimeout(resolve, 700));
+    const board = await browser.evaluate(`(() => {
+      const app = window.__app;
+      const scene = app._sceneManager;
+      const canvas = scene.getInputCanvas();
+      const { left, top, right, bottom } = canvas.getBoundingClientRect();
+      const start = [[left + 3, top + 3], [left + 3, top + 80]].find(([x, y]) =>
+        document.elementFromPoint(x, y) === canvas && !scene.getTableIntersectionAtScreenPos(x, y));
+      return { start, right, bottom, ids: scene.getAllCards().map(card => card.cardId),
+        fanOpen: app._fullHandFanPreviewUI.isOpen() };
+    })()`);
+    assert.equal(board.fanOpen, false);
+    assert.ok(board.start, 'Có nền trống ngoài vùng chiếu xuống bàn');
+    assert.equal(board.ids.length, 3);
+    await browser.mouseDrag(...board.start, board.right - 3, board.bottom - 3, 18);
+    assert.deepEqual((await browser.evaluate("window.__app._sceneManager.getInteractionManager().getSelectedCards().map(card => card.cardId)")).sort(), board.ids.sort());
+    assert.equal(await browser.evaluate("window.__app._fullHandFanPreviewUI.isOpen()"), false);
+
     const fan = await browser.evaluate(`(() => {
       const app = window.__app;
       const hand = app._sceneManager.getLocalHandCards();

@@ -162,6 +162,21 @@ async function run() {
       assert.equal(await client.evaluate("document.querySelector('#round-setup').hidden"), true);
     }
 
+    await waitFor(clientA, 'window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
+    const canvasBounds = await clientA.evaluate("window.__app._sceneManager.getInputCanvas().getBoundingClientRect().toJSON()");
+    const startX = canvasBounds.left + 3;
+    const startY = canvasBounds.top + 3;
+    assert.equal(await clientA.evaluate("document.elementFromPoint(" + startX + "," + startY + ") === window.__app._sceneManager.getInputCanvas()"), true);
+    await clientA.mouseDrag(startX, startY, canvasBounds.right - 3, canvasBounds.bottom - 3, 18);
+    const selection = await clientA.evaluate(`(() => {
+      const app = window.__app;
+      const cards = app._sceneManager.getInteractionManager().getSelectedCards();
+      return { total: cards.length, anonymous: cards.filter(card => card.isMasked()).length,
+        fanOpen: app._fullHandFanPreviewUI.isOpen() };
+    })()`);
+    assert.deepEqual(selection, { total: 12, anonymous: 6, fanOpen: false });
+    await clientA.mouseClick(startX, startY);
+
     // 3. Test cursor movement across screen, including extreme positions (horizon / edges)
     console.log('[Test] Moving cursors across screen including edges/sky...');
     const positions = [
