@@ -12,6 +12,8 @@
  */
 import * as THREE from 'three';
 import type { CursorUpdatePayload } from '@shared/types/protocol';
+import type { PlayerInfo } from '@shared/types/room';
+import { SEAT_COLORS } from '../objects/PlayerAreaConfig';
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('RemoteCursorManager');
@@ -26,17 +28,7 @@ const CURSOR_RADIUS = 0.2;
 const SPRITE_W = 256;
 const SPRITE_H = 64;
 
-/** Cursor colors indexed by playerIndex (wraps around). */
-const CURSOR_COLORS = [
-  0xef4444,
-  0x3b82f6,
-  0x22c55e,
-  0xf59e0b,
-  0xa855f7,
-  0xec4899,
-  0x14b8a6,
-  0xf97316,
-] as const;
+const UNSEATED_CURSOR_COLOR = 0xe2e8f0;
 
 interface CursorEntry {
   group: THREE.Group;
@@ -47,11 +39,14 @@ interface CursorEntry {
   spriteMaterial: THREE.SpriteMaterial;
   spriteTexture: THREE.CanvasTexture;
   lastSeq: number;
+  playerName: string;
+  color: number;
 }
 
 export class RemoteCursorManager {
   private readonly _scene: THREE.Scene;
   private readonly _cursors = new Map<string, CursorEntry>();
+  private _players = new Map<string, { name: string; color: number }>();
   private _localPlayerId: string | null = null;
   private readonly _requestRender: () => void;
 
@@ -68,6 +63,22 @@ export class RemoteCursorManager {
     this._localPlayerId = playerId;
   }
 
+  setPlayers(players: readonly PlayerInfo[]): void {
+    // Màu theo ghế do trạng thái phòng xác nhận, độc lập thứ tự nhận con trỏ.
+    this._players = new Map(players.map((player, index) => [
+      player.id, {
+        name: player.name,
+        color: (player.spectator ? undefined : SEAT_COLORS[player.playerIndex ?? index]) ?? UNSEATED_CURSOR_COLOR,
+      },
+    ]));
+    let changed = false;
+    for (const [id, entry] of this._cursors) {
+      const player = this._players.get(id);
+      if (player && this._updateIdentity(entry, player.name, player.color)) changed = true;
+    }
+    if (changed) this._requestRender();
+  }
+
   /**
    * Updates or creates a remote cursor from a server cursor:update message.
    * Ignores stale messages (seq < last received seq).
@@ -78,10 +89,13 @@ export class RemoteCursorManager {
     // Never render our own cursor
     if (playerId === this._localPlayerId) return;
 
+    const identity = this._players.get(playerId);
+    const name = identity?.name ?? playerName;
+    const color = identity?.color ?? UNSEATED_CURSOR_COLOR;
     let entry = this._cursors.get(playerId);
 
     if (!entry) {
-      entry = this._createCursorEntry(playerId, playerName);
+      entry = this._createCursorEntry(playerId, name, color);
       this._cursors.set(playerId, entry);
       this._scene.add(entry.group);
       logger.debug('Created remote cursor', { playerId, playerName });
@@ -93,6 +107,7 @@ export class RemoteCursorManager {
       return;
     }
 
+    this._updateIdentity(entry, name, color);
     entry.lastSeq = seq;
     entry.group.position.set(x, y + CURSOR_Y, z);
     this._requestRender();
@@ -122,6 +137,7 @@ export class RemoteCursorManager {
       logger.debug('Removed remote cursor', { playerId });
     }
     this._cursors.clear();
+    this._players.clear();
     this._requestRender();
   }
 
@@ -133,10 +149,7 @@ export class RemoteCursorManager {
 
   // ─── Private Helpers ────────────────────────────────────────────────────
 
-  private _createCursorEntry(playerId: string, playerName: string): CursorEntry {
-    const colorIndex = this._cursors.size % CURSOR_COLORS.length;
-    const colorHex = CURSOR_COLORS[colorIndex] ?? 0xef4444;
-
+  private _createCursorEntry(playerId: string, playerName: string, colorHex: number): CursorEntry {
     // Cone geometry (tip pointing up)
     const geometry = new THREE.ConeGeometry(CURSOR_RADIUS, CURSOR_HEIGHT, 8);
     const material = new THREE.MeshBasicMaterial({ color: colorHex });
@@ -150,69 +163,61 @@ export class RemoteCursorManager {
       playerName,
       colorHex
     );
-    sprite.position.set(0.4, CURSOR_HEIGHT + 0.3, 0);
-    sprite.scale.set(1.4, 0.35, 1);
+    sprite.position.set(0, CURSOR_HEIGHT + 0.35, 0);
+    sprite.scale.set(2.3, 0.575, 1);
+    sprite.renderOrder = 7;
 
     const group = new THREE.Group();
     group.name = `RemoteCursor_${playerId}`;
     group.add(mesh, sprite);
 
-    return { group, mesh, material, geometry, sprite, spriteMaterial, spriteTexture, lastSeq: -1 };
+    return { group, mesh, material, geometry, sprite, spriteMaterial, spriteTexture, lastSeq: -1, playerName, color: colorHex };
   }
 
   private _buildNameSprite(
     name: string,
     colorHex: number
   ): { sprite: THREE.Sprite; spriteMaterial: THREE.SpriteMaterial; spriteTexture: THREE.CanvasTexture } {
-    let canvas: HTMLCanvasElement | null = null;
-    try {
-      canvas = document.createElement('canvas');
-    } catch {
-      // In headless/test environment, create a minimal stub
-    }
-
-    let spriteTexture: THREE.CanvasTexture;
-
-    if (canvas) {
-      canvas.width = SPRITE_W;
-      canvas.height = SPRITE_H;
-      const ctx = canvas.getContext('2d');
-
-      // ctx may be null in jsdom/headless environments
-      if (ctx) {
-        // Background pill
-        const r = (colorHex >> 16) & 0xff;
-        const g = (colorHex >> 8) & 0xff;
-        const b = colorHex & 0xff;
-        ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
-        ctx.roundRect(4, 4, SPRITE_W - 8, SPRITE_H - 8, 10);
-        ctx.fill();
-
-        // Player name
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(name.slice(0, 20), SPRITE_W / 2, SPRITE_H / 2);
-
-        spriteTexture = new THREE.CanvasTexture(canvas);
-      } else {
-        // Canvas not supported in this environment (jsdom)
-        spriteTexture = new THREE.CanvasTexture(
-          { width: 1, height: 1 } as unknown as HTMLCanvasElement
-        );
-      }
-    } else {
-      // Fallback for test environment
-      spriteTexture = new THREE.CanvasTexture(
-        { width: 1, height: 1 } as unknown as HTMLCanvasElement
-      );
-    }
-
-    const spriteMaterial = new THREE.SpriteMaterial({ map: spriteTexture, transparent: true });
+    const canvas = document.createElement('canvas');
+    canvas.width = SPRITE_W;
+    canvas.height = SPRITE_H;
+    this._paintLabel(canvas, name, colorHex);
+    const spriteTexture = new THREE.CanvasTexture(canvas);
+    spriteTexture.colorSpace = THREE.SRGBColorSpace;
+    const spriteMaterial = new THREE.SpriteMaterial({
+      map: spriteTexture, transparent: true, depthTest: false, depthWrite: false,
+    });
     const sprite = new THREE.Sprite(spriteMaterial);
-
     return { sprite, spriteMaterial, spriteTexture };
+  }
+
+  private _updateIdentity(entry: CursorEntry, name: string, color: number): boolean {
+    if (entry.playerName === name && entry.color === color) return false;
+    entry.playerName = name;
+    entry.color = color;
+    entry.material.color.setHex(color);
+    this._paintLabel(entry.spriteTexture.image as HTMLCanvasElement, name, color);
+    entry.spriteTexture.needsUpdate = true;
+    return true;
+  }
+
+  private _paintLabel(canvas: HTMLCanvasElement, name: string, color: number): void {
+    if (navigator.userAgent.includes('jsdom')) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, SPRITE_W, SPRITE_H);
+    ctx.beginPath();
+    ctx.roundRect(4, 4, SPRITE_W - 8, SPRITE_H - 8, 10);
+    ctx.fillStyle = '#101827';
+    ctx.fill();
+    ctx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 33px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, SPRITE_W / 2, SPRITE_H / 2, SPRITE_W - 24);
   }
 
   private _disposeCursorEntry(entry: CursorEntry): void {

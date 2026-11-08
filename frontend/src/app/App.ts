@@ -1168,6 +1168,7 @@ export class App {
         // 3. Enable cursor broadcasting & update local player ID (M1.5.3)
         this._cursorBroadcaster.enable();
         this._remoteCursorManager.setLocalPlayerId(this._store.getPlayerId());
+        this._remoteCursorManager.setPlayers(roomState.players);
         this._hoverExpansionController.setLocalPlayerId(this._store.getPlayerId());
 
         // 4. Synchronize all room state objects (cards on table, opponent/local hands)

@@ -37,7 +37,7 @@ export class PlayerAreaObject3D extends THREE.Group {
   // Three.js sub-objects
   private _borderLine: THREE.LineLoop | null = null;
   private _slotLine: THREE.LineLoop | null = null;
-  private _labelMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
+  private _labelSprite: THREE.Sprite | null = null;
   private _occupantFrame?: number;
   private _avatar: THREE.Mesh | null = null;
 
@@ -46,7 +46,7 @@ export class PlayerAreaObject3D extends THREE.Group {
   private readonly _slotMaterial: THREE.LineBasicMaterial;
   private readonly _avatarMaterial: THREE.MeshBasicMaterial;
   private _labelTexture: THREE.CanvasTexture | null = null;
-  private _labelMaterial: THREE.MeshBasicMaterial | null = null;
+  private _labelMaterial: THREE.SpriteMaterial | null = null;
 
   constructor(opts: PlayerAreaObject3DOptions) {
     super();
@@ -129,17 +129,21 @@ export class PlayerAreaObject3D extends THREE.Group {
 
     const canvas = this._createLabelCanvas(this._label);
     this._labelTexture = new THREE.CanvasTexture(canvas);
-    this._labelMaterial = new THREE.MeshBasicMaterial({
+    this._labelTexture.colorSpace = THREE.SRGBColorSpace;
+    this._labelMaterial = new THREE.SpriteMaterial({
       map: this._labelTexture,
       transparent: true,
+      depthTest: false,
       depthWrite: false,
     });
     const { LABEL_WIDTH, LABEL_HEIGHT, LABEL_Y, LABEL_OUTSET } = PLAYER_AREA_VISUAL_CONFIG;
-    this._labelMesh = new THREE.Mesh(new THREE.PlaneGeometry(LABEL_WIDTH, LABEL_HEIGHT), this._labelMaterial);
-    this._labelMesh.rotation.x = -Math.PI / 2;
-    this._labelMesh.position.set(0, LABEL_Y, LABEL_OUTSET);
-    this._labelMesh.renderOrder = 2;
-    this.add(this._labelMesh);
+    // Sprite luôn hướng về camera dù mỗi máy ngồi ở một góc khác nhau.
+    this._labelSprite = new THREE.Sprite(this._labelMaterial);
+    this._labelSprite.scale.set(LABEL_WIDTH, LABEL_HEIGHT, 1);
+    this._labelSprite.name = 'SeatName_' + this.areaId;
+    this._labelSprite.position.set(0, LABEL_Y, LABEL_OUTSET);
+    this._labelSprite.renderOrder = 6;
+    this.add(this._labelSprite);
   }
 
   private _createLabelCanvas(text: string): HTMLCanvasElement {
@@ -150,15 +154,18 @@ export class PlayerAreaObject3D extends THREE.Group {
     // ctx may be null in test environments (JSDOM) — skip drawing safely
     if (!ctx) return canvas;
     ctx.clearRect(0, 0, 256, 64);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillStyle = 'rgba(12,18,30,0.94)';
     ctx.beginPath();
     ctx.roundRect(4, 4, 248, 56, 8);
     ctx.fill();
-    ctx.font = 'bold 40px Arial';
-    ctx.fillStyle = '#' + this._seatColor.toString(16).padStart(6, '0');
+    ctx.strokeStyle = '#' + this._seatColor.toString(16).padStart(6, '0');
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.font = 'bold 40px Arial, sans-serif';
+    ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 128, 32, 240);
+    ctx.fillText(text, 128, 32, 224);
     return canvas;
   }
 
@@ -180,7 +187,7 @@ export class PlayerAreaObject3D extends THREE.Group {
     const { BORDER_OPACITY, EMPTY_OPACITY, SLOT_OPACITY } = PLAYER_AREA_VISUAL_CONFIG;
     this._borderMaterial.opacity = this._isSelected || this._isHovered ? 1 : this._occupied ? BORDER_OPACITY : EMPTY_OPACITY;
     this._slotMaterial.opacity = this._occupied ? SLOT_OPACITY : EMPTY_OPACITY;
-    if (this._labelMesh) this._labelMesh.visible = this._occupied;
+    if (this._labelSprite) this._labelSprite.visible = this._occupied;
     if (this._avatar) this._avatar.visible = this._occupied;
   }
 
@@ -205,7 +212,7 @@ export class PlayerAreaObject3D extends THREE.Group {
     const frame = (now: number): void => {
       const t = Math.min(1, Math.max(0, (now - started) / duration));
       const weight = 1 - t * t * (3 - 2 * t);
-      if (this._labelMesh) this._labelMesh.position.set(offset.x * weight, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, PLAYER_AREA_VISUAL_CONFIG.LABEL_OUTSET + offset.z * weight);
+      if (this._labelSprite) this._labelSprite.position.set(offset.x * weight, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, PLAYER_AREA_VISUAL_CONFIG.LABEL_OUTSET + offset.z * weight);
       if (this._avatar) this._avatar.position.set(offset.x * weight, PLAYER_AREA_VISUAL_CONFIG.AVATAR_Y, PLAYER_AREA_VISUAL_CONFIG.AVATAR_OUTSET + offset.z * weight);
       render();
       this._occupantFrame = t < 1 ? requestAnimationFrame(frame) : undefined;
@@ -216,7 +223,7 @@ export class PlayerAreaObject3D extends THREE.Group {
   private _stopOccupantAnimation(): void {
     if (this._occupantFrame !== undefined) cancelAnimationFrame(this._occupantFrame);
     this._occupantFrame = undefined;
-    if (this._labelMesh) this._labelMesh.position.set(0, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, PLAYER_AREA_VISUAL_CONFIG.LABEL_OUTSET);
+    if (this._labelSprite) this._labelSprite.position.set(0, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, PLAYER_AREA_VISUAL_CONFIG.LABEL_OUTSET);
     if (this._avatar) this._avatar.position.set(0, PLAYER_AREA_VISUAL_CONFIG.AVATAR_Y, PLAYER_AREA_VISUAL_CONFIG.AVATAR_OUTSET);
   }
 
@@ -290,10 +297,9 @@ export class PlayerAreaObject3D extends THREE.Group {
   // ─── Dispose ──────────────────────────────────────────────────────────────
 
   private _disposeLabel(): void {
-    if (this._labelMesh) {
-      this._labelMesh.geometry.dispose();
-      this.remove(this._labelMesh);
-      this._labelMesh = null;
+    if (this._labelSprite) {
+      this.remove(this._labelSprite);
+      this._labelSprite = null;
     }
     this._labelTexture?.dispose();
     this._labelTexture = null;

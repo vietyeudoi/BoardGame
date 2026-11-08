@@ -206,6 +206,21 @@ async function run() {
       window.__app?._remoteCursorManager?._cursors?.size || 0
     `);
     console.log(`[Test] Remote cursors rendered: on A = ${cursorOnA}, on B = ${cursorOnB}`);
+    async function verifySeatMarkers(client, otherName) {
+      return client.evaluate(`(() => {
+        const app = window.__app;
+        const areas = app._sceneManager.getPlayerAreaManager().getAllAreas();
+        const other = app._store.getRoomState().players.find(p => p.name === ${JSON.stringify(otherName)});
+        const cursor = app._sceneManager.getScene().getObjectByName('RemoteCursor_' + other.id);
+        return {
+          matches: cursor?.children[0].material.color.getHex() === areas[other.playerIndex]._seatColor,
+          names: areas.filter(area => area._labelSprite?.visible && area._labelSprite.isSprite).map(area => area.getLabel()).sort(),
+        };
+      })()`);
+    }
+    for (const [client, other] of [[clientA, 'Bob'], [clientB, 'Alice']]) {
+      assert.deepEqual(await verifySeatMarkers(client, other), { matches: true, names: ['Alice', 'Bob'] });
+    }
 
     // 4. Test Player A draws cards to hand via official server protocol
     console.log('[Test] Alice draws 3 cards via networkClient { type: "card:draw" }...');
@@ -531,6 +546,9 @@ async function run() {
     await waitFor(clientA, 'window.__app._store.getPlayerIndex() === 1');
     await waitFor(clientB, 'window.__app._store.getPlayerIndex() === 5');
     await waitFor(clientC, "document.querySelector('#hud-roll-notices').textContent.includes('Alice và Bob đã đổi chỗ')");
+    for (const [client, other] of [[clientA, 'Bob'], [clientB, 'Alice']]) {
+      assert.deepEqual(await verifySeatMarkers(client, other), { matches: true, names: ['Alice', 'Bob'] });
+    }
 
     assert.deepEqual(await clientA.evaluate("window.__app._store.getRoomState().objects.filter(card => card.location === 'HAND').map(card => [card.id, card.handIndex, card.faceUp])"), seatHand);
     await clientA.evaluate("document.querySelector('#btn-round-reset').click()");

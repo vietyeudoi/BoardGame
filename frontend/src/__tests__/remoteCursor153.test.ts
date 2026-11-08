@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { RemoteCursorManager } from '../scene/RemoteCursorManager';
+import { SEAT_COLORS } from '../objects/PlayerAreaConfig';
 import type { CursorUpdatePayload } from '@shared/types/protocol';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -56,6 +57,23 @@ describe('M1.5.3 — RemoteCursorManager', () => {
 
     expect(scene.children.length).toBe(initialChildCount + 1);
     expect(renderCount).toBeGreaterThan(0);
+  });
+
+  it('lấy màu ghế dù nhận con trỏ trước và đổi màu ngay khi đổi ghế', () => {
+    manager.updateCursor(makePayload('bob', 'Bob', 1, 2, 0));
+    const group = scene.getObjectByName('RemoteCursor_bob')!;
+    const mesh = group.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+    const sprite = group.children[1] as THREE.Sprite;
+    const bob = { id: 'bob', name: 'Bob', isHost: false, isConnected: true, playerIndex: 8 };
+    manager.setPlayers([bob]);
+    expect(mesh.material.color.getHex()).toBe(SEAT_COLORS[8]);
+    const texture = sprite.material.map!;
+    const version = texture.version;
+    manager.setPlayers([{ ...bob, playerIndex: 2 }]);
+    expect(mesh.material.color.getHex()).toBe(SEAT_COLORS[2]);
+    expect(sprite.material.map).toBe(texture);
+    expect(texture.version).toBeGreaterThan(version);
+    expect(group.position.x).toBe(1);
   });
 
   // ─── 2. Updates cursor position ──────────────────────────────────────────
