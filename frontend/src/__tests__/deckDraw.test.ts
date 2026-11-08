@@ -103,6 +103,7 @@ describe('M1.3.3 Deck Draw & Card Transfer', () => {
 
       expect(drawnCard).toBeInstanceOf(CardObject3D);
       expect(drawnCard?.cardId).toBe(topBefore);
+      expect(drawnCard?.getCardType()).toBeTruthy();
     });
 
     it('2. Deck giảm đúng một lá bài sau khi rút', () => {

@@ -83,7 +83,7 @@ export const GAME_HUD_MARKUP = `
         <input id="deck-view-to" type="number" min="1" value="2" aria-label="Vị trí thứ hai">
         <button id="btn-deck-view-swap" type="button">Đổi chỗ</button>
       </span>
-      <button id="btn-deck-view-confirm" hidden type="button">Xác nhận</button>
+      <button id="btn-deck-view-confirm" hidden type="button">Xác nhận (Enter)</button>
       <button id="btn-deck-view-close" hidden type="button">Xong</button>
     </div>
     <div class="hud-dock">

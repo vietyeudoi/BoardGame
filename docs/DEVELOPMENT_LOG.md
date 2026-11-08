@@ -2672,3 +2672,19 @@ vitest@^2.1.4           — testing
 | Khung khu vực người chơi | PlayerAreaHUD hiển thị nhãn chọn và nút onToggleVisibility. |
 | Yêu cầu đổi chỗ gửi/nhận, đồng hồ, Đồng ý/Từ chối/Hủy | SeatPrompt nhận show/remove và chuyển nút qua onAction. App nối tới các yêu cầu ghế hiện có. |
 | Lỗi, thông báo xáo/gom và kết quả tung | GameScreen dựng hud-game-error, hud-deck-status và hud-roll-notices qua showError, showShuffleNotice, showDeckShuffle và showTableRollNotice. |
+
+## 2026-11-08 — Bảng đọc See/Alter
+
+- Người mở phiên đọc tên, hình minh họa và mô tả đầy đủ trên bảng DOM riêng. Hàng giữ thứ tự từ đỉnh và cuộn ngang khi nhiều lá.
+- Alter dùng cùng yêu cầu đổi thứ tự khi kéo, chọn hai lá hoặc khôi phục. Mặt bài trên bảng lấy từ dữ liệu riêng của phiên, còn hàng 3D tiếp tục phản ánh thứ tự cho cả bàn.
+
+## 2026-11-08 — Mẫu mặt bài thống nhất
+
+- Fan preview, See/Alter và danh sách bộ bài dùng chung mẫu DOM. Texture Canvas của lá 3D giữ nền, minh họa và mặt lưng của bàn, đồng thời dùng cùng tiêu đề, màu tiêu đề và tỷ lệ khối chức năng với fan. Lá trên chồng và bài đang chuyển động đi qua cùng texture.
+- Texture chuẩn dùng chung theo loại và bậc phân giải, nhả khi hết tham chiếu. Mặt lưng dùng chung cho lá và chồng bốc. DOM nhân bản từ mẫu theo loại, chưa biết danh tính thì dùng mẫu úp.
+
+## 2026-11-08 — Texture bàn làm mẫu mặt bài duy nhất
+
+- Canvas gốc 512×716 của CardTextureGenerator giữ nền trắng, khung kép, thanh tiêu đề màu theo loại hoặc bộ, minh họa giữa lá và khối chức năng tối từ 51% chiều cao. Lưng đỏ có lưới và huy hiệu vàng. Tỷ lệ và bo góc bám theo CardConfig.
+- Fan preview, bảng See/Alter và danh sách bộ bài dùng ảnh PNG xuất từ cùng Canvas. Các lá HAND 3D, bài kéo, chồng và bài bay dùng texture từ Canvas đó.
+- Dùng bậc nhỏ 256×358, chuẩn 512×716 và lớn 1024×1432. Texture có đếm tham chiếu. Ảnh DOM tái sử dụng theo loại và bậc với giới hạn 72 mục. Lá thiếu danh tính chỉ yêu cầu ảnh mặt lưng.

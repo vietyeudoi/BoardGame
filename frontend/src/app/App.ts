@@ -259,6 +259,7 @@ export class App {
     }, () => interaction.getSelectedObjects(), items => interaction.selectObjects(items));
 
     this._marquee.onActiveChange = active => {
+      uiContainer.toggleAttribute('data-marquee-active', active);
       if (this._store.getRoomId()) this._networkClient.send({ type: 'seat:busy', payload: { active } });
     };
     const updateSelection = interaction.onSelectionChanged;
@@ -341,9 +342,10 @@ export class App {
       (this._contextMenu.isOpen() && !!document.elementFromPoint?.(clientX, clientY)?.closest("#tabletop-context-menu"));
     this._sceneManager.isLocalHandPreviewOpen = () => this._fullHandFanPreviewUI.isOpen();
 
+    let activeDeckView: DeckViewState | null = null;
     // Wire local hand hover → open/close the full fan preview.
     this._sceneManager.onLocalHandHoverChanged = (hovering) => {
-      if (!hovering) {
+      if (!hovering || activeDeckView?.viewerId === this._store.getPlayerId()) {
         this._fullHandFanPreviewUI.hide();
         return;
       }
@@ -423,7 +425,6 @@ export class App {
     this._sceneManager.setupPlayerLayout(SHARED_CONFIG.MAX_PLAYERS_PER_ROOM);
 
 
-    let activeDeckView: DeckViewState | null = null;
     let rollCooldownUntil = 0;
     const rollDisabledReason = (): string | undefined => {
       const localId = this._store.getPlayerId();
@@ -462,6 +463,7 @@ export class App {
     };
     let pendingViewOrder: number[] | undefined;
     const applyDeckView = (view: DeckViewState | null): void => {
+      if (view?.viewerId === this._store.getPlayerId()) this._fullHandFanPreviewUI.hide(true);
       activeDeckView = view;
       pendingViewOrder = undefined;
       const localId = this._store.getPlayerId();
@@ -832,10 +834,6 @@ export class App {
     // Keyboard Shortcuts (F, R, Shift+R, H) — M1.7.5 Part 4: G removed with Snap-to-Grid
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && activeDeckView?.viewerId === this._store.getPlayerId()) {
-        closeDeckView(false);
-        return;
-      }
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
@@ -847,6 +845,16 @@ export class App {
 
       if (this._uiManager.getCurrentScreen() !== 'game') return;
 
+      if (e.defaultPrevented) return;
+      if (e.key === 'Escape' && activeDeckView?.viewerId === this._store.getPlayerId()) {
+        closeDeckView(false);
+        return;
+      }
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && activeDeckView?.mode === 'alter' &&
+        activeDeckView.viewerId === this._store.getPlayerId()) {
+        closeDeckView(true);
+        return;
+      }
       const key = e.key.toLowerCase();
 
       if (key === 'f') {

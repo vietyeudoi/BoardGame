@@ -9,16 +9,8 @@
  * Khi mở, overlay nhận chuột trên toàn vùng fan để HAND 3D không nhận nhầm.
  * Các callback vẫn ánh xạ về đúng id bài thật để chọn và kéo thả.
  */
-import { getCardFaceRules, RULE_FONT, RULE_PANEL } from '../../objects/CardFaceRules';
-import { CARD_CONFIG } from '../../objects/CardConfig';
-import { getPackCardArt } from '../../utils/CardArt';
-import {
-  FAN_CARD_ART,
-  FAN_CARD_BACK,
-  FAN_CARD_FALLBACK,
-  FAN_PREVIEW_LAYOUT,
-  type FanCardArt,
-} from '../FanPreviewConfig';
+import { paintCardFace } from './CardFaceDOM';
+import { FAN_PREVIEW_LAYOUT } from '../FanPreviewConfig';
 
 /** Minimal display data the overlay needs. */
 export interface FanCardData {
@@ -180,6 +172,8 @@ function buildStylesheet(): string {
   contain: layout style;
 }
 .${ROOT_CLASS}.${OPEN_CLASS} { opacity: 1; pointer-events: auto; }
+/* Giữ hình học của fan cho khung chọn, chỉ ẩn lớp hiển thị trong lúc kéo. */
+[data-marquee-active] .${ROOT_CLASS} { visibility: hidden; }
 .fhfp-glow {
   position: absolute; inset: 0;
   background: radial-gradient(ellipse 62% 95% at 50% 100%, rgba(6,10,24,.38) 0%, rgba(6,10,24,.18) 45%, rgba(6,10,24,0) 78%);
@@ -197,9 +191,8 @@ function buildStylesheet(): string {
   pointer-events: auto;
   user-select: none; -webkit-user-select: none; touch-action: none;
   display: flex; flex-direction: column;
-  border-radius: 12px; overflow: hidden;
+  border-radius: var(--face-radius-x) / var(--face-radius-y); overflow: hidden;
   background: #f8fafc;
-  border: 2px solid var(--accent, #94a3b8);
   box-shadow: 0 16px 32px rgba(0,0,0,.58), 0 1px 0 rgba(255,255,255,.35) inset;
   transform-origin: 50% 100%;
   /* M1.7.10: --dy-hover / --scale drive the hover / selection / drag lifts. */
@@ -221,64 +214,6 @@ function buildStylesheet(): string {
   pointer-events: none;
   opacity: 0;
   transform: translateX(-50%) translateY(var(--dy-enter, 54px)) rotate(var(--rot-enter, 0deg)) scale(.9);
-}
-.fhfp-banner {
-  flex: 0 0 auto;
-  background: var(--accent, #94a3b8);
-  color: #0b1020;
-  font-weight: 800; text-align: center;
-  letter-spacing: .07em; text-transform: uppercase;
-  padding: 5px 7px 4px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fhfp-banner--expansion {
-  color: #fff; white-space: normal; letter-spacing: normal; overflow-wrap: anywhere;
-}
-.fhfp-art {
-  position: relative;
-  flex: 1 1 auto;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--surface, #e2e8f0);
-  overflow: hidden;
-}
-.fhfp-art::after {
-  content: ""; position: absolute; inset: 0;
-  background: repeating-linear-gradient(135deg, rgba(255,255,255,.07) 0 2px, rgba(0,0,0,.04) 2px 6px);
-  pointer-events: none;
-}
-.fhfp-art-icon {
-  position: relative; z-index: 1;
-  line-height: 1;
-  filter: drop-shadow(0 8px 12px rgba(0,0,0,.45));
-}
-
-.fhfp-pack-label {
-  z-index: 1; padding: 3px 6px; color: #334155; text-align: center;
-  font: 600 calc(var(--rule-unit) * 27) / 1.15 Arial, sans-serif;
-}
-.fhfp-upper { display: flex; flex-direction: column; height: 50%; }
-.fhfp-rules {
-  position: absolute; box-sizing: border-box;
-  border-radius: 4px; background: rgba(15, 23, 42, .92); color: #f1f5f9;
-  display: flex; flex-direction: column; overflow: hidden; pointer-events: none;
-}
-.fhfp-rules-name { font-weight: 700; color: #fff; white-space: nowrap; line-height: 1.15; }
-.fhfp-rules-description { white-space: pre; line-height: 1.21; }
-.fhfp-title {
-  flex: 0 0 auto;
-  background: #f8fafc; color: #0f172a;
-  font-weight: 700; text-align: center; line-height: 1.16;
-  padding: 5px 6px 6px;
-  border-top: 1px solid rgba(15,23,42,.14);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; word-break: break-word;
-}
-.fhfp-card--back .fhfp-art::before {
-  content: ""; position: absolute; inset: 8%;
-  border: 2px solid rgba(226,232,240,.55);
-  border-radius: 8px;
-  background: repeating-linear-gradient(45deg, rgba(148,163,184,.22) 0 6px, transparent 6px 12px),
-              repeating-linear-gradient(-45deg, rgba(148,163,184,.22) 0 6px, transparent 6px 12px);
 }
 /* M1.7.9 Part B: light hover highlight for the exact fan card under the cursor. */
 .fhfp-card:hover:not(.fhfp-card--selected):not(.fhfp-card--dragging) {
@@ -393,7 +328,7 @@ export class FullHandFanPreviewUI {
           const card = this._cards[index]!;
           const old = previousById.get(card.id)!;
           if (old.masked === card.masked && old.title === card.title && old.cardType === card.cardType) return;
-          this._paintCardFace(el, card);
+          paintCardFace(el, card);
           if (old.masked !== card.masked) {
             el.firstElementChild?.animate?.([{ transform: "rotateY(-82deg)" }, { transform: "rotateY(0)" }], { duration: 150, easing: "ease-out" });
           }
@@ -609,70 +544,6 @@ export class FullHandFanPreviewUI {
     this._stage = stage;
   }
 
-  private _paintCardFace(el: HTMLElement, card: FanCardData): void {
-    const doc = this._container.ownerDocument;
-    const expansion = card.masked ? undefined : getPackCardArt(card.cardType);
-    const art: FanCardArt = card.masked
-      ? FAN_CARD_BACK
-      : (card.cardType ? FAN_CARD_ART[card.cardType] : undefined) ?? FAN_CARD_FALLBACK;
-
-    el.classList.toggle('fhfp-card--back', !!card.masked);
-    el.dataset.masked = String(!!card.masked);
-    el.dataset.cardType = card.masked ? "unknown" : card.cardType ?? "unknown";
-    el.style.setProperty('--accent', expansion?.color ?? art.accent);
-    el.style.setProperty('--surface', art.surface);
-
-    const banner = doc.createElement('div');
-    banner.className = expansion ? 'fhfp-banner fhfp-banner--expansion' : 'fhfp-banner';
-    banner.textContent = expansion?.name ?? art.shortName;
-
-    const artWrap = doc.createElement('div');
-    artWrap.className = 'fhfp-art';
-    const artLabel = doc.createElement('span');
-    artLabel.className = expansion ? 'fhfp-pack-label' : 'fhfp-art-icon';
-    artLabel.textContent = expansion?.pack ?? art.icon;
-    artWrap.appendChild(artLabel);
-
-
-    const face = doc.createElement('div');
-    face.style.cssText = 'position:relative;display:flex;flex-direction:column;flex:1;min-height:0';
-    const rules = card.masked ? undefined : getCardFaceRules(card.cardType);
-    if (rules) {
-      const upper = doc.createElement('div');
-      upper.className = 'fhfp-upper';
-      upper.append(banner, artWrap);
-      face.style.background = art.surface;
-      const panel = doc.createElement('div');
-      panel.className = 'fhfp-rules';
-      panel.style.left = RULE_PANEL.left * 100 + '%';
-      panel.style.top = RULE_PANEL.top * 100 + '%';
-      panel.style.width = RULE_PANEL.width * 100 + '%';
-      panel.style.height = RULE_PANEL.height * 100 + '%';
-      panel.style.padding = 'calc(var(--rule-unit) * ' + RULE_PANEL.padding + ')';
-      panel.style.gap = 'calc(var(--rule-unit) * ' + RULE_PANEL.gap + ')';
-      panel.style.fontFamily = RULE_FONT;
-      const title = doc.createElement('strong');
-      title.className = 'fhfp-rules-name';
-      title.textContent = rules.title;
-      title.style.fontSize = 'calc(var(--rule-unit) * ' + rules.titleSize + ')';
-      const description = doc.createElement('div');
-      description.className = 'fhfp-rules-description';
-      description.textContent = rules.lines.join('\n');
-      description.style.fontSize = 'calc(var(--rule-unit) * ' + rules.bodySize + ')';
-      panel.append(title, description);
-      face.append(upper, panel);
-    } else {
-      face.append(banner, artWrap);
-      if (!card.masked) {
-        const title = doc.createElement('div');
-        title.className = 'fhfp-title';
-        title.textContent = card.title || art.shortName;
-        face.appendChild(title);
-      }
-    }
-    el.replaceChildren(face);
-  }
-
   private _buildCards(): void {
     if (!this._stage) return;
     const doc = this._container.ownerDocument;
@@ -686,7 +557,7 @@ export class FullHandFanPreviewUI {
       el.dataset.fanIndex = String(index);
       el.dataset.masked = card.masked ? 'true' : 'false';
 
-      this._paintCardFace(el, card);
+      paintCardFace(el, card);
       this._stage!.appendChild(el);
 
       // M1.7.9 Part B: fan cards are interactive. Hover / click / drag intents
@@ -767,10 +638,6 @@ export class FullHandFanPreviewUI {
       el.style.left = '50%';
       el.style.setProperty('--slot-x', `${visualSlot.x.toFixed(2)}px`);
 
-      // Chừa viền và sai số làm tròn khi chuyển chữ từ texture sang DOM.
-      const ruleUnit = Math.min((slot.width - 6) / CARD_CONFIG.TEXTURE_WIDTH,
-        (slot.height - 6) / CARD_CONFIG.TEXTURE_HEIGHT);
-      el.style.setProperty('--rule-unit', ruleUnit + 'px');
       el.style.width = `${visualSlot.width}px`;
       el.style.height = `${visualSlot.height}px`;
       const pagerHeight = this._pager?.hidden === false ? FAN_PREVIEW_LAYOUT.PAGE_CONTROLS_HEIGHT_PX : 0;
@@ -792,18 +659,6 @@ export class FullHandFanPreviewUI {
       el.dataset.fanWidth = String(visualSlot.width);
       el.dataset.fanHeight = String(visualSlot.height);
 
-      const banner = el.querySelector<HTMLElement>('.fhfp-banner');
-      const art = el.querySelector<HTMLElement>('.fhfp-art');
-      const icon = el.querySelector<HTMLElement>('.fhfp-art-icon');
-      const title = el.querySelector<HTMLElement>('.fhfp-title');
-
-      if (banner) banner.style.fontSize = `${Math.max(8, Math.round(visualSlot.height * 0.043))}px`;
-      if (art) art.style.fontSize = `${Math.round(visualSlot.height * 0.33)}px`;
-      if (icon) icon.style.fontSize = `${Math.round(visualSlot.height * 0.33)}px`;
-      if (title) {
-        title.style.fontSize = `${Math.max(9, Math.round(visualSlot.height * 0.052))}px`;
-        title.style.maxHeight = `${Math.round(visualSlot.height * 0.24)}px`;
-      }
     });
     this._applyCardVisuals();
   }

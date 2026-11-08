@@ -8,7 +8,6 @@ import * as THREE from 'three';
 import { CARD_CONFIG } from './CardConfig';
 import { TABLE_CONFIG } from './TableConfig';
 import { getCardFaceRules } from './CardFaceRules';
-import { getCardTitle } from './CardTypeHelper';
 import { CardTextureGenerator } from './CardTextureGenerator';
 import { Logger } from '../utils/Logger';
 
@@ -96,11 +95,10 @@ export class CardObject3D extends THREE.Group {
   private _frontTexture: THREE.Texture | null = null;
   private _backTexture: THREE.Texture | null = null;
   private _frontCanvas: HTMLCanvasElement | null = null;
-  private _backCanvas: HTMLCanvasElement | null = null;
   private _ownsFrontTexture = false;
   private _externalFrontTexture = false;
   private _sharedFrontKey: string | null = null;
-  private _ownsBackTexture = false;
+  private _sharedBackTexture = false;
 
   constructor(options?: CardOptions) {
     super();
@@ -436,7 +434,7 @@ export class CardObject3D extends THREE.Group {
     // Back Texture
     if (options?.backTexture) {
       this._backTexture = options.backTexture;
-      this._ownsBackTexture = false;
+      this._sharedBackTexture = false;
     } else {
       this._generateProceduralBackTexture();
     }
@@ -447,9 +445,9 @@ export class CardObject3D extends THREE.Group {
     const { title, description, artwork, backgroundColor, textColor, accentColor } = this._content;
     const type = this._cardType;
     const canonical = type !== null && getCardFaceRules(type) !== undefined;
-    const standardTitle = !title || title === 'Card' || (canonical && title === getCardTitle(type!));
-    if (standardTitle && !description && !artwork && !backgroundColor && !textColor && !accentColor
-      && (type === null || canonical)) {
+    const plainUnknown = type === null && (!title || title === 'Card') && !description && !textColor && !accentColor;
+    // Lá đã biết loại dùng mẫu chuẩn, kể cả khi nơi tạo truyền thêm nhãn thao tác.
+    if (!artwork && !backgroundColor && (canonical || plainUnknown)) {
       const key = type ?? '';
       if (this._sharedFrontKey === key) return;
       this._releaseFrontTexture();
@@ -471,16 +469,8 @@ export class CardObject3D extends THREE.Group {
   }
 
   private _generateProceduralBackTexture(): void {
-    this._backCanvas = CardTextureGenerator.getOrCreateCanvas(this._backCanvas);
-    if (this._backCanvas) {
-      CardTextureGenerator.drawBack(this._backCanvas);
-      if (!this._backTexture) {
-        this._backTexture = CardTextureGenerator.createTextureFromCanvas(this._backCanvas);
-        this._ownsBackTexture = true;
-      } else {
-        this._backTexture.needsUpdate = true;
-      }
-    }
+    this._backTexture = CardTextureGenerator.acquireBackTexture();
+    this._sharedBackTexture = this._backTexture !== null;
   }
 
 
@@ -506,11 +496,10 @@ export class CardObject3D extends THREE.Group {
 
   setBackTexture(texture: THREE.Texture): void {
     if (this._isDisposed) return;
-    if (this._ownsBackTexture && this._backTexture) {
-      this._backTexture.dispose();
-    }
+    if (this._backTexture === texture) return;
+    if (this._sharedBackTexture) CardTextureGenerator.releaseBackTexture();
     this._backTexture = texture;
-    this._ownsBackTexture = false;
+    this._sharedBackTexture = false;
     this._backMaterial.map = texture;
     this._backMaterial.needsUpdate = true;
   }
@@ -733,13 +722,10 @@ export class CardObject3D extends THREE.Group {
 
     // 3. Nhả texture dùng chung hoặc hủy texture riêng.
     this._releaseFrontTexture();
-    if (this._ownsBackTexture && this._backTexture) {
-      this._backTexture.dispose();
-      this._backTexture = null;
-    }
+    if (this._sharedBackTexture) CardTextureGenerator.releaseBackTexture();
+    this._backTexture = null;
 
     this._frontCanvas = null;
-    this._backCanvas = null;
 
     // 4. Remove all children and cleanup
     this.remove(this._cardMesh);

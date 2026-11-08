@@ -48,6 +48,7 @@ export class DeckObject3D extends THREE.Group {
   private _topTexture: THREE.Texture | null = null;
 
   private _ownsTopTexture = false;
+  private _sharedBackTexture = false;
   private _onlineTopType?: string;
   private _onlineTopTexture: THREE.CanvasTexture | null = null;
   private _activityFrame?: number;
@@ -464,9 +465,8 @@ export class DeckObject3D extends THREE.Group {
 
   setTopTexture(texture: THREE.Texture, ownsTexture = false): void {
     if (this._isDisposed) return;
-    if (this._ownsTopTexture && this._topTexture) {
-      this._topTexture.dispose();
-    }
+    if (this._topTexture === texture) return;
+    this._releaseTopTexture();
     this._topTexture = texture;
     this._ownsTopTexture = ownsTexture;
     this._topMaterial.map = this.getCount() > 0 ? texture : null;
@@ -481,22 +481,19 @@ export class DeckObject3D extends THREE.Group {
       this._topTexture = options.topTexture;
       this._ownsTopTexture = false;
     } else {
-      this._topTexture = this._createDefaultTopTexture();
-      this._ownsTopTexture = true;
+      const shared = CardTextureGenerator.acquireBackTexture();
+      this._topTexture = shared ?? new THREE.Texture();
+      this._sharedBackTexture = shared !== null;
+      this._ownsTopTexture = shared === null;
     }
-
-
   }
 
-  private _createDefaultTopTexture(): THREE.Texture {
-    if (!CardTextureGenerator.isCanvasSupported()) {
-      return new THREE.Texture();
-    }
-    const canvas = CardTextureGenerator.getOrCreateCanvas();
-    if (!canvas) return new THREE.Texture();
-
-    CardTextureGenerator.drawBack(canvas);
-    return CardTextureGenerator.createTextureFromCanvas(canvas) ?? new THREE.Texture();
+  private _releaseTopTexture(): void {
+    if (this._sharedBackTexture) CardTextureGenerator.releaseBackTexture();
+    else if (this._ownsTopTexture) this._topTexture?.dispose();
+    this._sharedBackTexture = false;
+    this._ownsTopTexture = false;
+    this._topTexture = null;
   }
 
   private _buildGeometry(): THREE.BufferGeometry {
@@ -647,10 +644,7 @@ export class DeckObject3D extends THREE.Group {
     this._sideMaterial.dispose();
 
     // 3. Dispose owned textures
-    if (this._ownsTopTexture && this._topTexture) {
-      this._topTexture.dispose();
-      this._topTexture = null;
-    }
+    this._releaseTopTexture();
     this._emptyOutline.geometry.dispose();
     (this._emptyOutline.material as THREE.Material).dispose();
     this._badge?.material.map?.dispose();

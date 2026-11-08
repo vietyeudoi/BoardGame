@@ -1,8 +1,6 @@
-import { CARD_DEFINITIONS } from '@shared/constants/cardTypes';
-import type { CardType } from '@shared/types/gameObjects';
+import './DeckViewPanel.css';
 import type { DeckViewState } from '@shared/types/protocol';
-import { getCardTitle } from '../../objects/CardTypeHelper';
-import { FAN_CARD_ART, getPackCardArt } from '../../utils/CardArt';
+import { createCardFace } from './CardFaceDOM';
 
 const CARD_SELECTOR = '[data-alter-token]';
 const MIN_DRAG_DISTANCE = 5;
@@ -18,9 +16,14 @@ interface CardDrag {
 
 export class DeckAlterStrip {
   private readonly _element = document.createElement('section');
+  private readonly _scroll: HTMLElement;
   private readonly _cards: HTMLElement;
   private readonly _events = new AbortController();
   private _drag?: CardDrag;
+  private _sessionId?: string;
+  private _initialOrder: number[] = [];
+  private _selected?: HTMLElement;
+  private _nodes = new Map<number, HTMLElement>();
   onOrder?: (order: number[]) => void;
 
   constructor(container: HTMLElement) {
@@ -28,31 +31,36 @@ export class DeckAlterStrip {
     this._element.hidden = true;
     this._element.setAttribute('aria-label', 'Xếp thứ tự chồng bài');
     this._element.innerHTML = `
-      <style>
-        #deck-alter-strip {
-          position:absolute;top:104px;left:16px;max-width:min(480px,calc(100% - 32px));
-          box-sizing:border-box;padding:10px;border-radius:12px;border:1px solid #475569;
-          background:#131823ef;color:#f1f5f9;font:13px system-ui;pointer-events:auto;z-index:2;
-        }
-        .deck-alter-cards { display:flex;gap:8px;overflow-x:auto;padding:5px 2px; }
-        .deck-alter-card {
-          flex:0 0 84px;display:grid;align-content:start;gap:5px;box-sizing:border-box;
-          width:84px;min-height:96px;padding:6px;border:1px solid #64748b;border-radius:8px;
-          color:#f8fafc;background:#242b3b;text-align:center;font:600 12px system-ui;
-          cursor:grab;touch-action:none;user-select:none;
-        }
-        .deck-alter-card[data-source] { opacity:.35; }
-        .deck-alter-card[data-target] { outline:2px solid #fbbf24;outline-offset:-2px; }
-        .deck-alter-ghost { position:fixed;top:0;left:0;z-index:1000;pointer-events:none;cursor:grabbing; }
-        .deck-alter-icon { font-size:20px; }
-        .deck-alter-pack { font-size:.67rem;font-weight:400;color:#cbd5e1; }
-      </style>
-      <strong>Alter · Kéo thẻ vào vị trí mới</strong>
-      <div class="deck-alter-cards" aria-label="Thứ tự từ đỉnh chồng"></div>
+      <header><strong class="deck-view-title"></strong><small>Chỉ mình bạn thấy</small></header>
+      <div class="deck-view-direction">← Trên cùng <span>Sâu hơn →</span></div>
+      <div class="deck-view-scroll" aria-label="Thứ tự từ đỉnh chồng" tabindex="0">
+        <div class="deck-alter-cards"></div>
+      </div>
+      <footer class="deck-view-footer"><button type="button" class="deck-view-reset">Khôi phục thứ tự ban đầu</button></footer>
     `;
+    this._scroll = this._element.querySelector<HTMLElement>('.deck-view-scroll')!;
     this._cards = this._element.querySelector<HTMLElement>('.deck-alter-cards')!;
     container.append(this._element);
     const options = { signal: this._events.signal };
+    this._element.addEventListener('contextmenu', event => event.preventDefault(), options);
+    this._element.querySelector('.deck-view-reset')!.addEventListener('click', () => {
+      this._select(undefined);
+      this.onOrder?.(this._initialOrder.slice());
+    }, options);
+    this._cards.addEventListener('keydown', event => {
+      if (!this._element.hasAttribute('data-alter') || !['Enter', ' '].includes(event.key)) return;
+      const card = (event.target as HTMLElement).closest<HTMLElement>(CARD_SELECTOR);
+      if (!card) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this._choose(card);
+    }, options);
+    this._scroll.addEventListener('wheel', event => {
+      if (event.shiftKey || event.deltaX || this._scroll.scrollWidth <= this._scroll.clientWidth) return;
+      if (this._scroll.scrollHeight > this._scroll.clientHeight) return;
+      event.preventDefault();
+      this._scroll.scrollLeft += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+    }, { ...options, passive: false });
     this._cards.addEventListener('pointerdown', this._onDown, options);
     this._cards.addEventListener('pointermove', this._onMove, options);
     this._cards.addEventListener('pointerup', this._onUp, options);
@@ -61,39 +69,106 @@ export class DeckAlterStrip {
     window.addEventListener('blur', () => this._endDrag(), options);
   }
 
+  mountControls(...controls: HTMLElement[]): void {
+    this._element.querySelector('.deck-view-footer')!.append(...controls);
+  }
+
   sync(view: DeckViewState | null): void {
     this._endDrag();
+    this._select(undefined);
     this._element.hidden = !view;
-    this._cards.replaceChildren(...(view?.cards.map(({ token, cardType }, index) => {
-      const card = document.createElement('div');
-      const art = cardType ? FAN_CARD_ART[cardType] : undefined;
-      const title = getCardTitle(cardType);
-      const expansion = getPackCardArt(cardType);
-      card.className = 'deck-alter-card';
-      card.dataset['alterToken'] = String(token);
-      card.title = title;
-      if (art || expansion) card.style.borderColor = art?.accent ?? expansion!.color;
-      const position = document.createElement('span');
-      position.textContent = String(index + 1);
-      const icon = document.createElement('span');
-      icon.className = expansion ? 'deck-alter-pack' : 'deck-alter-icon';
-      icon.textContent = expansion?.pack ?? art?.icon ?? '🂠';
-      icon.setAttribute('aria-hidden', 'true');
-      const name = document.createElement('strong');
-      name.textContent = CARD_DEFINITIONS.get(cardType as CardType)?.name ?? title;
-      if (expansion) card.append(position, name, icon);
-      else card.append(position, icon, name);
+    if (!view) {
+      this._sessionId = undefined;
+      this._nodes.clear();
+      this._cards.replaceChildren();
+      return;
+    }
+    const fresh = this._sessionId !== view.id;
+    if (fresh) {
+      this._sessionId = view.id;
+      this._initialOrder = view.cards.map(card => card.token);
+      this._nodes.clear();
+      this._scroll.scrollLeft = 0;
+      this._scroll.scrollTop = 0;
+    }
+    const alter = view.mode === 'alter';
+    this._element.toggleAttribute('data-alter', alter);
+    this._element.querySelector('.deck-view-title')!.textContent =
+      (alter ? 'Sắp xếp ' : 'Xem ') + view.cards.length + ' lá trên cùng';
+    const reset = this._element.querySelector<HTMLButtonElement>('.deck-view-reset')!;
+    reset.hidden = !alter;
+    reset.disabled = view.cards.every((card, index) => card.token === this._initialOrder[index]);
+
+    // Giữ các nút lá theo token để kéo thả không dựng lại mặt bài sau mỗi lần đổi.
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const previous = new Map(reduced || fresh ? [] :
+      [...this._nodes.values()].map(card => [card, card.getBoundingClientRect().left] as const));
+    const nodes = view.cards.map(({ token, cardType }, index) => {
+      let card = this._nodes.get(token);
+      if (!card) {
+        card = this._createCard(token, cardType, alter);
+        this._nodes.set(token, card);
+      }
+      card.querySelector('.deck-view-number')!.textContent = String(index + 1);
+      card.querySelector('.deck-view-depth')!.textContent = index === 0 ? 'Trên cùng' :
+        index === view.cards.length - 1 ? 'Sâu nhất trong phiên' : '';
       return card;
-    }) ?? []));
+    });
+    if (fresh) this._cards.replaceChildren(...nodes);
+    else nodes.forEach((node, index) => {
+      const at = this._cards.children[index];
+      if (node !== at) this._cards.insertBefore(node, at ?? null);
+    });
+    for (const [node, left] of previous) {
+      const delta = left - node.getBoundingClientRect().left;
+      if (delta) node.animate?.([{ translate: delta + 'px' }, { translate: '0' }], { duration: 180, easing: 'ease-out' });
+    }
+  }
+
+  private _createCard(token: number, type: string | undefined, alter: boolean): HTMLElement {
+    const card = document.createElement('article');
+    card.className = 'deck-alter-card';
+    card.dataset.alterToken = String(token);
+    card.tabIndex = alter ? 0 : -1;
+    if (alter) {
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-pressed', 'false');
+    }
+    const number = document.createElement('span');
+    number.className = 'deck-view-number';
+    const depth = document.createElement('small');
+    depth.className = 'deck-view-depth';
+    card.append(createCardFace(document, type, 'large'), number, depth);
+    return card;
+  }
+
+  private _select(card: HTMLElement | undefined): void {
+    this._selected?.setAttribute('aria-pressed', 'false');
+    this._selected = card;
+    card?.setAttribute('aria-pressed', 'true');
+  }
+
+  private _choose(card: HTMLElement): void {
+    const first = this._selected;
+    if (!first || first === card) {
+      this._select(first ? undefined : card);
+      return;
+    }
+    this._select(undefined);
+    const cards = Array.from(this._cards.querySelectorAll<HTMLElement>(CARD_SELECTOR));
+    const order = cards.map(item => Number(item.dataset.alterToken));
+    const a = cards.indexOf(first);
+    const b = cards.indexOf(card);
+    [order[a], order[b]] = [order[b]!, order[a]!];
+    this.onOrder?.(order);
   }
 
   private _onDown = (event: PointerEvent): void => {
-    if (event.button !== 0 || this._drag) return;
+    if (event.button !== 0 || this._drag || !this._element.hasAttribute('data-alter')) return;
     const source = (event.target as HTMLElement).closest<HTMLElement>(CARD_SELECTOR);
     if (!source) return;
     this._drag = { pointerId: event.pointerId, source, x: event.clientX, y: event.clientY };
     this._cards.setPointerCapture(event.pointerId);
-    event.preventDefault();
   };
 
   private _targetAt(event: PointerEvent): HTMLElement | undefined {
@@ -110,7 +185,8 @@ export class DeckAlterStrip {
       delete ghost.dataset['alterToken'];
       ghost.classList.add('deck-alter-ghost');
       ghost.setAttribute('aria-hidden', 'true');
-      this._element.append(ghost);
+      ghost.style.width = drag.source.offsetWidth + 'px';
+      document.body.append(ghost);
       drag.ghost = ghost;
       drag.source.dataset['source'] = '';
     }
@@ -128,6 +204,7 @@ export class DeckAlterStrip {
     if (drag?.pointerId !== event.pointerId) return;
     const target = drag.ghost ? this._targetAt(event) : undefined;
     this._endDrag();
+    if (!drag.ghost) { this._choose(drag.source); return; }
     if (!target || target === drag.source) return;
     const cards = Array.from(this._cards.querySelectorAll<HTMLElement>(CARD_SELECTOR));
     const order = cards.map(card => Number(card.dataset['alterToken']));

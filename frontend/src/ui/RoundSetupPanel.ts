@@ -1,3 +1,4 @@
+import { createCardFace } from './components/CardFaceDOM';
 import { CARD_PACKS, DEFAULT_BASE_PACK, getBasePack, getEditableCardLimit } from '@shared/constants/cardTypes';
 import type { BaseCardPackId, CardType, CardDefinition, CardPack, CardPackId } from '@shared/types/gameObjects';
 import type { DeckSetup, RoundSetup } from '@shared/types/room';
@@ -92,6 +93,18 @@ export class RoundSetupPanel {
     description.textContent = isBase ? 'Các lá còn lại giữ số mặc định theo tùy chọn của phòng.' : pack.description;
     description.style.cssText = 'color:#cbd5e1;font-size:12px;margin:7px 0';
     settings.append(description);
+    const gallery = document.createElement('details');
+    const galleryTitle = document.createElement('summary');
+    galleryTitle.textContent = 'Danh sách bài';
+    const faces = document.createElement('div');
+    faces.className = 'setup-card-faces';
+    gallery.append(galleryTitle, faces);
+    gallery.addEventListener('toggle', () => {
+      if (gallery.open && !faces.childElementCount) {
+        faces.append(...pack.cards.map(card => createCardFace(document, card.type, 'small')));
+      }
+    }, { signal: this._abort.signal });
+    settings.append(gallery);
     const editable = pack.cards.filter(card => getEditableCardLimit(card.type) !== undefined);
     for (const card of editable) settings.append(this._buildCount(card, getEditableCardLimit(card.type)!));
     settings.append(this._button('Đặt lại mặc định', () => {

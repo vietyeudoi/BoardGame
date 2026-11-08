@@ -74,7 +74,9 @@ export class GameScreen {
     this._container.appendChild(this._element);
     const panels = this._element.querySelector<HTMLElement>('#hud-panels')!;
     this.roundSetup = new RoundSetupPanel(panels);
-    this.deckAlterStrip = new DeckAlterStrip(panels);
+    this.deckAlterStrip = new DeckAlterStrip(this._element);
+    this.deckAlterStrip.mountControls(...['hud-deck-view-swap', 'btn-deck-view-confirm', 'btn-deck-view-close']
+      .map(id => this._element.querySelector<HTMLElement>('#' + id)!));
     this._setupEvents();
   }
 
@@ -271,16 +273,16 @@ export class GameScreen {
 
 
   updateDeckView(view: DeckViewState | null, localId: string | null): void {
-    this._element.querySelector<HTMLElement>('#hud-deck-view')!.hidden = !view;
     const own = view?.viewerId === localId && Boolean(view);
     const alter = own && view?.mode === 'alter';
-    this.deckAlterStrip.sync(alter ? view : null);
+    this._element.querySelector<HTMLElement>('#hud-deck-view')!.hidden = !view || own;
+    this.deckAlterStrip.sync(own ? view : null);
     const status = this._element.querySelector('#hud-deck-view-lock')!;
     status.textContent = view ? '🔒 ' + view.viewerName + (view.mode === 'alter' ? ' đang xếp bài' : ' đang xem bài') : '';
     this._element.querySelector<HTMLButtonElement>('#btn-deck-view-confirm')!.hidden = !alter;
     const close = this._element.querySelector<HTMLButtonElement>('#btn-deck-view-close')!;
     close.hidden = !own;
-    close.textContent = alter ? 'Hủy' : 'Xong';
+    close.textContent = alter ? 'Hủy (Esc)' : 'Xong (Esc)';
     this._element.querySelector<HTMLElement>('#hud-deck-view-swap')!.hidden = !alter || (view?.cards.length ?? 0) < 2;
     for (const id of ['deck-view-from', 'deck-view-to']) {
       this._element.querySelector<HTMLInputElement>('#' + id)!.max = String(view?.cards.length ?? 0);

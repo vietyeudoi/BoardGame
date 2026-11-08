@@ -8,7 +8,7 @@ import { CardTextureGenerator } from '../objects/CardTextureGenerator';
 import { getCardTitle } from '../objects/CardTypeHelper';
 
 const ROW_WIDTH = 11;
-const CARD_SCALE = 0.72;
+const CARD_SCALE = 0.53;
 const ROW_Y = 0.2;
 const LABEL_HEIGHT = 0.32;
 const DRAG_HEIGHT = 0.75;
@@ -65,8 +65,8 @@ export class DeckViewRow {
     const seat = getDefaultSeatPlacement(state.seat);
     const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), seat.rotationY);
     const tangent = new THREE.Vector3(Math.cos(seat.rotationY), 0, -Math.sin(seat.rotationY));
-    const center = new THREE.Vector3(seat.x, ROW_Y, seat.z);
-    if (!this._name) {
+    const center = new THREE.Vector3(seat.x * 0.87, ROW_Y, seat.z * 0.87);
+    if (!this._name && !this._local) {
       this._name = this._label(state.viewerName + (state.mode === 'alter' ? ' đang xếp bài' : ' đang xem bài'), 3.7);
       this._name.position.set(center.x - Math.sin(seat.rotationY) * 1.7, ROW_Y + LABEL_HEIGHT,
         center.z - Math.cos(seat.rotationY) * 1.7);
@@ -78,8 +78,10 @@ export class DeckViewRow {
       if (entry?.index === index) return;
       if (!entry) {
         const id = DECK_VIEW_PREFIX + state.id + ':' + token;
-        const card = new CardObject3D({ id, cardType, title: getCardTitle(cardType), faceUp: Boolean(cardType) });
-        card.setMasked(!cardType);
+        // Mặt bài riêng đã có trong bảng 2D, hàng 3D chỉ giúp theo dõi thứ tự.
+        const face = this._local ? undefined : cardType;
+        const card = new CardObject3D({ id, cardType: face, title: getCardTitle(face), faceUp: Boolean(face) });
+        card.setMasked(!face);
         card.position.copy(deckPosition ?? center);
         card.scale.setScalar(0.58);
         const label = this._label('', 0.54);

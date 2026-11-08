@@ -45,17 +45,18 @@ describe('DeckAlterStrip', () => {
     elementFromPoint.mockReturnValue(cards[2]!.firstElementChild);
     pointer('pointermove', cards[0]!, 60);
     expect(cards[2]!.hasAttribute('data-target')).toBe(true);
-    expect(host.querySelector('.deck-alter-ghost')).not.toBeNull();
+    expect(document.querySelector('.deck-alter-ghost')).not.toBeNull();
     pointer('pointerup', cards[0]!, 60);
     expect(strip.onOrder).toHaveBeenCalledWith([1, 2, 3]);
-    expect(host.querySelector('.deck-alter-ghost')).toBeNull();
+    expect(document.querySelector('.deck-alter-ghost')).toBeNull();
   });
 
   it('đặt tên lá mở rộng trước nhãn bộ', () => {
-    strip.sync({ ...view, cards: [{ token: 0, cardType: 'imploding:reverse' }] });
+    strip.sync({ ...view, id: 'expansion', cards: [{ token: 0, cardType: 'imploding:reverse' }] });
     const card = host.querySelector('[data-alter-token]')!;
-    expect(card.children[1]?.textContent).toBe('Đảo chiều');
-    expect(card.children[2]?.textContent).toBe('Imploding Kittens');
+    expect(card.querySelector('.fhfp-rules-name')?.textContent).toBe('Đảo chiều');
+    expect(card.querySelector('.fhfp-pack-label')?.textContent).toBe('Imploding Kittens');
+    expect(card.querySelector('.fhfp-rules-description')?.textContent?.replace(/\s+/g, ' ')).toContain('Khi có hai người');
   });
 
   it('bỏ thao tác thả ra ngoài và xóa các lá khi phiên đóng', () => {

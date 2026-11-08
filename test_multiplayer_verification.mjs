@@ -398,6 +398,8 @@ async function run() {
     }
     await clickAction(1);
     await waitFor(clientA, row + '._state?.mode === "see" && ' + row + '._cards.size === 3');
+    assert.equal(await clientA.evaluate("document.querySelector('#deck-alter-strip header strong').textContent"), 'Xem 3 lá trên cùng');
+    assert.equal(await clientA.evaluate("document.querySelectorAll('#deck-alter-strip .fhfp-rules-description').length"), 3);
     clientC = await startBrowser(9224);
     await waitFor(clientC, 'window.__app?._networkClient?.getStatus() === "connected"');
     await clientC.evaluate("document.querySelector('#input-player-name').value = 'Carol'; document.querySelector('#input-room-id').value = " + JSON.stringify(roomId) + "; document.querySelector('#btn-join-room').click()");
@@ -425,13 +427,6 @@ async function run() {
     for (const client of deckViewClients) await waitFor(client, '!' + row + '._state');
     await clickAction(3);
     await waitFor(clientA, row + '._state?.mode === "alter" && window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
-    const firstPreview = await projectWorld(clientA, 'scene.deckViewRow._cards.get(0).card.position');
-    const lastPreview = await projectWorld(clientA, 'scene.deckViewRow._cards.get(2).card.position');
-    await clientA.mouseDrag(firstPreview.x, firstPreview.y, lastPreview.x, lastPreview.y, 15);
-    for (const client of deckViewClients) {
-      await waitFor(client, row + '._state?.cards.map(card => card.token).join() === "1,2,0"');
-    }
-
     const alterHud = "document.querySelector('#deck-alter-strip')";
     await waitFor(clientA, '!' + alterHud + '.hidden');
     for (const client of [clientB, clientC]) assert.equal(await client.evaluate(alterHud + '.hidden'), true);
@@ -439,11 +434,18 @@ async function run() {
       const bounds = tile.getBoundingClientRect();
       return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
     })`);
-    await clientA.mouseDrag(lastTile.x, lastTile.y, firstTile.x, firstTile.y, 15);
+    await clientA.mouseDrag(firstTile.x, firstTile.y, lastTile.x, lastTile.y, 15);
+    for (const client of deckViewClients) await waitFor(client, row + '._state?.cards.map(card => card.token).join() === "1,2,0"');
+    await clientA.evaluate("document.querySelector('.deck-view-reset').click()");
     for (const client of deckViewClients) {
       await waitFor(client, row + '._state?.cards.map(card => card.token).join() === "0,1,2"');
     }
-    await clientA.evaluate("document.querySelector('#btn-deck-view-confirm').click()");
+    await clientA.mouseClick(firstTile.x, firstTile.y);
+    await clientA.mouseClick(lastTile.x, lastTile.y);
+    for (const client of deckViewClients) {
+      await waitFor(client, row + '._state?.cards.map(card => card.token).join() === "2,1,0"');
+    }
+    await clientA.evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter' }))");
     for (const client of deckViewClients) await waitFor(client, '!' + row + '._state');
     await clickAction(3);
     await waitFor(clientA, row + '._state?.mode === "alter"');

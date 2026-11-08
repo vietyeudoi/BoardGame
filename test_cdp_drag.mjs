@@ -73,7 +73,17 @@ async function main() {
       return { x: start.left + start.width / 2, y: start.top + start.height / 2,
         endX: Math.max(...cards.map(card => card.right)) + 4, endY: Math.max(...cards.map(card => card.bottom)) };
     })()`);
-    await browser.mouseDrag(fanPoints.x, fanPoints.y, fanPoints.endX, fanPoints.endY);
+    await browser.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed', x: fanPoints.x, y: fanPoints.y, button: 'left', clickCount: 1,
+    });
+    await browser.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', x: fanPoints.endX, y: fanPoints.endY, button: 'left', buttons: 1,
+    });
+    assert.equal(await browser.evaluate("getComputedStyle(document.querySelector('.fhfp-root')).visibility"), 'hidden');
+    await browser.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x: fanPoints.endX, y: fanPoints.endY, button: 'left', clickCount: 1,
+    });
+    assert.equal(await browser.evaluate("getComputedStyle(document.querySelector('.fhfp-root')).visibility"), 'visible');
     const fanSelected = await browser.evaluate("window.__app._sceneManager.getInteractionManager().getSelectedCards().map(card => card.cardId)");
     assert.deepEqual(fanSelected.sort(), fan.sort());
     console.log('Đã kiểm tra kéo khung trên bàn, trong fan và click vùng trống bằng Chrome.');

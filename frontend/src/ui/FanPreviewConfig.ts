@@ -5,24 +5,6 @@
  * authoritative CardRegistry/game state.
  */
 
-import type { FanCardArt } from '../utils/CardArt';
-export { FAN_CARD_ART, type FanCardArt } from '../utils/CardArt';
-
-export const FAN_CARD_FALLBACK: FanCardArt = {
-  icon: '🃏',
-  shortName: 'Card',
-  accent: '#94a3b8',
-  surface: 'radial-gradient(circle at 50% 38%, #f1f5f9 0%, #e2e8f0 42%, #334155 100%)',
-};
-
-/** Card back shown if a local hand card is unexpectedly masked. */
-export const FAN_CARD_BACK: FanCardArt = {
-  icon: '🐾',
-  shortName: 'Ẩn',
-  accent: '#475569',
-  surface: 'radial-gradient(circle at 50% 38%, #334155 0%, #1e293b 55%, #0f172a 100%)',
-};
-
 /** Pure layout constants for the fan geometry (px / degrees / ratios). */
 export const FAN_PREVIEW_LAYOUT = {
   MIN_CARD_HEIGHT_PX: 102,

@@ -34,7 +34,7 @@ import { DeckViewRow, DECK_VIEW_PREFIX } from './DeckViewRow';
 import { CardTransferAnimator, TRANSFER_DURATION_MIN_MS, type CardSlotTransform } from '../animation/CardTransferAnimator';
 import { ZONE_VISUAL_CONFIG } from '../objects/TableZonesConfig';
 import { getTableOuterRadius, resolveTableSeatCount, PlayerCount } from '../objects/TableShapeConfig';
-import { getCardTitle } from '../objects/CardTypeHelper';
+import { CARD_TYPES, getCardTitle } from '../objects/CardTypeHelper';
 import { computePlayerPerspective } from './PlayerPerspectiveHelper';
 import { SEAT_CHANGE } from '@shared/constants/config';
 import { ANONYMOUS_HAND_PREFIX, getAnonymousHandSlotId, type SandboxObject, type PlayerInfo } from '@shared/types/room';
@@ -49,6 +49,13 @@ const logger = Logger.create('SceneManager');
 const DEAL_CARD_INTERVAL_MS = 35;
 const OFFLINE_DECK_SIZE = 30;
 const makeOfflineDeckIds = () => Array.from({ length: OFFLINE_DECK_SIZE }, (_, i) => "card_" + (i + 1));
+
+// Bàn offline có bộ mẫu riêng. Gắn loại theo ID để xáo hoặc chèn lại không đổi mặt lá.
+function getOfflineCardType(id: string): string | undefined {
+  const number = /^card_(\d+)$/.exec(id)?.[1];
+  const index = Number(number) - 1;
+  return index >= 0 && index < OFFLINE_DECK_SIZE ? CARD_TYPES[index % CARD_TYPES.length] : undefined;
+}
 
 interface PendingHandTransfer {
   cardId: string;
@@ -649,10 +656,12 @@ export class SceneManager {
       // 6. Instantiate CardObject3D with atomic error protection (Phase 0)
       let newCard: CardObject3D;
       try {
+        const cardType = !this._onlineCardRoomId && deck === this.getOriginalDeck()
+          ? getOfflineCardType(topCardId) : undefined;
         newCard = new CardObject3D({
           id: topCardId,
-          title: `Lá bài ${topCardId}`,
-          description: `Rút từ ${deck.deckId}`,
+          cardType,
+          title: cardType ? getCardTitle(cardType) : `Lá bài ${topCardId}`,
           position: spawnPos,
           faceUp: true,
         });
@@ -803,10 +812,12 @@ export class SceneManager {
       // 7. Instantiate CardObject3D
       let newCard: CardObject3D;
       try {
+        const cardType = !this._onlineCardRoomId && deck === this.getOriginalDeck()
+          ? getOfflineCardType(topCardId) : undefined;
         newCard = new CardObject3D({
           id: topCardId,
-          title: `Lá bài ${topCardId}`,
-          description: `Rút từ ${deck.deckId}`,
+          cardType,
+          title: cardType ? getCardTitle(cardType) : `Lá bài ${topCardId}`,
           position: { x: spawnPos.x, y: TABLE_CONFIG.SURFACE_Y, z: spawnPos.z },
           faceUp: true,
         });
@@ -1418,10 +1429,11 @@ export class SceneManager {
    * Ensures clients joining mid-game or after card actions see all public table cards and proper hand counts.
    */
   private _createOfflineDemoCard(): CardObject3D {
+    const cardType = CARD_TYPES[0]!;
     return new CardObject3D({
       id: DEMO_TABLE_CARD_ID,
-      title: "Cat Boom",
-      description: "Lá bài mẫu của bàn offline.",
+      cardType,
+      title: getCardTitle(cardType),
       position: { x: DEMO_TABLE_CARD_X, y: TABLE_CONFIG.SURFACE_Y, z: 0 },
     });
   }
