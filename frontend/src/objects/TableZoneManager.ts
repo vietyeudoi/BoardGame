@@ -6,6 +6,8 @@
  */
 
 import * as THREE from 'three';
+import { SHARED_CONFIG } from '../../../shared/constants/config';
+
 import { PlayerCount } from './TableShapeConfig';
 import {
   TableZonesLayout,
@@ -46,7 +48,7 @@ export class TableZoneManager {
       rotationY: layout.deckZone.rotationY,
       width: layout.deckZone.width,
       depth: layout.deckZone.depth,
-      label: layout.deckZone.label,
+      label: "", // Số lá hiển thị trên badge của bộ rút.
       borderColor: ZONE_VISUAL_CONFIG.DECK_COLOR,
       fillColor: ZONE_VISUAL_CONFIG.DECK_COLOR,
     });
@@ -70,8 +72,20 @@ export class TableZoneManager {
     this._zones.set(discardObj.zoneId, discardObj);
     this._scene.add(discardObj);
 
-    // Placement zones remain in the layout for drag/drop queries, but their
-    // distracting visual markers are intentionally not rendered.
+    // Dấu vùng đặt bài mờ để mặt bàn vẫn dễ đọc khi đủ ghế.
+    if (playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM) {
+      for (const placement of layout.cardPlacementZones) {
+        const zone = new TableZoneObject3D({
+          ...placement,
+          label: "",
+          borderOpacity: ZONE_VISUAL_CONFIG.SEAT_PLACEMENT_BORDER_OPACITY,
+          fillOpacity: ZONE_VISUAL_CONFIG.SEAT_PLACEMENT_FILL_OPACITY,
+        });
+        zone.visible = this._visible;
+        this._zones.set(zone.zoneId, zone);
+        this._scene.add(zone);
+      }
+    }
 
     this._requestRender();
     logger.info(`Table zones configured for ${playerCount} players`);

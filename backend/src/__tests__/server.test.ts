@@ -6,7 +6,8 @@ import * as http from 'http';
 import { WebSocket } from 'ws';
 import { HttpServer } from '../server/HttpServer.js';
 import { WebSocketServer } from '../server/WebSocketServer.js';
-import { RoomManager } from '../room/RoomManager.js';
+import type { RoomManager } from '../room/RoomManager.js';
+import { LegacyRoomFixture } from './LegacyRoomFixture.js';
 import type { ServerToClientMessage } from '../../../shared/types/protocol.js';
 
 const TEST_PORT = 4099;
@@ -17,7 +18,7 @@ describe('M0 Server Live Verification (HTTP + WebSocket)', () => {
   let roomManager: RoomManager;
 
   beforeAll(async () => {
-    roomManager = new RoomManager();
+    roomManager = new LegacyRoomFixture();
     httpServer = new HttpServer(TEST_PORT);
     wsServer = new WebSocketServer(httpServer.getServer(), roomManager);
 
@@ -74,7 +75,7 @@ describe('M0 Server Live Verification (HTTP + WebSocket)', () => {
     ws.send(
       JSON.stringify({
         type: 'room:create',
-        payload: { roomName: 'Test Sandbox Room' },
+        payload: { roomName: 'Test Sandbox Room', maxPlayers: 2 },
       })
     );
 
@@ -93,8 +94,10 @@ describe('M0 Server Live Verification (HTTP + WebSocket)', () => {
     if (stateMsg && stateMsg.type === 'room:state') {
       expect(stateMsg.payload.name).toBe('Test Sandbox Room');
       expect(stateMsg.payload.players.length).toBe(1);
+      expect(stateMsg.payload.maxPlayers).toBe(10);
       expect(stateMsg.payload.players[0].isHost).toBe(true);
-      expect(stateMsg.payload.objects.length).toBeGreaterThan(0);
+      expect(stateMsg.payload.objects.filter(object => object.type === "card" && object.location !== "DECK")).toHaveLength(0);
+      expect(stateMsg.payload.objects.filter(object => object.type === "card" && object.location === "DECK")).toHaveLength(20);
     }
 
     ws.close();

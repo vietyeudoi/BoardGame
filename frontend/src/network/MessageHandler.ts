@@ -1,7 +1,7 @@
 /**
  * MessageHandler.ts — Dispatches incoming server messages to appropriate handlers
  */
-import type { ServerToClientMessage } from '@shared/types/protocol';
+import type { DeckViewState, DrawHoverUpdatePayload, ServerToClientMessage } from '@shared/types/protocol';
 import type { SandboxObject } from '@shared/types/room';
 import type { ClientStore } from '../store/ClientStore';
 import type { SceneManager } from '../scene/SceneManager';
@@ -11,8 +11,12 @@ import { Logger } from '../utils/Logger';
 const logger = Logger.create('MessageHandler');
 
 export class MessageHandler {
+  public onDrawHoverChanged: ((payload: DrawHoverUpdatePayload) => void) | null = null;
+  public onFlipConfirmed?: (cardId: string) => void;
   public onCardDrawn: ((card: SandboxObject, playerIndex: number) => void) | null = null;
   public onCardTransferred: ((payload: { cardId: string; fromPlayerIndex: number; toPlayerIndex: number; card: SandboxObject; seq?: number }) => void) | null = null;
+  public onDeckView?: (state: DeckViewState | null) => void;
+  public onDeckShuffled?: (playerName: string) => void;
   public onError: ((message: string) => void) | null = null;
   /** M1.7.4: server rejection tied to an object, used to restore optimistic UI. */
   public onRejection: ((objectId: string, code?: string) => void) | null = null;
@@ -28,6 +32,25 @@ export class MessageHandler {
   handle(msg: ServerToClientMessage): void {
     logger.debug('Received message', { type: msg.type });
     switch (msg.type) {
+
+      case 'round:configured':
+        this._store.updateRound(msg.payload);
+        break;
+
+      case 'deck:view-state':
+        this.onDeckView?.(msg.payload);
+        break;
+      case 'deck:shuffled':
+        this._store.updateDeckCount(msg.payload.deck.count, undefined, undefined, msg.payload.deck);
+        this._sceneManager.animateDeckShuffle();
+        this.onDeckShuffled?.(msg.payload.playerName);
+        break;
+      case 'deck:inserted':
+        this._sceneManager.animateDeckInsertion(msg.payload.count);
+        break;
+      case 'deck:count':
+        this._store.updateDeckCount(msg.payload.count, msg.payload.ownerId, msg.payload.handCount, msg.payload.deck);
+        break;
       case 'room:state':
         this._store.updateRoomState(msg.payload);
         break;
@@ -45,9 +68,16 @@ export class MessageHandler {
         this._store.addPlayer(msg.payload);
         break;
       case 'room:player-left':
-        this._store.removePlayer(msg.payload.playerId);
+        // Server vẫn giữ ghế và bài tay của người đã ngắt kết nối.
+        this._store.markPlayerDisconnected(msg.payload.playerId);
         // Remove the departing player's cursor (M1.5.3)
         this.remoteCursorManager?.removeCursor(msg.payload.playerId);
+        this._sceneManager.remoteDragPreview?.stop(msg.payload.playerId);
+        this.onDrawHoverChanged?.({ playerId: msg.payload.playerId, playerName: "", hovering: false });
+        break;
+      case 'deck:card-taken':
+        this._store.addOrUpdateObject(msg.payload.card, msg.payload.deckCount, msg.payload.deck);
+        this._sceneManager.animateDeckTake(msg.payload.card.id);
         break;
       case 'hand:card-drawn':
         this._store.addOrUpdateObject(msg.payload.card);
@@ -73,8 +103,18 @@ export class MessageHandler {
         break;
 
       // ── M1.5.3: Remote cursor & drag sync ──────────────────────────────
+      case 'draw:hovered':
+        if (msg.payload.hovering) this.remoteCursorManager?.removeCursor(msg.payload.playerId);
+        this.onDrawHoverChanged?.(msg.payload);
+        break;
       case 'cursor:update':
         this.remoteCursorManager?.updateCursor(msg.payload);
+        break;
+      case 'object:drag-preview':
+        this._sceneManager.remoteDragPreview?.update(msg.payload);
+        break;
+      case 'object:drag-preview-stop':
+        this._sceneManager.remoteDragPreview?.stop(msg.payload.playerId, msg.payload.dragId);
         break;
       case 'object:drag-start':
         this._sceneManager.onRemoteDragStart?.(
@@ -89,15 +129,26 @@ export class MessageHandler {
           msg.payload.seq
         );
         break;
-      case 'object:drag-end':
-        this._sceneManager.onRemoteDragEnd?.(
+
+      case 'object:drag-end': {
+        const room = this._store.getRoomState();
+        const object = room?.objects.find(item => item.id === msg.payload.objectId);
+        const authoritativeTable = Boolean(room?.round && object?.location === 'TABLE');
+        if (msg.payload.playerId !== this._store.getPlayerId()) this._sceneManager.onRemoteDragEnd?.(
           msg.payload.objectId,
           { x: msg.payload.x, y: msg.payload.y, z: msg.payload.z },
           msg.payload.faceUp,
           msg.payload.seq,
-          msg.payload.rotation
+          msg.payload.rotation,
+          authoritativeTable,
         );
+        if (msg.payload.dragId !== undefined || authoritativeTable) {
+          if (object?.location === "TABLE") {
+            this._store.updateObjectPosition({ id: object.id, position: { x: msg.payload.x, y: msg.payload.y, z: msg.payload.z }, rotation: msg.payload.rotation ?? object.rotation });
+          }
+        }
         break;
+      }
       // ────────────────────────────────────────────────────────────────────
 
       case 'error':
@@ -111,6 +162,7 @@ export class MessageHandler {
         logger.debug('Pong received');
         break;
       case 'object:flipped': {
+        this.onFlipConfirmed?.(msg.payload.objectId);
         this._sceneManager.syncFlippedCard(
           msg.payload.objectId,
           msg.payload.faceUp,

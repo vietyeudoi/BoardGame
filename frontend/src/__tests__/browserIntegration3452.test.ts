@@ -107,6 +107,7 @@ describe('M1.3.4.5.2 — Browser Integration Testing & Insertion Flow Stabilizat
     document.body.appendChild(container);
 
     sceneManager = new SceneManager(container);
+    sceneManager.rebuildTable(4);
     assertTabletopInvariants(sceneManager);
   });
 

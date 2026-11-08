@@ -2,7 +2,7 @@
  * ClientStore.ts — Client-side state mirror (read-only from backend)
  * This is NOT the authoritative state — backend is.
  */
-import type { RoomState, PlayerInfo, ObjectPosition, SandboxObject } from '@shared/types/room';
+import type { RoomState, PlayerInfo, ObjectPosition, SandboxObject, RoundSetup, PublicDeckState } from '@shared/types/room';
 import type { ConnectionStatus } from '../network/NetworkClient';
 import { Logger } from '../utils/Logger';
 
@@ -59,6 +59,17 @@ export class ClientStore {
     this._notify();
   }
 
+  markPlayerDisconnected(playerId: string): void {
+    if (!this._roomState) return;
+    this._roomState = {
+      ...this._roomState,
+      players: this._roomState.players.map((player) => player.id === playerId
+        ? { ...player, isConnected: false }
+        : player),
+    };
+    this._notify();
+  }
+
   removePlayer(playerId: string): void {
     if (!this._roomState) return;
     this._roomState = {
@@ -77,7 +88,23 @@ export class ClientStore {
     this._notify();
   }
 
-  addOrUpdateObject(obj: SandboxObject): void {
+
+  updateRound(round: RoundSetup): void {
+    if (!this._roomState) return;
+    this._roomState = { ...this._roomState, round };
+    this._notify();
+  }
+
+  updateDeckCount(count: number, ownerId?: string, handCount?: number, deck?: PublicDeckState): void {
+    if (!this._roomState) return;
+    const handCounts = ownerId && handCount !== undefined
+      ? { ...this._roomState.handCounts, [ownerId]: handCount }
+      : this._roomState.handCounts;
+    this._roomState = { ...this._roomState, deckCount: count, handCounts, deck: deck ?? this._roomState.deck };
+    this._notify();
+  }
+
+  addOrUpdateObject(obj: SandboxObject, deckCount?: number, deck?: PublicDeckState): void {
     if (!this._roomState) return;
     const existingIdx = this._roomState.objects.findIndex((o) => o.id === obj.id);
     const newObjects = [...this._roomState.objects];
@@ -86,7 +113,7 @@ export class ClientStore {
     } else {
       newObjects.push(obj);
     }
-    this._roomState = { ...this._roomState, objects: newObjects };
+    this._roomState = { ...this._roomState, objects: newObjects, deckCount: deckCount ?? this._roomState.deckCount, deck: deck ?? this._roomState.deck };
     this._notify();
   }
 

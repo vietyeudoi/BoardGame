@@ -408,6 +408,7 @@ describe('M1.3.3 Deck Draw & Card Transfer', () => {
 
       // Release
       window.dispatchEvent(new MouseEvent('mouseup'));
+      sceneManager.flushCardTransfers();
       expect(dragController.isDragging()).toBe(false);
       expect(drawnCard.position.y).toBeCloseTo(TABLE_CONFIG.SURFACE_Y, 5);
     });

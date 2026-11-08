@@ -192,14 +192,14 @@ describe('M1.4.1 — Dynamic Polygon Table System & Adaptive Scaling', () => {
   // ─── 3. TableObject3D Dynamic Rebuilds ──────────────────────────────────────
 
   describe('TableObject3D', () => {
-    it('constructs with 4-player rectangular table by default', () => {
+    it('khởi tạo bàn thập giác mặc định', () => {
       const table = new TableObject3D();
-      expect(table.playerCount).toBe(4);
-      expect(table.shapeType).toBe('rectangle');
+      expect(table.playerCount).toBe(10);
+      expect(table.shapeType).toBe('polygon');
       expect(table.surfaceY).toBe(TABLE_CONFIG.SURFACE_Y);
 
-      // Felt + 4 rails + 1 apron + 4 legs = 10 children
-      expect(table.children).toHaveLength(10);
+      // Mặt bàn, 10 thanh viền, tạp dề và 10 chân.
+      expect(table.children).toHaveLength(22);
       table.dispose();
     });
 

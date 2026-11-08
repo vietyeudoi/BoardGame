@@ -4,6 +4,8 @@
  * Supports dynamic polygon rebuilds (2–8 players) per M1.4.1.
  */
 import * as THREE from 'three';
+import { SHARED_CONFIG } from '../../../shared/constants/config';
+
 import { TABLE_CONFIG } from './TableConfig';
 import {
   PlayerCount,
@@ -21,7 +23,7 @@ export class TableObject3D extends THREE.Group {
   private _proceduralTexture: THREE.CanvasTexture | null = null;
   private _currentParams: TableShapeParams;
 
-  constructor(initialPlayerCount: PlayerCount = 4) {
+  constructor(initialPlayerCount: PlayerCount = SHARED_CONFIG.MAX_PLAYERS_PER_ROOM) {
     super();
     this.name = 'TableObject3D';
     this._currentParams = getTableShape(initialPlayerCount);

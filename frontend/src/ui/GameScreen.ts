@@ -2,6 +2,10 @@
  * GameScreen.ts — In-game HUD Component
  * Displays top status, camera control buttons, and interactive tabletop hints.
  */
+import type { DeckViewState } from '@shared/types/protocol';
+import type { PublicDeckState, RoundSetup } from '@shared/types/room';
+import { DeckAlterStrip } from './components/DeckAlterStrip';
+import { RoundSetupPanel } from './RoundSetupPanel';
 import type { ConnectionStatus } from '../network/NetworkClient';
 import type { InsertionMode } from '../interaction/InteractionConfig';
 import { Logger } from '../utils/Logger';
@@ -23,7 +27,16 @@ export class GameScreen {
   private _btnInsertTop: HTMLButtonElement | null = null;
   private _btnInsertBottom: HTMLButtonElement | null = null;
   private _btnInsertCustom: HTMLButtonElement | null = null;
-  private _drawToHandBtn: HTMLButtonElement | null = null;
+  readonly roundSetup: RoundSetupPanel;
+  readonly deckAlterStrip: DeckAlterStrip;
+
+  onCloseDeckView?: (confirm: boolean) => void;
+  onSwapDeckView?: (first: number, second: number) => void;
+  onDeckAffectedCount?: (count: number) => void;
+  onDeckPosition?: (position: number) => void;
+  private _deckState?: PublicDeckState;
+  onResetRound?: () => void;
+  private _errorTimeout?: ReturnType<typeof setTimeout>;
   private readonly _abortController = new AbortController();
 
   public onResetCamera: (() => void) | null = null;
@@ -33,11 +46,12 @@ export class GameScreen {
   public onToLobby: (() => void) | null = null;
   public onSetInsertionMode: ((mode: InsertionMode, customVal?: number) => void) | null = null;
   public onRequestCustomModal: (() => void) | null = null;
-  public onDrawToHand: (() => void) | null = null;
 
   constructor(private readonly _container: HTMLElement) {
     this._element = this._buildDOM();
     this._container.appendChild(this._element);
+    this.roundSetup = new RoundSetupPanel(this._element);
+    this.deckAlterStrip = new DeckAlterStrip(this._element);
     this._setupEvents();
   }
 
@@ -46,13 +60,14 @@ export class GameScreen {
     el.id = 'game-screen';
     el.style.cssText = 'display:none;width:100%;height:100%;position:relative;pointer-events:none;';
     el.innerHTML = `
+      <style>#game-screen [data-round-hidden] { display: none !important; }</style>
       <!-- Top Bar: Status and Navigation -->
       <div id="hud-top" style="
-        position:absolute;top:14px;left:50%;transform:translateX(-50%);
+        position:absolute;top:14px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 36px);box-sizing:border-box;
         background:rgba(18,18,32,0.85);backdrop-filter:blur(8px);
         border:1px solid #3d3d5c;border-radius:24px;
         padding:8px 20px;font-size:0.85rem;color:#e0e0f0;
-        display:flex;align-items:center;gap:12px;
+        display:flex;flex-wrap:wrap;align-items:center;gap:8px;
         box-shadow:0 4px 16px rgba(0,0,0,0.4);pointer-events:auto;
       ">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -62,7 +77,7 @@ export class GameScreen {
           <span id="hud-player-badge" style="background:#1e293b;border:1px solid #10b981;color:#6ee7b7;border-radius:12px;padding:2px 8px;font-size:0.72rem;font-weight:600;display:none;"></span>
         </div>
         <div style="width:1px;height:16px;background:#3d3d5c;"></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0;">
           <span id="hud-deck-pill" style="
             background:#0f172a;color:#cbd5e1;border:1px solid #334155;
             border-radius:6px;padding:4px 8px;font-size:0.75rem;font-weight:600;
@@ -71,24 +86,46 @@ export class GameScreen {
 
           <!-- Insertion Mode Control Group (M1.3.4.5) -->
           <div id="hud-insert-mode-group" style="
-            display:flex;align-items:center;gap:3px;background:#0f172a;border:1px solid #334155;
+            display:flex;flex-wrap:wrap;align-items:center;gap:3px;background:#0f172a;border:1px solid #334155;
             border-radius:6px;padding:2px 4px;font-size:0.75rem;
           ">
             <span style="color:#94a3b8;font-weight:600;padding:0 4px;font-size:0.7rem;">Chèn:</span>
-            <button id="btn-insert-top" title="Chèn lên đỉnh (Mặc định)" style="
+            <button id="btn-insert-top" aria-pressed="true" title="Chèn lên đỉnh (Mặc định)" style="
               background:#1d4ed8;color:#eff6ff;border:1px solid #3b82f6;border-radius:4px;
               padding:3px 6px;font-size:0.7rem;cursor:pointer;font-weight:600;
             ">Đỉnh (Top)</button>
-            <button id="btn-insert-bottom" title="Chèn xuống đáy" style="
+            <button id="btn-insert-bottom" aria-pressed="false" title="Chèn xuống đáy" style="
               background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;
               padding:3px 6px;font-size:0.7rem;cursor:pointer;font-weight:600;
             ">Đáy (Bottom)</button>
-            <button id="btn-insert-custom" title="Chèn vào vị trí tùy chọn..." style="
+            <button id="btn-insert-custom" aria-pressed="false" title="Chèn vào vị trí tùy chọn..." style="
               background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;
               padding:3px 6px;font-size:0.7rem;cursor:pointer;font-weight:600;
             ">Tùy chọn...</button>
           </div>
 
+
+          <div id="hud-deck-controls" hidden style="font-size:.75rem;color:#cbd5e1">
+            <label id="hud-deck-position-label" hidden>Vị trí chèn
+              <input id="hud-deck-position" type="number" min="1" step="1" style="width:3rem">
+            </label>
+            <label for="hud-affected-count">Số lá tác động</label>
+            <button id="hud-affected-minus" aria-label="Giảm số lá tác động" type="button">−</button>
+            <input id="hud-affected-count" type="number" min="1" step="1" style="width:3rem">
+            <button id="hud-affected-plus" aria-label="Tăng số lá tác động" type="button">+</button>
+            <output id="hud-deck-status" aria-live="polite"></output>
+          </div>
+
+          <div id="hud-deck-view" hidden style="font-size:.78rem;color:#fcd34d">
+            <span id="hud-deck-view-lock" role="status"></span>
+            <span id="hud-deck-view-swap" hidden>
+              <input id="deck-view-from" type="number" min="1" value="1" aria-label="Vị trí thứ nhất" style="width:3rem">
+              <input id="deck-view-to" type="number" min="1" value="2" aria-label="Vị trí thứ hai" style="width:3rem">
+              <button id="btn-deck-view-swap" type="button">Đổi chỗ</button>
+            </span>
+            <button id="btn-deck-view-confirm" hidden type="button">Xác nhận</button>
+            <button id="btn-deck-view-close" hidden type="button">Xong</button>
+          </div>
           <button id="btn-flip-card" title="Lật bài (Phím F)" style="
             background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;
             border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
@@ -104,16 +141,12 @@ export class GameScreen {
             border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
             display:flex;align-items:center;gap:4px;font-weight:600;
           ">📦 Xếp chồng</button>
-          <button id="btn-draw-to-hand" title="Rút bài vào tay (Phím H)" style="
-            background:#312e81;color:#a5b4fc;border:1px solid #6366f1;
-            border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
-            display:flex;align-items:center;gap:4px;font-weight:600;
-          ">🖐 Rút vào tay (H)</button>
           <button id="btn-reset-cam" title="Reset Camera góc nhìn mặc định" style="
             background:#334155;color:#e2e8f0;border:1px solid #475569;
             border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
             display:flex;align-items:center;gap:4px;
           ">🎥 Reset Camera</button>
+          <button id="btn-round-reset" hidden type="button" style="pointer-events:auto">Làm lại ván</button>
           <button id="btn-to-lobby" title="Return to Main Lobby" style="
             background:#1e293b;color:#94a3b8;border:1px solid #334155;
             border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer;
@@ -121,6 +154,12 @@ export class GameScreen {
         </div>
       </div>
 
+
+      <div id="hud-game-error" role="alert" hidden style="
+        position:absolute;top:88px;left:50%;transform:translateX(-50%);
+        max-width:85%;padding:8px 14px;border-radius:8px;background:#450a0a;
+        border:1px solid #b91c1c;color:#fee2e2;font-size:0.85rem;
+      "></div>
       <!-- Bottom Helper Pill -->
       <div id="hud-bottom-hint" style="
         position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
@@ -128,7 +167,7 @@ export class GameScreen {
         border:1px solid #2e2e48;border-radius:20px;
         padding:6px 18px;font-size:0.75rem;color:#cbd5e1;
         box-shadow:0 2px 10px rgba(0,0,0,0.3);pointer-events:none;user-select:none;
-        white-space:nowrap;
+        white-space:nowrap;max-width:80%;overflow:hidden;
       ">
         🖱️ <b>Kéo trái:</b> Di chuyển bài &nbsp;|&nbsp; 
         ⌨️ <b>R / Shift+R:</b> Xoay 90° &nbsp;|&nbsp; 
@@ -153,19 +192,43 @@ export class GameScreen {
     this._btnInsertTop = el.querySelector<HTMLButtonElement>('#btn-insert-top');
     this._btnInsertBottom = el.querySelector<HTMLButtonElement>('#btn-insert-bottom');
     this._btnInsertCustom = el.querySelector<HTMLButtonElement>('#btn-insert-custom');
-    this._drawToHandBtn = el.querySelector<HTMLButtonElement>('#btn-draw-to-hand');
 
     return el;
   }
 
   private _setupEvents(): void {
+
+
     const opts = { signal: this._abortController.signal };
+    this._element.querySelector('#btn-deck-view-confirm')?.addEventListener('click', () => this.onCloseDeckView?.(true), opts);
+    this._element.querySelector('#btn-deck-view-close')?.addEventListener('click', () => this.onCloseDeckView?.(false), opts);
+    this._element.querySelector('#btn-deck-view-swap')?.addEventListener('click', () => {
+      const from = this._element.querySelector<HTMLInputElement>('#deck-view-from')!;
+      const to = this._element.querySelector<HTMLInputElement>('#deck-view-to')!;
+      if (from.reportValidity() && to.reportValidity()) this.onSwapDeckView?.(from.valueAsNumber - 1, to.valueAsNumber - 1);
+    }, opts);
+    const count = this._element.querySelector<HTMLInputElement>('#hud-affected-count')!;
+    count.addEventListener('change', () => {
+      const requested = count.valueAsNumber;
+      // Giữ số đã xác nhận nếu máy chủ từ chối thao tác khi chồng bị khóa.
+      count.value = String(this._deckState?.affectedCount ?? '');
+      if (Number.isInteger(requested)) this.onDeckAffectedCount?.(requested);
+    }, opts);
+    for (const [id, delta] of [['hud-affected-minus', -1], ['hud-affected-plus', 1]] as const) {
+      this._element.querySelector('#' + id)?.addEventListener('click', () => {
+        if (this._deckState?.count) this.onDeckAffectedCount?.(this._deckState.affectedCount + delta);
+      }, opts);
+    }
+    const position = this._element.querySelector<HTMLInputElement>('#hud-deck-position')!;
+    position.addEventListener('change', () => {
+      this.onDeckPosition?.(Number.isFinite(position.valueAsNumber) ? Math.trunc(position.valueAsNumber) : 1);
+    }, opts);
+    this._element.querySelector('#btn-round-reset')?.addEventListener('click', () => this.onResetRound?.(), opts);
 
     if (this._btnInsertTop) {
       this._btnInsertTop.addEventListener('click', () => {
         logger.debug('Insert top button clicked');
         this.onSetInsertionMode?.('TOP');
-        this.setInsertionModeState('TOP');
       }, opts);
     }
 
@@ -173,7 +236,6 @@ export class GameScreen {
       this._btnInsertBottom.addEventListener('click', () => {
         logger.debug('Insert bottom button clicked');
         this.onSetInsertionMode?.('BOTTOM');
-        this.setInsertionModeState('BOTTOM');
       }, opts);
     }
 
@@ -205,12 +267,6 @@ export class GameScreen {
       }, opts);
     }
 
-    if (this._drawToHandBtn) {
-      this._drawToHandBtn.addEventListener('click', () => {
-        logger.debug('Draw to hand button clicked');
-        this.onDrawToHand?.();
-      }, opts);
-    }
 
     if (this._resetCamBtn) {
       this._resetCamBtn.addEventListener('click', () => {
@@ -227,8 +283,77 @@ export class GameScreen {
     }
   }
 
+
+
+  updateRound(round: RoundSetup | undefined, isHost: boolean, spectator = false): void {
+    this.roundSetup.update(round, isHost);
+    const inactive = round?.phase === 'SETUP' || spectator;
+    for (const id of ['hud-insert-mode-group', 'btn-rotate-card', 'btn-stack-cards', 'hud-bottom-hint']) {
+      this._element.querySelector('#' + id)?.toggleAttribute('data-round-hidden', inactive);
+    }
+    this._flipCardBtn?.toggleAttribute('data-round-hidden', round?.phase === 'SETUP');
+    this._deckPill?.toggleAttribute('data-round-hidden', round?.phase === 'SETUP');
+    const reset = this._element.querySelector<HTMLButtonElement>('#btn-round-reset');
+    if (reset) reset.hidden = !isHost || round?.phase !== 'PLAYING';
+  }
+
+
+  updateDeckControls(deck?: PublicDeckState, customPosition?: number, readOnly = false): void {
+    this._deckState = deck;
+    this._element.querySelector<HTMLElement>('#hud-deck-controls')!.hidden = !deck;
+    if (!deck) {
+      this._element.querySelector('#hud-deck-status')!.textContent = '';
+      return;
+    }
+    const count = this._element.querySelector<HTMLInputElement>('#hud-affected-count')!;
+    count.max = String(deck.count);
+    count.value = deck.count ? String(deck.affectedCount) : '';
+    count.disabled = readOnly || deck.count === 0;
+    this._element.querySelector<HTMLButtonElement>('#hud-affected-minus')!.disabled = count.disabled || deck.affectedCount <= 1;
+    this._element.querySelector<HTMLButtonElement>('#hud-affected-plus')!.disabled = count.disabled || deck.affectedCount >= deck.count;
+    const position = this._element.querySelector<HTMLInputElement>('#hud-deck-position')!;
+    this._element.querySelector<HTMLElement>('#hud-deck-position-label')!.hidden = customPosition === undefined || readOnly;
+    position.max = String(deck.count + 1);
+    position.value = String(customPosition ?? 1);
+  }
+
+
+  updateDeckView(view: DeckViewState | null, localId: string | null): void {
+    this._element.querySelector<HTMLElement>('#hud-deck-view')!.hidden = !view;
+    const own = view?.viewerId === localId && Boolean(view);
+    const alter = own && view?.mode === 'alter';
+    this.deckAlterStrip.sync(alter ? view : null);
+    const status = this._element.querySelector('#hud-deck-view-lock')!;
+    status.textContent = view ? '🔒 ' + view.viewerName + (view.mode === 'alter' ? ' đang xếp bài' : ' đang xem bài') : '';
+    this._element.querySelector<HTMLButtonElement>('#btn-deck-view-confirm')!.hidden = !alter;
+    const close = this._element.querySelector<HTMLButtonElement>('#btn-deck-view-close')!;
+    close.hidden = !own;
+    close.textContent = alter ? 'Hủy' : 'Xong';
+    this._element.querySelector<HTMLElement>('#hud-deck-view-swap')!.hidden = !alter || (view?.cards.length ?? 0) < 2;
+    for (const id of ['deck-view-from', 'deck-view-to']) {
+      this._element.querySelector<HTMLInputElement>('#' + id)!.max = String(view?.cards.length ?? 0);
+    }
+  }
+
+  showDeckShuffle(playerName: string): void {
+    this._element.querySelector('#hud-deck-status')!.textContent = playerName + ' vừa xáo bài';
+  }
+
+  showError(message: string): void {
+    const alert = this._element.querySelector<HTMLElement>('#hud-game-error');
+    if (!alert) return;
+    clearTimeout(this._errorTimeout);
+    alert.textContent = message;
+    alert.hidden = false;
+    this._errorTimeout = setTimeout(() => { alert.hidden = true; }, 3200);
+  }
+
   setInsertionModeState(mode: InsertionMode, customVal?: number): void {
     if (!this._btnInsertTop || !this._btnInsertBottom || !this._btnInsertCustom) return;
+
+    this._btnInsertTop.setAttribute('aria-pressed', String(mode === 'TOP'));
+    this._btnInsertBottom.setAttribute('aria-pressed', String(mode === 'BOTTOM'));
+    this._btnInsertCustom.setAttribute('aria-pressed', String(mode === 'CUSTOM'));
 
     // Reset styles
     const defaultBg = '#1e293b';
@@ -301,7 +426,8 @@ export class GameScreen {
       }
     }
     if (this._playerBadge) {
-      this._playerBadge.textContent = `👤 ${playerName} (P${playerIndex + 1})`;
+      const seat = playerIndex < 0 ? 'Khán giả' : 'P' + (playerIndex + 1);
+      this._playerBadge.textContent = '👤 ' + playerName + ' (' + seat + ')';
       this._playerBadge.style.display = 'inline-flex';
     }
   }
@@ -313,11 +439,13 @@ export class GameScreen {
   }
 
   dispose(): void {
+    clearTimeout(this._errorTimeout);
+    this.roundSetup.dispose();
+    this.deckAlterStrip.dispose();
     this._abortController.abort();
     this.onResetCamera = null;
     this.onFlipCard = null;
     this.onToLobby = null;
-    this.onDrawToHand = null;
     this._element.remove();
   }
 }

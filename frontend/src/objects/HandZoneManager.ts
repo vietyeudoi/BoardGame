@@ -5,6 +5,8 @@
  */
 
 import * as THREE from 'three';
+import { SHARED_CONFIG } from '../../../shared/constants/config';
+
 import { HandZoneObject3D } from './HandZoneObject3D';
 import { computeHandZoneLayout } from './HandZoneConfig';
 import { PlayerCount } from './TableShapeConfig';
@@ -58,6 +60,7 @@ export class HandZoneManager {
         label,
         width: pos.width,
         depth: pos.depth,
+        useSeatFrame: playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM,
         isCardSelected: this._isCardSelectedCallback,
         isCardHovered: this._isCardHoveredCallback,
       });

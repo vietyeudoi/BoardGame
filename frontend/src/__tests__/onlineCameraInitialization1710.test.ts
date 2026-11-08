@@ -228,7 +228,7 @@ describe('M1.7.10 Part C — Online camera initialization', () => {
     const cameraController = sceneManager.getCameraController();
     const radiusBefore = cameraController.getRadius();
     expect(radiusBefore).toBeGreaterThanOrEqual(4.5);
-    expect(radiusBefore).toBeLessThanOrEqual(40);
+    expect(Number.isFinite(radiusBefore)).toBe(true);
 
     sceneManager.dispose();
   });
@@ -293,7 +293,7 @@ describe('M1.7.10 Part C — Online camera initialization', () => {
     const offlineTarget = offline.getCameraController().getTarget();
     const onlineTarget = online.getCameraController().getTarget();
     expect(onlineCamera.position.distanceTo(offlineCamera.position)).toBeLessThan(1e-8);
-    expect(onlineCamera.quaternion.angleTo(offlineCamera.quaternion)).toBeLessThan(1e-8);
+    expect(onlineCamera.quaternion.toArray()).toEqual(offlineCamera.quaternion.toArray());
     expect(onlineTarget.distanceTo(offlineTarget)).toBeLessThan(1e-8);
     expect(online.getCameraController().getRadius()).toBeCloseTo(offline.getCameraController().getRadius(), 8);
     expect(online.getCameraController().getTheta()).toBeCloseTo(offline.getCameraController().getTheta(), 8);

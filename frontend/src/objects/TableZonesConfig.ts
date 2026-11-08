@@ -5,6 +5,7 @@
  * Strict TypeScript, no magic numbers, files <= 400 lines.
  */
 
+import { getDefaultSeatPlacement, SHARED_CONFIG, TABLE_PLAYER_AREA_INSET } from '../../../shared/constants/config';
 import { TABLE_CONFIG } from './TableConfig';
 import { PlayerCount, TABLE_SHAPE_CONFIGS, getPolygonVertices } from './TableShapeConfig';
 
@@ -35,6 +36,9 @@ export const ZONE_VISUAL_CONFIG = {
   DISCARD_COLOR: 0xff6644,
   PLACEMENT_COLOR: 0x44ddaa,
   PLACEMENT_OPACITY: 0.45,
+  SEAT_PLACEMENT_DEPTH: 1.85,
+  SEAT_PLACEMENT_BORDER_OPACITY: 0.20,
+  SEAT_PLACEMENT_FILL_OPACITY: 0.035,
   SURFACE_Y: TABLE_CONFIG.SURFACE_Y + 0.005,
 } as const;
 
@@ -57,8 +61,8 @@ export function computeTableZones(
   const R = customCircumradius ?? shape.circumradius;
 
   // 1. Deck and Discard zones
-  const deckX = playerCount === 2 ? -4.5 : -2.5;
-  const discardX = playerCount === 2 ? 4.5 : 2.5;
+  const deckX = playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM ? 0 : playerCount === 2 ? -4.5 : -2.5;
+  const discardX = playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM ? 3.6 : playerCount === 2 ? 4.5 : 2.5;
 
   const deckZone: ZoneRect = {
     id: 'zone_deck',
@@ -87,7 +91,7 @@ export function computeTableZones(
   if (playerCount >= 5) {
     const N = playerCount;
     const vertices = getPolygonVertices(N, R);
-    const playerInset = 1.45;
+    const playerInset = TABLE_PLAYER_AREA_INSET;
     const placementInset = playerInset + 2.6;
 
     for (let i = 0; i < N; i++) {
@@ -118,14 +122,20 @@ export function computeTableZones(
         label: `Người chơi ${i + 1}`,
       });
 
-      // Card Placement Zone
-      cardPlacementZones.push({
-        id: `card_placement_${i + 1}`,
+      // Vùng nhận bài dùng cùng tọa độ với máy chủ trên bàn mặc định.
+      const placement = N === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM ? getDefaultSeatPlacement(i, R) : {
         x: midX + placementInset * inwardNormX,
         z: midZ + placementInset * inwardNormZ,
         rotationY: rotY,
+      };
+      cardPlacementZones.push({
+        id: `card_placement_${i + 1}`,
+        ...placement,
+        rotationY: normalizeAngle(placement.rotationY),
         width: ZONE_VISUAL_CONFIG.PLACEMENT_WIDTH,
-        depth: ZONE_VISUAL_CONFIG.PLACEMENT_DEPTH,
+        depth: playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM
+          ? ZONE_VISUAL_CONFIG.SEAT_PLACEMENT_DEPTH
+          : ZONE_VISUAL_CONFIG.PLACEMENT_DEPTH,
         label: `Vùng Đặt Bài P${i + 1}`,
       });
     }

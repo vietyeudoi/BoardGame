@@ -4,6 +4,7 @@
  * Strict TypeScript, no magic numbers, files <= 400 lines per PROJECT_RULES.md.
  */
 
+import { SHARED_CONFIG } from '../../../shared/constants/config';
 import { TABLE_CONFIG } from './TableConfig';
 import { PlayerCount } from './TableShapeConfig';
 import { computeTableZones } from './TableZonesConfig';
@@ -22,10 +23,12 @@ export interface HandZonePosition {
 export const HAND_ZONE_CONFIG = {
   // Dimensions matching player area footprint
   DEFAULT_WIDTH: 5.2,
+  SEAT_HAND_WIDTH: 6.4,
+  SEAT_HAND_DEPTH: 4.0,
   DEFAULT_DEPTH: 2.3,
 
   // Surface Y elevation slightly above felt & placement zone to eliminate Z-fighting
-  SURFACE_Y: TABLE_CONFIG.SURFACE_Y + 0.006,
+  SURFACE_Y: TABLE_CONFIG.SURFACE_Y + 0.003,
 
   // Colors & Visual Styling (Cat Boom blue theme)
   BORDER_COLOR: 0x3b82f6,
@@ -42,19 +45,24 @@ export const HAND_ZONE_CONFIG = {
   // so the row fits the hand zone, while a strip of each card stays visible.
   // Spacing is derived from card width + card count + available zone width; it
   // is never a single hard-coded distance.
-  HAND_MARGIN: 0.15, // Safe horizontal margin inside the hand zone
+  HAND_MARGIN: 0.25, // Safe horizontal margin inside the hand zone
+  SEAT_CARD_INSET: 0.58,
+  CARD_PITCH: 0,
+  OPPONENT_FAN_ANGLE: 0.12,
+  OPPONENT_FAN_ARC: 0.08,
   NATURAL_GAP: 0.06, // Edge-to-edge gap when there is room for no overlap
   SPACING_RATIO_LIGHT: 0.62, // 4–6 cards: light overlap
   SPACING_RATIO_MEDIUM: 0.48, // 7–10 cards: medium overlap
   SPACING_RATIO_HEAVY: 0.34, // 11+ cards: heavy overlap, still recognisable
+  MAX_ROW_ELEVATION: 0.035,
   ELEVATION_STEP: 0.002, // Physical step per layer to prevent Z-fighting
-  SELECTED_ELEVATION: 0.12, // Visual lift when a card in hand is selected
+  SELECTED_ELEVATION: 0.04, // Visual lift when a card in hand is selected
   SELECTION_LAYER_OFFSET: 100, // Render-order boost for a selected hand card
   BASE_LAYER_INDEX: 20, // RenderOrder base for cards in hand
 
   // M1.7.7.1: the ONE hover presentation for hand cards — a gentle lift + a tiny
   // scale + a render-order bump. Rotation/pitch/fan are never touched on hover.
-  HOVER_LIFT_Y: 0.05,
+  HOVER_LIFT_Y: 0.018,
   HOVER_SCALE: 1.04, // Within the allowed 1.03–1.05 range
   HOVER_LAYER_OFFSET: 30, // Puts the hovered card above its neighbours
   // ────────────────────────────────────────────────────────────────────────────
@@ -76,14 +84,15 @@ export function computeHandZoneLayout(
   customCircumradius?: number
 ): HandZonePosition[] {
   const zonesLayout = computeTableZones(playerCount, customCircumradius);
+  const inset = playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM ? HAND_ZONE_CONFIG.SEAT_CARD_INSET : 0;
   return zonesLayout.playerAreas.map((pa, i) => ({
     id: `hand_zone_${i + 1}`,
     playerIndex: i,
-    x: pa.x,
-    z: pa.z,
+    x: pa.x - inset * Math.sin(pa.rotationY),
+    z: pa.z - inset * Math.cos(pa.rotationY),
     rotationY: pa.rotationY,
-    width: HAND_ZONE_CONFIG.DEFAULT_WIDTH,
-    depth: HAND_ZONE_CONFIG.DEFAULT_DEPTH,
+    width: inset > 0 ? HAND_ZONE_CONFIG.SEAT_HAND_WIDTH : HAND_ZONE_CONFIG.DEFAULT_WIDTH,
+    depth: inset > 0 ? HAND_ZONE_CONFIG.SEAT_HAND_DEPTH : HAND_ZONE_CONFIG.DEFAULT_DEPTH,
     label: pa.label,
   }));
 }

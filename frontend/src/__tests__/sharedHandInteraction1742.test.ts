@@ -154,7 +154,7 @@ describe('M1.7.4.2 — Frontend Shared Card Interaction', () => {
   it('5. syncFlippedCard flips any card in hand or on table and updates title if faceUp', () => {
     const card = sceneManager.syncDrawnCard('card_flip_sync', 1, 'see-the-future', true)!;
     expect(card.isFaceUp()).toBe(true);
-    expect(card.getContent().title).toContain('See The Future');
+    expect(card.getContent().title).toContain('See the Future');
 
     // Flip to face down
     sceneManager.syncFlippedCard('card_flip_sync', false);

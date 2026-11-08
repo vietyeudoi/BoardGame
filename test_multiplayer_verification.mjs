@@ -1,12 +1,49 @@
+import assert from 'node:assert/strict';
 import { startBrowser } from './run_visual_debug.mjs';
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function waitFor(client, expression, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (await client.evaluate(expression)) return;
+    await sleep(50);
+  } while (Date.now() < deadline);
+  assert.fail('Hết thời gian chờ: ' + expression);
+}
+
+async function clickDeck(client) {
+  const point = await client.evaluate(`(() => {
+    const scene = window.__app._sceneManager;
+    const deck = scene.getOriginalDeck();
+    const position = deck.position.clone();
+    deck.getWorldPosition(position);
+    position.y += deck.getVisualHeight() / 2;
+    position.project(scene.getCameraController().getCamera());
+    const rect = scene._renderer.getDomElement().getBoundingClientRect();
+    return { x: rect.left + (position.x + 1) * rect.width / 2, y: rect.top + (1 - position.y) * rect.height / 2 };
+  })()`);
+
+  await client.mouseMove(point.x, point.y);
+  await waitFor(client, "(() => { const scene = window.__app._sceneManager; return scene.getInteractionManager().getHoveredObject() === scene.getOriginalDeck(); })()");
+  await client.mouseClick(point.x, point.y);
+}
+
+
+function projectWorld(client, worldExpression) {
+  return client.evaluate(`(() => {
+    const scene = window.__app._sceneManager;
+    const point = (${worldExpression}).clone().project(scene.getCameraController().getCamera());
+    const rect = scene._renderer.getDomElement().getBoundingClientRect();
+    return { x: rect.left + (point.x + 1) * rect.width / 2, y: rect.top + (1 - point.y) * rect.height / 2 };
+  })()`);
+}
+
 async function run() {
   console.log('--- Starting Two-Player Multiplayer Verification ---');
-  let clientA, clientB;
+  let clientA, clientB, clientC;
 
   try {
     // 1. Launch Player A
@@ -21,6 +58,7 @@ async function run() {
       const nameInput = document.querySelector('#input-player-name');
       if (roomInput) roomInput.value = 'MultiRoom';
       if (nameInput) nameInput.value = 'Alice';
+      document.querySelector('#input-double-deck').checked = true;
       const createBtn = document.querySelector('#btn-create-room');
       if (createBtn) createBtn.click();
     `);
@@ -65,6 +103,38 @@ async function run() {
 
     if (stateA.roomId !== roomId || stateB.roomId !== roomId) {
       throw new Error(`Room join mismatch: A=${stateA.roomId}, B=${stateB.roomId}`);
+    }
+
+    assert.equal(await clientA.evaluate("window.__app._store.getRoomState().round.totalCards"), 102);
+    assert.equal(await clientA.evaluate("window.__app._sceneManager.getOriginalDeck().visible"), false);
+    assert.equal(await clientB.evaluate("window.__app._sceneManager.tableActions.visible"), false);
+    assert.equal(await clientB.evaluate("document.querySelector('#setup-defuses').disabled"), true);
+    await clientA.evaluate("(() => { const input = document.querySelector('#setup-defuses'); input.value = '7'; input.dispatchEvent(new Event('change')); })()");
+    await waitFor(clientB, "document.querySelector('#setup-defuses').value === '7'");
+
+    const streaking = "document.querySelector('[data-pack-id=streaking]')";
+    await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 118');
+    assert.equal(await clientB.evaluate(streaking + ".querySelector('input[type=checkbox]').disabled"), true);
+    await clientA.evaluate(streaking + ".querySelector('summary').click()");
+    await clientA.evaluate("(() => { const input = document.querySelector('#setup-streaking-mark'); input.value = '0'; input.dispatchEvent(new Event('change')); })()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 115');
+    await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 103');
+    await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 115');
+    await clientA.evaluate(streaking + ".querySelector('details > button').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 118');
+    await clientA.evaluate(streaking + ".querySelector('input[type=checkbox]').click()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().round.totalCards === 103');
+    await clientA.evaluate("document.querySelector('#btn-round-deal').click()");
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, "window.__app._sceneManager.getOriginalDeck().getCount() === 91");
+      const own = await client.evaluate("window.__app._store.getRoomState().objects");
+      assert.equal(own.length, 6);
+      assert.equal(own.filter(card => card.cardType === 'defuse').length, 1);
+      assert.ok(own.every(card => card.location === 'HAND' && card.cardType));
+      assert.equal(await client.evaluate("document.querySelector('#round-setup').hidden"), true);
     }
 
     // 3. Test cursor movement across screen, including extreme positions (horizon / edges)
@@ -125,70 +195,227 @@ async function run() {
     })()`);
     console.log('[Test] Bob view of Alice hand cards (must be masked and faceDown):', bSeesAliceCardDetails);
 
-    // 5. Test local hand fan preview on Alice
-    console.log('[Test] Testing local hand fan preview on Alice...');
-    const localZone = await clientA.evaluate(`(() => {
-      const zone = window.__app?._sceneManager?._handZoneManager?.getHandZoneForPlayer(0);
-      if (zone) zone.setPreviewActive(true);
-      return zone ? zone.isPreviewActive() : false;
-    })()`);
-    console.log(`[Test] Alice hand fan preview active: ${localZone}`);
+    assert.equal(aHandCount, 9);
+    assert.equal(bSeesAHandCount, 9);
+    assert.ok(bSeesAliceCardDetails.every(card => card.masked && card.inHand && !card.faceUp && card.id.startsWith('anonymous-hand:')));
+    for (const client of [clientA, clientB]) {
+      assert.equal(await client.evaluate(`window.__app._sceneManager.getOriginalDeck().getCount()`), 88);
+      assert.equal(await client.evaluate(`Boolean(window.__app._sceneManager.getObject('demo_card'))`), false);
+    }
 
-    // Screenshot Alice hand preview
+    // Rê lên tay bài thật và kiểm tra fan hiện tại.
+    const handPoint = await clientA.evaluate(`(() => {
+      const scene = window.__app._sceneManager;
+      const point = scene.getLocalHandZone().position.clone().project(scene.getCameraController().getCamera());
+      const rect = scene._renderer.getDomElement().getBoundingClientRect();
+      return { x: rect.left + (point.x + 1) * rect.width / 2, y: rect.top + (1 - point.y) * rect.height / 2 };
+    })()`);
+    await clientA.mouseMove(handPoint.x, handPoint.y);
+    await sleep(300);
+    assert.equal(await clientA.evaluate(`window.__app._fullHandFanPreviewUI.isOpen()`), true);
     await clientA.screenshot('m173_fix_alice_hand_preview.png');
 
-    // 6. Player A plays a card to table
-    console.log('[Test] Alice plays card to table...');
-    const cardToPlayId = await clientA.evaluate(`
-      window.__app?._sceneManager?._handZoneManager?.getHandZoneForPlayer(0)?.getCardIds()[0] || null
-    `);
-    console.log(`[Test] Card ID to play: ${cardToPlayId}`);
-
-    if (cardToPlayId) {
-      await clientA.evaluate(`
-        const card = window.__app?._sceneManager?._cardRegistry?.getCardObject('${cardToPlayId}');
-        if (card) {
-          card.position.set(0, 0, 0);
-          window.__app?._dragController?.onCardDropped?.(card);
-          window.__app?._dragController?.onDragEndBroadcast?.('${cardToPlayId}', { x: 0, y: 0, z: 0 }, true, null);
-        }
-      `);
-      await sleep(2000);
-
-      // Verify Bob sees the card on table
-      const bSeesTableCard = await clientB.evaluate(`(() => {
-        const c = window.__app?._sceneManager?._cardRegistry?.getCardObject('${cardToPlayId}');
-        return c ? { found: true, x: c.position.x, z: c.position.z, inHand: c.isInHand(), faceUp: c.isFaceUp() } : { found: false };
-      })()`);
-      console.log('[Test] Bob sees table card:', bSeesTableCard);
-
-      // 7. Bob interacts with the table card (can drag)
-      console.log('[Test] Bob interacts with table card...');
-      const bCanDrag = await clientB.evaluate(`(() => {
-        const c = window.__app?._sceneManager?._cardRegistry?.getCardObject('${cardToPlayId}');
-        return c ? window.__app?._dragController?.canDragCard?.(c) : false;
-      })()`);
-      console.log(`[Test] Bob can drag table card: ${bCanDrag}`);
-
-      // 8. Bob attempts to interact with Alice's private hand cards (should be blocked)
-      const bCanDragAliceHand = await clientB.evaluate(`(() => {
-        const aliceZone = window.__app?._sceneManager?._handZoneManager?.getHandZoneForPlayer(0);
-        const card = aliceZone?.getCards()[0];
-        return card ? window.__app?._dragController?.canDragCard?.(card) : 'no_card';
-      })()`);
-      console.log(`[Test] Bob can drag Alice hand card: ${bCanDragAliceHand} (expected: false)`);
-    }
+    const cardId = await clientA.evaluate(`window.__app._sceneManager.getLocalHandCards()[0].cardId`);
+    const play = { type: 'card:play-to-table', payload: { cardId, position: { x: 2, y: 0, z: -2 }, faceUp: true } };
+    await clientA.evaluate('window.__app._networkClient.send(' + JSON.stringify(play) + ')');
+    await sleep(600);
+    assert.equal(await clientB.evaluate(`(() => {
+      const scene = window.__app._sceneManager;
+      const card = scene.getObject(${JSON.stringify(cardId)});
+      return !!card && !card.isInHand() && scene.getDragController().canDragCard(card);
+    })()`), true);
 
     // Take screenshots of both players
     await clientA.screenshot('m173_fix_multiplayer_playerA.png');
     await clientB.screenshot('m173_fix_multiplayer_playerB.png');
 
+    // Kiểm tra nút HUD và hit-test 3D thật ở hai góc ghế.
+    await clientA.evaluate(`document.querySelector('#btn-insert-bottom').click()`);
+    const bottomActive = `document.querySelector('#btn-insert-bottom').getAttribute('aria-pressed') === 'true'`;
+    await Promise.all([waitFor(clientA, bottomActive), waitFor(clientB, bottomActive)]);
+
+    await clientA.evaluate(`(() => {
+      document.querySelector('#btn-insert-custom').click();
+      const input = document.querySelector('#hud-deck-position');
+      input.value = '2';
+      input.dispatchEvent(new Event('change'));
+    })()`);
+    await waitFor(clientA, `document.querySelector('#btn-insert-custom').getAttribute('aria-pressed') === 'true'`);
+    assert.equal(await clientB.evaluate(bottomActive), true);
+
+    await clickDeck(clientA);
+    await waitFor(clientB, 'window.__app._sceneManager.getOriginalDeck().getCount() === 87');
+    await clickDeck(clientB);
+
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, 'window.__app._sceneManager.getOriginalDeck().getCount() === 86');
+      const taken = await client.evaluate("window.__app._store.getRoomState().objects.filter(card => card.takenFromDeck && !card.faceUp)");
+      assert.equal(taken.length, 2);
+      assert.ok(taken.every(card => !card.faceUp && !card.cardType));
+    }
+
+    // Kéo lá vừa lấy vào tay Bob, rồi kéo đúng lá đó từ fan ra bàn.
+    const transferredId = await clientA.evaluate("window.__app._store.getRoomState().objects.find(card => card.takenFromDeck).id");
+    const idExpression = JSON.stringify(transferredId);
+    const sceneCard = 'window.__app._sceneManager.getObject(' + idExpression + ')';
+    await waitFor(clientA, 'window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
+    const start = await projectWorld(clientA, 'scene.getObject(' + idExpression + ').position');
+    const targetHand = 'scene._handZoneManager.getHandZoneForPlayer(1).position';
+    const target = await projectWorld(clientA, targetHand);
+    await clientA.mouseMove(start.x, start.y);
+    await clientA.mouseDrag(start.x, start.y, target.x, target.y, 20);
+    await waitFor(clientB, sceneCard + '?.isInHand() && ' + sceneCard + '.visible');
+
+    assert.ok(await clientB.evaluate(sceneCard + '.getCardType()'));
+    await waitFor(clientB, 'window.__app._sceneManager.getDragController().canDragCard(' + sceneCard + ')');
+    await waitFor(clientA, 'window.__app._sceneManager._handZoneManager.getHandZoneForPlayer(1).getCardCount() === 7');
+    await waitFor(clientA, '!' + sceneCard);
+    const bobHand = await projectWorld(clientB, targetHand);
+    await clientB.mouseMove(bobHand.x, bobHand.y);
+    const fan = 'document.querySelector(' + JSON.stringify('[data-fan-card-id="' + transferredId + '"]') + ')';
+    await waitFor(clientB, fan);
+
+
+    const tabletop = await projectWorld(clientB, 'scene.getOriginalDeck().position.clone().set(-4, 0, -5)');
+    const fanTop = await clientB.evaluate("document.querySelector('.fhfp-root').getBoundingClientRect().top");
+    assert.ok(tabletop.y < fanTop, 'Điểm thả phải nằm ngoài vùng fan');
+    // Gửi vào đúng lá DOM để hiệu ứng nâng khi hover không đổi điểm nhấn của bài kiểm thử.
+    const dragId = await clientB.evaluate(`(() => {
+      const element = ${fan};
+      const rect = element.getBoundingClientRect();
+      element.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true, button: 0, buttons: 1, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
+      }));
+      window.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: true, buttons: 1, clientX: ${tabletop.x}, clientY: ${tabletop.y},
+      }));
+      return window.__app._sceneManager.getDragController().getDraggedCard()?.cardId;
+    })()`);
+    assert.equal(dragId, transferredId);
+    await clientB.evaluate(`window.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true, button: 0, clientX: ${tabletop.x}, clientY: ${tabletop.y},
+    }))`);
+
+    await waitFor(clientB, "window.__app._store.getRoomState().objects.some(card => card.id === " + idExpression + " && card.location === 'TABLE')");
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, sceneCard + '?.visible && !' + sceneCard + '.isInHand()');
+    }
+
+    await clientA.evaluate(`document.querySelector('#btn-insert-top').click()`);
+    await waitFor(clientB, `document.querySelector('#btn-insert-top').getAttribute('aria-pressed') === 'true'`);
+    await clickDeck(clientA);
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, 'window.__app._sceneManager.getOriginalDeck().getCount() === 85');
+    }
+
+    const bobId = await clientB.evaluate('window.__app._store.getPlayerId()');
+    const bobIsConnected = 'window.__app._store.getRoomState().players.find(player => player.id === ' + JSON.stringify(bobId) + ')?.isConnected';
+    await clientB.evaluate('window.__app._networkClient._ws.close()');
+    await waitFor(clientA, '!(' + bobIsConnected + ')');
+    await clientA.evaluate("document.querySelector('#btn-insert-bottom').click()");
+
+    await waitFor(clientA, bottomActive);
+    await waitFor(clientA, 'window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
+    await clickDeck(clientA);
+    await waitFor(clientA, 'window.__app._sceneManager.getOriginalDeck().getCount() === 84');
+    await waitFor(clientB, bottomActive + ' && window.__app._sceneManager.getOriginalDeck().getCount() === 84', 10000);
+    assert.equal(await clientB.evaluate('window.__app._store.getPlayerId()'), bobId);
+
+
+    await clientA.evaluate("(() => { const input = document.querySelector('#hud-affected-count'); input.value = '5'; input.dispatchEvent(new Event('change')); })()");
+    await waitFor(clientB, "document.querySelector('#hud-affected-count').value === '5'");
+    await clientA.evaluate("document.querySelector('#btn-insert-top').click()");
+    await waitFor(clientB, "window.__app._store.getRoomState().deckDrawEnd === 'TOP'");
+    await clientA.evaluate("window.__app._networkClient.send({ type:'object:flip', payload:{ objectId:" + idExpression + " } })");
+    await waitFor(clientA, sceneCard + '?.isFaceUp()');
+    const publicType = await clientA.evaluate(sceneCard + '.getCardType()');
+    assert.ok(publicType);
+    const from = await projectWorld(clientA, 'scene.getObject(' + idExpression + ').position');
+    const to = await projectWorld(clientA, 'scene.getOriginalDeck().position');
+    await clientA.mouseMove(from.x, from.y);
+    await clientA.mouseDrag(from.x, from.y, to.x, to.y, 18);
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, "window.__app._store.getRoomState().deck.count === 85 && !" + sceneCard);
+      assert.equal(await client.evaluate('window.__app._sceneManager.getOriginalDeck()._onlineTopType'), publicType);
+    }
+    const shuffle = await projectWorld(clientA, 'scene.tableActions.children[2].getWorldPosition(scene.getOriginalDeck().position.clone())');
+    await clientA.mouseMove(shuffle.x, shuffle.y);
+    await clientA.mouseClick(shuffle.x, shuffle.y);
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, "document.querySelector('#hud-deck-status').textContent.includes('Alice')");
+      assert.equal(await client.evaluate('window.__app._store.getRoomState().deck.count'), 85);
+    }
+
+
+    console.log('[Test] See và Alter trên mặt bàn, ba kết nối cùng phòng...');
+    await clientA.evaluate("(() => { const input = document.querySelector('#hud-affected-count'); input.value = '3'; input.dispatchEvent(new Event('change')); })()");
+    await waitFor(clientB, 'window.__app._store.getRoomState().deck.affectedCount === 3');
+    const row = 'window.__app._sceneManager.deckViewRow';
+    async function clickAction(index) {
+      const point = await projectWorld(clientA, 'scene.tableActions.children[' + index + '].getWorldPosition(scene.getOriginalDeck().position.clone())');
+      await clientA.mouseMove(point.x, point.y);
+      await clientA.mouseClick(point.x, point.y);
+    }
+    await clickAction(1);
+    await waitFor(clientA, row + '._state?.mode === "see" && ' + row + '._cards.size === 3');
+    clientC = await startBrowser(9224);
+    await waitFor(clientC, 'window.__app?._networkClient?.getStatus() === "connected"');
+    await clientC.evaluate("document.querySelector('#input-player-name').value = 'Carol'; document.querySelector('#input-room-id').value = " + JSON.stringify(roomId) + "; document.querySelector('#btn-join-room').click()");
+    const deckViewClients = [clientA, clientB, clientC];
+    for (const client of deckViewClients) {
+      await waitFor(client, row + '._cards.size === 3');
+      assert.ok(await client.evaluate("document.querySelector('#hud-deck-view-lock').textContent.includes('Alice')"));
+      const hidden = await client.evaluate(row + '._state.cards.filter(card => !card.cardType).length');
+      if (client === clientA) assert.equal(hidden, 0);
+      else assert.ok(hidden >= 2);
+    }
+
+    await clientB.evaluate("(() => { const input = document.querySelector('#hud-affected-count'); input.value = '1'; input.dispatchEvent(new Event('change')); })()");
+    await waitFor(clientB, "document.querySelector('#hud-game-error').textContent.includes('Alice đang xem bài')");
+    assert.equal(await clientB.evaluate("document.querySelector('#hud-affected-count').value"), '3');
+    await clientA.evaluate("document.querySelector('#btn-deck-view-close').click()");
+    for (const client of deckViewClients) await waitFor(client, '!' + row + '._state');
+    await clickAction(3);
+    await waitFor(clientA, row + '._state?.mode === "alter" && window.__app._sceneManager._transferAnimator.getActiveCount() === 0');
+    const firstPreview = await projectWorld(clientA, 'scene.deckViewRow._cards.get(0).card.position');
+    const lastPreview = await projectWorld(clientA, 'scene.deckViewRow._cards.get(2).card.position');
+    await clientA.mouseDrag(firstPreview.x, firstPreview.y, lastPreview.x, lastPreview.y, 15);
+    for (const client of deckViewClients) {
+      await waitFor(client, row + '._state?.cards.map(card => card.token).join() === "1,2,0"');
+    }
+
+    const alterHud = "document.querySelector('#deck-alter-strip')";
+    await waitFor(clientA, '!' + alterHud + '.hidden');
+    for (const client of [clientB, clientC]) assert.equal(await client.evaluate(alterHud + '.hidden'), true);
+    const [firstTile, lastTile] = await clientA.evaluate(`Array.from(${alterHud}.querySelectorAll('[data-alter-token]')).filter((_, i) => i !== 1).map(tile => {
+      const bounds = tile.getBoundingClientRect();
+      return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+    })`);
+    await clientA.mouseDrag(lastTile.x, lastTile.y, firstTile.x, firstTile.y, 15);
+    for (const client of deckViewClients) {
+      await waitFor(client, row + '._state?.cards.map(card => card.token).join() === "0,1,2"');
+    }
+    await clientA.evaluate("document.querySelector('#btn-deck-view-confirm').click()");
+    for (const client of deckViewClients) await waitFor(client, '!' + row + '._state');
+    await clickAction(3);
+    await waitFor(clientA, row + '._state?.mode === "alter"');
+    await clientA.evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape' }))");
+    for (const client of deckViewClients) await waitFor(client, '!' + row + '._state');
+
+    await clientA.evaluate("document.querySelector('#btn-round-reset').click()");
+    for (const client of [clientA, clientB]) {
+      await waitFor(client, "window.__app._store.getRoomState().round.phase === 'SETUP'");
+      assert.equal(await client.evaluate("window.__app._sceneManager.getAllCards().length"), 0);
+      assert.equal(await client.evaluate("window.__app._sceneManager.getOriginalDeck().visible"), false);
+    }
     console.log('--- Multiplayer Verification Completed Successfully! ---');
   } catch (err) {
     console.error('[Test Error]:', err);
+    process.exitCode = 1;
   } finally {
     if (clientA) await clientA.close();
     if (clientB) await clientB.close();
+    if (clientC) await clientC.close();
   }
 }
 

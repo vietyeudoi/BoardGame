@@ -230,8 +230,8 @@ describe('DeckObject3D (M1.2.2)', () => {
       expect(deck.deckHeight).toBe(DECK_CONFIG.HEIGHT);
     });
 
-    it('visual height equals count * cardThickness', () => {
-      const expectedHeight = 5 * DECK_CONFIG.CARD_THICKNESS;
+    it('chiều cao hình ảnh luôn bằng một lá', () => {
+      const expectedHeight = DECK_CONFIG.CARD_THICKNESS;
       expect(deck.getVisualHeight()).toBeCloseTo(expectedHeight, 4);
     });
 
@@ -240,9 +240,9 @@ describe('DeckObject3D (M1.2.2)', () => {
       expect(deck.getBottomY()).toBeCloseTo(TABLE_CONFIG.SURFACE_Y, 4);
     });
 
-    it('top surface is at TABLE_CONFIG.SURFACE_Y + count * cardThickness', () => {
+    it('mặt trên luôn nằm ở độ cao một lá', () => {
       deck.setPosition(0, TABLE_CONFIG.SURFACE_Y, 0);
-      const expectedTop = TABLE_CONFIG.SURFACE_Y + 5 * DECK_CONFIG.CARD_THICKNESS;
+      const expectedTop = TABLE_CONFIG.SURFACE_Y + DECK_CONFIG.CARD_THICKNESS;
       expect(deck.getTopY()).toBeCloseTo(expectedTop, 4);
     });
 
@@ -251,8 +251,8 @@ describe('DeckObject3D (M1.2.2)', () => {
       const box = deck.getBoundingBox();
 
       expect(box.min.y).toBeCloseTo(TABLE_CONFIG.SURFACE_Y, 4);
-      expect(box.max.y).toBeCloseTo(TABLE_CONFIG.SURFACE_Y + 5 * DECK_CONFIG.CARD_THICKNESS, 4);
-      expect(box.max.y - box.min.y).toBeCloseTo(5 * DECK_CONFIG.CARD_THICKNESS, 4);
+      expect(box.max.y).toBeCloseTo(TABLE_CONFIG.SURFACE_Y + DECK_CONFIG.CARD_THICKNESS, 4);
+      expect(box.max.y - box.min.y).toBeCloseTo(DECK_CONFIG.CARD_THICKNESS, 4);
     });
 
     it('empty deck has zero visual height and does not have negative height', () => {
@@ -263,7 +263,7 @@ describe('DeckObject3D (M1.2.2)', () => {
       const box = emptyDeck.getBoundingBox();
       expect(box.max.y - box.min.y).toBeGreaterThanOrEqual(0);
       expect(emptyDeck.getBottomY()).toBeCloseTo(TABLE_CONFIG.SURFACE_Y, 4);
-      expect(emptyDeck.getMesh().visible).toBe(false);
+      expect(emptyDeck.getMesh().visible).toBe(true);
 
       emptyDeck.dispose();
     });
@@ -272,25 +272,25 @@ describe('DeckObject3D (M1.2.2)', () => {
   // ─── Nhóm 5: Cập nhật dữ liệu và hình học ──────────────────────────────────
 
   describe('Nhóm 5 — Cập nhật dữ liệu & hình học (Dynamic Updates)', () => {
-    it('draw reduces visual height by exactly one card thickness', () => {
+    it('rút một lá không đổi chiều cao nếu bộ vẫn còn bài', () => {
       const initialHeight = deck.getVisualHeight();
       deck.draw();
       const newHeight = deck.getVisualHeight();
-      expect(initialHeight - newHeight).toBeCloseTo(DECK_CONFIG.CARD_THICKNESS, 4);
+      expect(newHeight).toBe(initialHeight);
     });
 
-    it('addCard increases visual height by exactly one card thickness', () => {
+    it('thêm một lá không đổi chiều cao', () => {
       const initialHeight = deck.getVisualHeight();
       deck.addCard('card_6');
       const newHeight = deck.getVisualHeight();
-      expect(newHeight - initialHeight).toBeCloseTo(DECK_CONFIG.CARD_THICKNESS, 4);
+      expect(newHeight).toBe(initialHeight);
     });
 
-    it('addCards increases visual height by N * cardThickness', () => {
+    it('thêm nhiều lá không đổi chiều cao', () => {
       const initialHeight = deck.getVisualHeight();
       deck.addCards(['c6', 'c7', 'c8']);
       const newHeight = deck.getVisualHeight();
-      expect(newHeight - initialHeight).toBeCloseTo(3 * DECK_CONFIG.CARD_THICKNESS, 4);
+      expect(newHeight).toBe(initialHeight);
     });
 
     it('shuffle does NOT alter visual height or bounding box', () => {
@@ -394,7 +394,7 @@ describe('DeckObject3D (M1.2.2)', () => {
       expect(deckA.getCount()).toBe(2);
       expect(deckB.getCount()).toBe(3);
 
-      expect(deckA.getVisualHeight()).not.toBe(deckB.getVisualHeight());
+      expect(deckA.getVisualHeight()).toBe(deckB.getVisualHeight());
 
       deckA.dispose();
       deckB.dispose();

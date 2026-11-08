@@ -5,6 +5,8 @@
  * and the RaycastInteractionManager (M1.3.1).
  */
 import * as THREE from 'three';
+import { DEMO_TABLE_CARD_ID, DEMO_TABLE_CARD_X, SHARED_CONFIG } from '../../../shared/constants/config';
+
 import { Renderer } from './Renderer';
 import { CameraController } from './CameraController';
 import { LightingManager } from './LightingManager';
@@ -21,15 +23,19 @@ import { CardStack } from '../objects/CardStack';
 import { LayeringManager } from '../objects/LayeringManager';
 import { PlayerAreaManager } from '../objects/PlayerAreaManager';
 import { PlayerAreaObject3D } from '../objects/PlayerAreaObject3D';
+import { RemoteDragPreview } from './RemoteDragPreview';
+import { TableActions3D } from '../objects/TableActions3D';
 import { TableZoneManager } from '../objects/TableZoneManager';
 import { HandZoneManager } from '../objects/HandZoneManager';
 import { HandZoneObject3D } from '../objects/HandZoneObject3D';
-import { CardTransferAnimator, type CardSlotTransform } from '../animation/CardTransferAnimator';
+import type { DeckViewState } from '@shared/types/protocol';
+import { DeckViewRow, DECK_VIEW_PREFIX } from './DeckViewRow';
+import { CardTransferAnimator, TRANSFER_DURATION_MIN_MS, type CardSlotTransform } from '../animation/CardTransferAnimator';
 import { ZONE_VISUAL_CONFIG } from '../objects/TableZonesConfig';
-import { getTableOuterRadius, PlayerCount } from '../objects/TableShapeConfig';
+import { getTableOuterRadius, resolveTableSeatCount, PlayerCount } from '../objects/TableShapeConfig';
 import { getCardTitle } from '../objects/CardTypeHelper';
 import { computePlayerPerspective } from './PlayerPerspectiveHelper';
-import type { SandboxObject, PlayerInfo } from '@shared/types/room';
+import { ANONYMOUS_HAND_PREFIX, getAnonymousHandSlotId, type SandboxObject, type PlayerInfo } from '@shared/types/room';
 import {
   INTERACTION_CONFIG,
   clampTablePosition,
@@ -38,12 +44,15 @@ import {
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('SceneManager');
+const DEAL_CARD_INTERVAL_MS = 35;
+const OFFLINE_DECK_SIZE = 30;
+const makeOfflineDeckIds = () => Array.from({ length: OFFLINE_DECK_SIZE }, (_, i) => "card_" + (i + 1));
 
 interface PendingHandTransfer {
   cardId: string;
   sourceZoneId: string | null;
   sourceIndex: number;
-  targetPlayerIndex: number;
+  targetPlayerIndex?: number;
   originalPosition: THREE.Vector3;
   originalRotation: THREE.Euler;
   originalScale: THREE.Vector3;
@@ -67,6 +76,15 @@ export class SceneManager {
   private readonly _playerAreaManager: PlayerAreaManager;
   private readonly _tableZoneManager: TableZoneManager;
   private readonly _handZoneManager: HandZoneManager;
+  readonly remoteDragPreview: RemoteDragPreview;
+  onOnlineDeckInsert?: (cards: CardObject3D[]) => boolean;
+  onOnlineDeckClick?: () => void;
+  private _roundSetup = false;
+  private _roundSpectator = false;
+  private readonly _spectatorFlipIds = new Set<string>();
+  private _onlineCardRoomId: string | null = null;
+  readonly tableActions: TableActions3D;
+  readonly deckViewRow: DeckViewRow;
   private readonly _transferAnimator: CardTransferAnimator;
   private readonly _pendingTransfers = new Map<string, PendingHandTransfer>();
   private readonly _lastTransferSeq = new Map<string, number>();
@@ -89,9 +107,16 @@ export class SceneManager {
    * Kept in sync with every table rebuild / perspective seating so the default
    * HAND→TABLE orientation can be derived from the acting player's seat.
    */
-  private _activePlayerCount: PlayerCount = 4;
+  private _activePlayerCount: PlayerCount = SHARED_CONFIG.MAX_PLAYERS_PER_ROOM;
   private _localSessionId: string = '';
+  private readonly _tablePointerRaycaster = new THREE.Raycaster();
+  private readonly _tablePointerNdc = new THREE.Vector2();
   private readonly _resizeAbortController = new AbortController();
+  private _handPreviewDismissed = false;
+  private _handPointer: { clientX: number; clientY: number } | null = null;
+  private static readonly HAND_PREVIEW_SETTLE_MS = 280;
+  private _handLeaveTimer: ReturnType<typeof setTimeout> | null = null;
+  public isLocalHandPreviewOpen: (() => boolean) | null = null;
   private readonly _playerAreaAbortController = new AbortController();
 
   /** Callback invoked when a deck count changes (e.g. card drawn) to update HUD */
@@ -121,12 +146,12 @@ export class SceneManager {
 
   constructor(container: HTMLElement) {
     this._scene = new THREE.Scene();
-    this._scene.background = new THREE.Color(0x141424);
 
     this._renderer = new Renderer(container);
     this._cameraController = new CameraController(
       this._renderer.getCamera(),
-      this._renderer.getDomElement()
+      this._renderer.getDomElement(),
+      { fitTablePerspective: true }
     );
 
     // Whenever camera moves, immediately request a new frame render
@@ -150,29 +175,29 @@ export class SceneManager {
 
     // Initialize Centralized Card ID Registry (M1.3.3)
     this._cardRegistry = new CardRegistry();
+    this.remoteDragPreview = new RemoteDragPreview(this._scene,
+      id => this._cardRegistry.getCardObject(id) ?? undefined, () => this.requestRender());
 
     // M1.7.4: Single owner for animated hand-transfer trajectories
+
     this._transferAnimator = new CardTransferAnimator(this._scene, () => this.requestRender());
+    this.deckViewRow = new DeckViewRow(this._renderer.getDomElement(), this._renderer.getCamera(), this._transferAnimator,
+      (id, object) => this.addObject(id, object), id => this.removeObject(id), () => this.requestRender());
 
     // Initialize M1.2.1 Demo Card on tabletop (rests flush on table surface)
-    const demoCard = new CardObject3D({
-      id: 'demo_card_1',
-      title: 'Cat Boom',
-      description: 'Lá bài 3D thử nghiệm sandbox.\nNhấn F hoặc nút trên HUD để lật bài!',
-      position: { x: 0, y: TABLE_CONFIG.SURFACE_Y, z: 0 },
-    });
+    const demoCard = this._createOfflineDemoCard();
     this.addObject('demo_card', demoCard);
     this._cardRegistry.registerTableCard(demoCard);
 
     // Initialize M1.4.2 Table Zone Manager (Deck Zone, Discard Zone, Card Placement Zones)
     this._tableZoneManager = new TableZoneManager(this._scene, () => this.requestRender());
-    this._tableZoneManager.setupZones(4);
+    this._tableZoneManager.setupZones(SHARED_CONFIG.MAX_PLAYERS_PER_ROOM);
     const deckPos = this._tableZoneManager.getDeckPosition();
 
     // Initialize M1.2.2 Demo Deck on tabletop (rests flush on table surface at deck zone position)
     const demoDeck = new DeckObject3D({
       id: 'demo_deck_1',
-      cardIds: Array.from({ length: 30 }, (_, i) => `card_${i + 1}`),
+      cardIds: makeOfflineDeckIds(),
       position: { x: deckPos.x, y: TABLE_CONFIG.SURFACE_Y, z: deckPos.z },
     });
     this.addObject('demo_deck', demoDeck);
@@ -186,15 +211,20 @@ export class SceneManager {
     );
     this._interactionManager.registerObject('demo_card', demoCard);
     this._interactionManager.registerObject('demo_deck', demoDeck);
+    this.tableActions = new TableActions3D(this._renderer.getDomElement(), this._renderer.getCamera(),
+      () => this.requestRender(), () => this._interactionManager.getHoveredObject() !== null);
+    this.tableActions.setAnchor(deckPos.x, deckPos.z, 0);
+    this.addObject('table-actions', this.tableActions);
 
     // Wire deck clicks to drawCardFromDeck (M1.3.3)
     this._interactionManager.onDeckClick = (deck: DeckObject3D) => {
-      this.drawCardFromDeck(deck.getId());
+      if (this._onlineCardRoomId) this.onOnlineDeckClick?.();
+      else this.drawCardFromDeck(deck.getId());
     };
 
     // M1.3.4.2: Wire Alt+Click on card-in-stack to select entire stack
     this._interactionManager.onAltClickCardInStack = (card: CardObject3D) => {
-      this.selectStack(card.getStackId()!);
+      if (!this._roundSpectator) this.selectStack(card.getStackId()!);
     };
 
     // Initialize M1.3.2 Drag & Drop System for CardObject3D
@@ -222,7 +252,7 @@ export class SceneManager {
       (c) => this._interactionManager.isSelected(c),
       (c) => this._interactionManager.getHoveredObject() === c
     );
-    this._handZoneManager.setupLayout(4);
+    this._handZoneManager.setupLayout(SHARED_CONFIG.MAX_PLAYERS_PER_ROOM);
 
     // Re-arrange cards in hand whenever selection changes (elevation + on-top renderOrder)
     this._interactionManager.onSelectionChanged = () => {
@@ -248,7 +278,26 @@ export class SceneManager {
 
     // M1.7.4: Hand cards in every zone are interactable (hover/select/flip/drag).
     // Content privacy is enforced by CardObject3D masking, not by blocking input.
-    this._interactionManager.canInteractWithObject = () => true;
+    // Fan sở hữu tương tác HAND; raycast không chọn nhầm lá gốc bên dưới.
+    this._interactionManager.canInteractWithObject = (object) => !this._roundSetup &&
+      (!this._roundSpectator || (object instanceof CardObject3D && this.canFlipCard(object))) &&
+      !(object instanceof CardObject3D && this.isCardTransferAnimating(object.cardId)) &&
+      !(this.isLocalHandPreviewOpen?.() && this.isLocalHandCard(object));
+
+    window.addEventListener('mousemove', (event: MouseEvent) => {
+      this._handPointer = { clientX: event.clientX, clientY: event.clientY };
+      if (this._localHandDragActive) return;
+      if (this._handLeaveTimer !== null) clearTimeout(this._handLeaveTimer);
+      if (!this.isLocalHandPreviewOpen?.() && this._isPointerOverHandRegion()) {
+        this._updateLocalHandHover(null);
+      } else {
+        // Dung sai ngắn khi chuyển giữa vùng kích hoạt và overlay, tránh nhấp nháy.
+        this._handLeaveTimer = setTimeout(() => {
+          this._handLeaveTimer = null;
+          if (!this._localHandDragActive) this._updateLocalHandHover(null, true);
+        }, 90);
+      }
+    }, { capture: true, signal: this._resizeAbortController.signal });
 
     // Re-arrange cards in hand whenever hover changes. M1.7.7.1: this is the ONE
     // hand-presentation trigger. The old M1.7.3 fan preview (which pitched every
@@ -273,6 +322,7 @@ export class SceneManager {
     // for the local player only. This is display-only — no game state changes.
     this._handZoneManager.setCardsChangedCallback((zone) => {
       if (zone.playerIndex !== (this._activePlayerIndex ?? 0)) return;
+      if (zone.getCards().length === 0) this._resetLocalHandHover();
       this.onLocalHandChanged?.();
       // M1.7.10: hand membership changes can invalidate the hover boundary (e.g.
       // the hovered card left the hand or the hand became empty). Re-evaluate it
@@ -283,9 +333,8 @@ export class SceneManager {
       }
     });
 
-    // M1.7.10: a drag in progress must NOT close the fan preview. The fan stays
-    // open through the whole drag (HAND → Preview → TABLE / reorder) and is
-    // closed afterwards once the pointer leaves the interaction zone.
+    // Theo dõi lá 3D để khôi phục fan nếu thao tác trả lá về tay.
+    this._dragController.getSeatDragYaw = () => this.getDefaultTableRotationForSeat();
     this._dragController.onDragStarted = (card) => {
       this._localHandDragActive = true;
       this._lastDraggedCardId = card?.cardId ?? null;
@@ -300,11 +349,10 @@ export class SceneManager {
       this._onCardDropped(card, isGroup, followers);
     };
 
-    // M1.7.4: Every hand card can begin a local drag. Opponent-hand drags are
-    // intentionally optimistic; the backend rejects them and the client restores
-    // the card to its authoritative slot (no client-side bypass).
+    // Tay đối thủ trong ván mới chỉ có mesh úp minh họa, không thể kéo.
     this._dragController.canDragCard = (card: CardObject3D) => {
-      if (card.isDisposed() || card.isLayoutControlled()) return false;
+      if (this._roundSetup || this._roundSpectator || card.cardId.startsWith(ANONYMOUS_HAND_PREFIX)
+        || card.isDisposed() || card.isLayoutControlled() || this.remoteDragPreview.isLocked(card.cardId)) return false;
       return true;
     };
 
@@ -391,10 +439,8 @@ export class SceneManager {
       const stillInLocalHand =
         draggedId !== null && this.getLocalHandCards().some((c) => c.cardId === draggedId);
       if (stillInLocalHand) {
-        if (!this._localHandHovered) {
-          this._localHandHovered = true;
-          this.onLocalHandHoverChanged?.(true);
-        }
+        this._localHandHovered = true;
+        this.onLocalHandHoverChanged?.(true);
         return;
       }
       // The card left the HAND (table, deck, discard, opponent hand). Keep the
@@ -423,6 +469,27 @@ export class SceneManager {
     // started) owns the card; the drag must not release layout control.
     this._dragController.shouldReleaseLayoutControl = (card: CardObject3D) =>
       !this.isCardTransferAnimating(card.cardId);
+
+    this._dragController.onDragSettled = (card, start) => {
+      // Transfer đang chờ server đã có chủ sở hữu animation riêng.
+      if (card.isDisposed() || card.isInStack() || this.isCardTransferAnimating(card.cardId)) return;
+      const destination = {
+        position: card.position.clone(), quaternion: card.quaternion.clone(), scale: card.scale.clone(),
+      };
+      const zone = card.isInHand() ? this._handZoneManager.getHandZone(card.getHandZoneId()!) : null;
+      card.position.copy(start.position);
+      card.rotation.copy(start.rotation);
+      card.scale.copy(start.scale);
+      this._transferAnimator.start({
+        card,
+        getTarget: () => zone?.getCardSlotTransform(card) ?? destination,
+        onComplete: () => {
+          zone?.arrangeCards();
+          if (!this._localHandDragActive) this._updateLocalHandHover(null);
+          this.requestRender();
+        },
+      });
+    };
 
     this._setupResizeHandler();
 
@@ -848,24 +915,24 @@ export class SceneManager {
       card.setMasked(this._shouldMask('HAND', ownerId ?? null, faceUp));
       if (ownerId !== undefined) card.setOwnerId(ownerId);
       if (cardType) {
-        card.updateContent({ title: getCardTitle(cardType) });
         card.setCardType(cardType);
+        card.updateContent({ title: getCardTitle(cardType) });
       }
     } else {
       const deck = this.getOriginalDeck();
-      if (deck && deck.getCount() > 0) {
+      if (!this._onlineCardRoomId && deck && deck.getCount() > 0) {
         deck.draw();
         this.onDeckCountChanged?.(deck.getId(), deck.getCount());
       }
 
       card = new CardObject3D({
         id: cardId,
+        cardType,
         title: (faceUp && cardType) ? getCardTitle(cardType) : 'Card',
         faceUp: faceUp,
         ownerId: ownerId ?? null,
       });
       card.setMasked(this._shouldMask('HAND', ownerId ?? null, faceUp));
-      if (cardType) card.setCardType(cardType);
 
       if (!this._cardRegistry.hasCard(cardId)) {
         this._cardRegistry.registerTableCard(card);
@@ -919,11 +986,13 @@ export class SceneManager {
     }
 
     this._pendingTransfers.delete(cardId);
+    this.remoteDragPreview.finishCard(cardId);
 
     let card = this.getObject(cardId) as CardObject3D | undefined;
     if (!card || card.isDisposed()) {
       card = new CardObject3D({
         id: cardId,
+        cardType,
         title: (faceUp && cardType) ? getCardTitle(cardType) : 'Card',
         faceUp: faceUp,
         ownerId: ownerId ?? null,
@@ -999,6 +1068,8 @@ export class SceneManager {
         card!.quaternion.copy(finalSlot.quaternion);
         card!.scale.copy(finalSlot.scale);
         if (finalSlot.layerIndex !== undefined) card!.setLayerIndex(finalSlot.layerIndex);
+        // Con trỏ có thể đứng yên từ lúc drop: không chờ mouseenter tiếp theo.
+        if (!this._localHandDragActive) this._updateLocalHandHover(null);
         this.requestRender();
       },
     });
@@ -1072,8 +1143,8 @@ export class SceneManager {
     card.setFaceUp(faceUp);
     card.setMasked(this._shouldMask(location, ownerId, faceUp));
     if (cardType) {
-      card.updateContent({ title: getCardTitle(cardType) });
       card.setCardType(cardType);
+      card.updateContent({ title: getCardTitle(cardType) });
     }
   }
 
@@ -1155,6 +1226,68 @@ export class SceneManager {
     this.requestRender();
   }
 
+  restoreRejectedHandDrop(object: SandboxObject, players: PlayerInfo[]): void {
+    const card = this._cardRegistry.getCardObject(object.id);
+    if (!card || card.isDisposed() || card.isInHand()) return;
+    const start = { position: card.position.clone(), rotation: card.rotation.clone(), scale: card.scale.clone() };
+    this._transferAnimator.cancel(object.id, false);
+    card.setLayoutControlled(false);
+    this.syncRoomObjects([object], players);
+    this._dragController.onDragSettled?.(card, start);
+  }
+
+
+
+  animateRoundDeal(): void {
+    const deck = this.getOriginalDeck();
+    if (!deck) return;
+    const start = deck.getWorldPosition(new THREE.Vector3());
+    const orientation = deck.getWorldQuaternion(new THREE.Quaternion());
+    start.y += DECK_CONFIG.CARD_THICKNESS;
+    for (const card of this.getAllCards()) {
+      const zoneId = card.getHandZoneId();
+      const zone = zoneId ? this._handZoneManager.getHandZone(zoneId) : undefined;
+      if (!zone) continue;
+      const index = zone.getCards().indexOf(card);
+      card.position.copy(start);
+      card.quaternion.copy(orientation);
+      this._transferAnimator.start({
+        card,
+        getTarget: () => zone.getCardSlotTransform(card),
+        durationMs: TRANSFER_DURATION_MIN_MS + index * DEAL_CARD_INTERVAL_MS,
+      });
+    }
+  }
+
+  animateDeckTake(cardId: string): void {
+    const card = this._cardRegistry.getCardObject(cardId);
+    const deck = this.getOriginalDeck();
+    if (!card || !deck) return;
+
+    const target = {
+      position: card.position.clone(),
+      quaternion: card.quaternion.clone(),
+      scale: card.scale.clone(),
+    };
+    // Badge đã giảm trước khi chạy hiệu ứng, kể cả khi vừa lấy lá cuối.
+    deck.getWorldPosition(card.position);
+    card.position.y += DECK_CONFIG.CARD_THICKNESS;
+    deck.getWorldQuaternion(card.quaternion);
+    this._transferAnimator.start({ card, getTarget: () => target });
+  }
+
+  restoreRejectedTableDrop(objectId: string, position: { x: number; y: number; z: number }, rotation: number): void {
+    const card = this._cardRegistry.getCardObject(objectId);
+    if (!card || card.isDisposed() || card.isInHand()) return;
+    this._transferAnimator.cancel(objectId, false);
+    const target = {
+      position: new THREE.Vector3(position.x, position.y, position.z),
+      quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotation, 0)),
+      scale: new THREE.Vector3(1, 1, 1),
+    };
+    this._transferAnimator.start({ card, getTarget: () => target, onComplete: () => this.requestRender() });
+  }
+
   private _restorePendingTransfer(cardId: string): boolean {
     const pending = this._pendingTransfers.get(cardId);
     if (!pending) return false;
@@ -1219,14 +1352,142 @@ export class SceneManager {
    * Synchronizes all room state objects (cards on table, cards in hands) received from server.
    * Ensures clients joining mid-game or after card actions see all public table cards and proper hand counts.
    */
+  private _createOfflineDemoCard(): CardObject3D {
+    return new CardObject3D({
+      id: DEMO_TABLE_CARD_ID,
+      title: "Cat Boom",
+      description: "Lá bài mẫu của bàn offline.",
+      position: { x: DEMO_TABLE_CARD_X, y: TABLE_CONFIG.SURFACE_Y, z: 0 },
+    });
+  }
+
+
+  setCardRoom(roomId: string | null, setup = false, spectator = false): void {
+    const resetCards = this._onlineCardRoomId !== roomId || this._roundSetup !== setup;
+    this._roundSetup = setup;
+    this._roundSpectator = spectator;
+    const deck = this.getOriginalDeck();
+    if (deck) deck.visible = !setup;
+    this.tableActions.visible = !setup && !spectator;
+    if (!resetCards) return;
+    this.requestRender();
+    this._onlineCardRoomId = roomId;
+    this.deckViewRow.clear();
+    this._spectatorFlipIds.clear();
+    this._dragController.abortDrag();
+    this.remoteDragPreview.clear();
+    this._interactionManager.clearSelection();
+    for (const [id, object] of this._registeredObjects) {
+      if (!(object instanceof CardObject3D)) continue;
+      this._removeRoomCard(id, object);
+    }
+    this._cardRegistry.clear();
+    this._pendingTransfers.clear();
+    this._lastTransferSeq.clear();
+    this._remoteDragSeq.clear();
+    this._suppressDragEndIds.clear();
+    if (deck) {
+      const ids = roomId ? [] : makeOfflineDeckIds();
+      deck.resetLocalCards(ids, roomId !== null);
+      this._cardRegistry.registerDeck(deck.getId(), ids);
+      this.onDeckCountChanged?.(deck.getId(), deck.getCount());
+    }
+    if (!roomId) {
+      this.setLocalSessionId("");
+      const demo = this._createOfflineDemoCard();
+      this._cardRegistry.registerTableCard(demo);
+      this.addObject("demo_card", demo);
+      this._interactionManager.registerObject("demo_card", demo);
+    }
+  }
+
+
+  private _removeRoomCard(id: string, card: CardObject3D): void {
+    this.remoteDragPreview.finishCard(id);
+    this._transferAnimator.cancel(id, false);
+    this._pendingTransfers.delete(id);
+    this._remoteDragSeq.delete(id);
+    this._lastTransferSeq.delete(id);
+    this._handZoneManager.removeCardFromHand(id);
+    if (this._cardRegistry.getLocation(id) === 'IN_HAND') this._cardRegistry.transferHandToTable(id);
+
+    if (card.isInStack()) this._stackManager.removeCardFromStack(card);
+    this.removeObject(id);
+    // Mất quyền xem chỉ hủy mô hình cục bộ. Cùng ID có thể trở lại khi lá ra bàn.
+    this._cardRegistry.forgetDisposedCard(id);
+  }
+
+
+  get isRoundSpectator(): boolean { return this._roundSpectator; }
+
+  canFlipCard(card: CardObject3D): boolean {
+    return !this._roundSpectator || this._spectatorFlipIds.has(card.cardId);
+  }
+
+  syncPrivateRoundObjects(objects: SandboxObject[], players: PlayerInfo[], handCounts: Record<string, number>): void {
+    if (this._roundSpectator) {
+      this._spectatorFlipIds.clear();
+      for (const object of objects) {
+        if (object.location === 'TABLE' && object.takenFromDeck) this._spectatorFlipIds.add(object.id);
+      }
+    }
+    const visible = [...objects];
+    for (const player of players) {
+      if (player.id === this._localSessionId || player.spectator) continue;
+      // Mesh úp chỉ là hình minh họa số lượng, không có ID lá thật.
+      const count = handCounts[player.id] ?? 0;
+      for (let index = 0; index < count; index++) {
+        visible.push({
+          id: getAnonymousHandSlotId(player.id, index),
+          type: 'card', ownerId: player.id, location: 'HAND', handIndex: index,
+          position: { x: 0, y: 0, z: 0 }, rotation: 0, faceUp: false, lockedBy: null,
+        });
+      }
+    }
+    const visibleIds = new Set(visible.map(object => object.id));
+    for (const [id, object] of this._registeredObjects) {
+      if (object instanceof CardObject3D && !id.startsWith(DECK_VIEW_PREFIX) && !visibleIds.has(id)) this._removeRoomCard(id, object);
+    }
+    this.syncRoomObjects(visible, players);
+  }
+
+
+  setOnlineDeckCount(count: number, topCardType?: string): void {
+    const deck = this.getOriginalDeck();
+    if (!deck) return;
+    const countChanged = deck.setOnlineCount(count);
+    const faceChanged = deck.setOnlineTopType(topCardType);
+    if (faceChanged && count > 0) deck.animateActivity('flip', () => this.requestRender());
+    if (countChanged || faceChanged) this.requestRender();
+  }
+
+
+  syncDeckView(state: DeckViewState | null, localId: string | null): void {
+    this.deckViewRow.sync(state, localId, this.getOriginalDeck()?.position);
+  }
+
+  animateDeckShuffle(): void {
+    this.getOriginalDeck()?.animateActivity('shuffle', () => this.requestRender());
+  }
+
+  animateDeckInsertion(count: number): void {
+    this.getOriginalDeck()?.animateActivity('insert', () => this.requestRender(), count);
+  }
+
   syncRoomObjects(objects: SandboxObject[], players: PlayerInfo[]): void {
+    this._playerAreaManager.updateOccupants(players);
     let modified = false;
 
     for (const obj of objects) {
       if (obj.type !== 'card') continue;
 
-      // M1.7.4: never let a snapshot fight an in-flight transfer trajectory.
-      if (this.isCardTransferAnimating(obj.id)) continue;
+
+      if (this.isCardTransferAnimating(obj.id)) {
+        const card = this._cardRegistry.getCardObject(obj.id);
+        // Vị trí mới của máy chủ được ưu tiên khi lá đã rời tay trong lúc còn animation nhận bài.
+        if (obj.location !== 'TABLE' || !card?.isInHand() || !this._transferAnimator.isAnimating(obj.id)) continue;
+        this._transferAnimator.cancel(obj.id, false);
+      }
 
       if (obj.location === 'HAND') {
         const owner = players.find((p) => p.id === obj.ownerId);
@@ -1236,6 +1497,7 @@ export class SceneManager {
         if (!card) {
           card = new CardObject3D({
             id: obj.id,
+            cardType: obj.cardType,
             title: (obj.faceUp && obj.cardType) ? getCardTitle(obj.cardType) : 'Card',
             faceUp: obj.faceUp,
             ownerId: obj.ownerId ?? null,
@@ -1243,7 +1505,7 @@ export class SceneManager {
           card.setMasked(this._shouldMask('HAND', obj.ownerId, obj.faceUp));
           this._cardRegistry.registerTableCard(card);
           this.addObject(obj.id, card);
-          this._interactionManager.registerObject(obj.id, card);
+          if (!obj.id.startsWith(ANONYMOUS_HAND_PREFIX)) this._interactionManager.registerObject(obj.id, card);
         }
 
         // M1.7.4: an in-flight transfer is authoritative for its own transform.
@@ -1251,12 +1513,12 @@ export class SceneManager {
           continue;
         }
 
-        card.setFaceUp(obj.faceUp);
+        if (card.isFaceUp() !== obj.faceUp) card.setFaceUp(obj.faceUp);
         card.setMasked(this._shouldMask('HAND', obj.ownerId, obj.faceUp));
         if (obj.ownerId !== undefined) card.setOwnerId(obj.ownerId);
         if (obj.cardType) {
-          card.updateContent({ title: getCardTitle(obj.cardType) });
           card.setCardType(obj.cardType);
+          card.updateContent({ title: getCardTitle(obj.cardType) });
         }
 
         const handZone = this._handZoneManager.getHandZoneForPlayer(pIndex);
@@ -1281,11 +1543,11 @@ export class SceneManager {
         if (!card) {
           card = new CardObject3D({
             id: obj.id,
+            cardType: obj.cardType,
             title: obj.cardType ? getCardTitle(obj.cardType) : 'Card',
             position: { x: obj.position.x, y: obj.position.y ?? TABLE_CONFIG.SURFACE_Y, z: obj.position.z },
             faceUp: obj.faceUp,
           });
-          if (obj.cardType) card.setCardType(obj.cardType);
           // M1.7.5 Part 3: a card created from an authoritative snapshot (e.g.
           // reconnect) adopts its stored rotation exactly once.
           card.rotation.set(0, obj.rotation ?? 0, 0);
@@ -1314,10 +1576,10 @@ export class SceneManager {
           card.setOwnerId(null);
           card.position.set(obj.position.x, obj.position.y ?? TABLE_CONFIG.SURFACE_Y, obj.position.z);
           card.setMasked(this._shouldMask('TABLE', null, obj.faceUp));
-          card.setFaceUp(obj.faceUp);
+          if (card.isFaceUp() !== obj.faceUp) card.setFaceUp(obj.faceUp);
           if (obj.cardType) {
-            card.updateContent({ title: getCardTitle(obj.cardType) });
             card.setCardType(obj.cardType);
+            card.updateContent({ title: getCardTitle(obj.cardType) });
           }
           modified = true;
         }
@@ -1329,7 +1591,7 @@ export class SceneManager {
     }
   }
 
-  syncFlippedCard(cardId: string, faceUp: boolean, cardType?: string, ownerId?: string | null, location?: string): void {
+  syncFlippedCard(cardId: string, faceUp: boolean, cardType?: string, ownerId?: string | null, location?: string, notifyHand = true): void {
     const card = this._cardRegistry.getCardObject(cardId);
     if (!card || card.isDisposed()) return;
 
@@ -1342,16 +1604,14 @@ export class SceneManager {
     } else if (ownerId !== undefined) {
       card.setOwnerId(ownerId);
     }
-    card.setMasked(this._shouldMask(loc, owner, faceUp));
+    const localOfflineHand = loc === 'HAND' && !this._onlineCardRoomId && this.isLocalHandCard(card);
+    card.setMasked(localOfflineHand ? !faceUp : this._shouldMask(loc, owner, faceUp));
     if (faceUp && cardType) {
-      card.updateContent({ title: getCardTitle(cardType) });
       card.setCardType(cardType);
+      card.updateContent({ title: getCardTitle(cardType) });
     }
-    if (!card.isFlipAnimating()) {
-      card.animateFlipTo(faceUp, {
-        requestRender: () => this.requestRender(),
-      });
-    }
+    if (card.isFaceUp() !== faceUp) card.animateFlipTo(faceUp, { requestRender: () => this.requestRender() });
+    if (notifyHand && this.isLocalHandCard(card)) this.onLocalHandChanged?.();
     this.requestRender();
   }
 
@@ -1398,8 +1658,8 @@ export class SceneManager {
 
   getAllCards(): CardObject3D[] {
     const cards: CardObject3D[] = [];
-    for (const obj of this._registeredObjects.values()) {
-      if (obj instanceof CardObject3D && !obj.isDisposed()) {
+    for (const [id, obj] of this._registeredObjects) {
+      if (!id.startsWith(DECK_VIEW_PREFIX) && obj instanceof CardObject3D && !obj.isDisposed()) {
         cards.push(obj);
       }
     }
@@ -1515,6 +1775,7 @@ export class SceneManager {
    * Rollback is performed if any step fails.
    */
   returnCardToDeck(card: CardObject3D, deckId?: string, index?: number): boolean {
+    if (this._onlineCardRoomId) return false;
     if (!card || card.isDisposed()) return false;
 
     const targetDeck = deckId
@@ -1591,6 +1852,7 @@ export class SceneManager {
    * Preserves the stack's relative bottom-to-top order.
    */
   returnStackToDeck(stackId: string, deckId?: string, index?: number): boolean {
+    if (this._onlineCardRoomId) return false;
     const stack = this._stackManager.getStack(stackId);
     if (!stack) return false;
 
@@ -1723,7 +1985,7 @@ export class SceneManager {
     playerIndex: number = this._activePlayerIndex,
     playerCount: PlayerCount = this._activePlayerCount
   ): number {
-    const safeCount = Math.min(8, Math.max(2, playerCount)) as PlayerCount;
+    const safeCount = resolveTableSeatCount(playerCount);
     const safeIndex = ((Math.floor(playerIndex) % safeCount) + safeCount) % safeCount;
     return computePlayerPerspective(safeIndex, safeCount, this._table.currentParams.circumradius).theta;
   }
@@ -1753,7 +2015,21 @@ export class SceneManager {
 
     // 1. Check if dropped onto a Deck (M1.3.4.5)
     const nearbyDeck = this.findNearbyDeck(card, INTERACTION_CONFIG.DROP_ZONE_RADIUS);
-    if (nearbyDeck) {
+
+    if (this._onlineCardRoomId && this.isInsideDeckZone(card.position.x, card.position.z, 0)) {
+      const group = [card, ...followers];
+      const selected = this._interactionManager.getSelectedCards().filter(selectedCard => group.includes(selectedCard));
+      const ordered = [...selected, ...group.filter(groupCard => !selected.includes(groupCard))];
+      if (this.onOnlineDeckInsert?.(ordered)) {
+
+        for (const item of ordered) {
+          this._suppressDragEndIds.add(item.cardId);
+          this._queuePendingHandTransfer(item);
+        }
+        return;
+      }
+    }
+    if (nearbyDeck && !this._onlineCardRoomId) {
       if (card.isInHand()) {
         const oldHand = this._handZoneManager.getHandZone(card.getHandZoneId()!);
         oldHand?.removeCard(card.cardId);
@@ -1779,7 +2055,9 @@ export class SceneManager {
         const oldHand = this._handZoneManager.getHandZone(card.getHandZoneId()!);
         oldHand?.removeCard(card.cardId);
         this._cardRegistry.transferHandToTable(card.cardId);
+        const yaw = this._dragController.getDropYaw(card) ?? this.getDefaultTableRotationForSeat();
         this._clearHandPresentation(card);
+        card.rotation.y = yaw;
         card.setMasked(this._shouldMask('TABLE', null, card.isFaceUp()));
       }
       this._handleDropInDiscardZone(card, isEntireStack, cardStack);
@@ -1804,10 +2082,11 @@ export class SceneManager {
       // M1.7.5 Part 1: hand transforms are local presentation only. Clear the
       // residual hover/preview/lift/scale/layer state so HandZone stops
       // affecting the card — a table card resumes the canonical flat transform.
+      const yaw = this._dragController.getDropYaw(card) ?? this.getDefaultTableRotationForSeat();
       this._clearHandPresentation(card);
       // M1.7.5 Part 2: default orientation derived from the acting player's
       // seat, computed once at this HAND→TABLE transition (never re-derived).
-      card.rotation.set(0, this.getDefaultTableRotationForSeat(), 0);
+      card.rotation.set(0, yaw, 0);
       card.setMasked(this._shouldMask('TABLE', null, card.isFaceUp()));
       leftHand = true;
     }
@@ -1816,8 +2095,9 @@ export class SceneManager {
         const fOldHand = this._handZoneManager.getHandZone(follower.getHandZoneId()!);
         fOldHand?.removeCard(follower.cardId);
         this._cardRegistry.transferHandToTable(follower.cardId);
+        const yaw = this._dragController.getDropYaw(follower) ?? this.getDefaultTableRotationForSeat();
         this._clearHandPresentation(follower);
-        follower.rotation.set(0, this.getDefaultTableRotationForSeat(), 0);
+        follower.rotation.set(0, yaw, 0);
         follower.setMasked(this._shouldMask('TABLE', null, follower.isFaceUp()));
         leftHand = true;
       }
@@ -1913,6 +2193,8 @@ export class SceneManager {
    * M1.7.5 Part 3: emits `onObjectsRotationChanged` so the new yaw syncs.
    */
   rotateSelectedCards(direction: 1 | -1 = 1): void {
+    if (this._roundSpectator) return;
+    if (this._dragController.rotateDrag(direction * INTERACTION_CONFIG.ROTATION_STEP)) return;
     let targets = this._interactionManager.getSelectedCards();
     if (targets.length === 0) {
       const demo = this.getDemoCard();
@@ -1934,7 +2216,8 @@ export class SceneManager {
    * the camera as before.
    */
   canRotateSelectionWithWheel(): boolean {
-    if (this._dragController.isDragging()) return false;
+    if (this._roundSpectator) return false;
+    if (this._dragController.isDragging()) return true;
     return this._interactionManager.getSelectedCards().some(
       (c) => !c.isDisposed() && !c.isInHand()
     );
@@ -1948,14 +2231,11 @@ export class SceneManager {
    * Returns true when a rotation was applied (caller should preventDefault).
    */
   rotateSelectionByWheel(notches: number, fine = false): boolean {
-    if (this._dragController.isDragging()) return false;
     if (!Number.isFinite(notches) || notches === 0) return false;
 
     const targets = this._interactionManager.getSelectedCards().filter(
       (c) => !c.isDisposed() && !c.isInHand()
     );
-    if (targets.length === 0) return false;
-
     const stepDeg = fine
       ? INTERACTION_CONFIG.WHEEL_ROTATION_STEP_FINE_DEG
       : INTERACTION_CONFIG.WHEEL_ROTATION_STEP_DEG;
@@ -1963,6 +2243,8 @@ export class SceneManager {
     const direction = notches < 0 ? 1 : -1;
     const angleDelta = direction * Math.abs(notches) * stepDeg * (Math.PI / 180);
 
+    if (this._dragController.rotateDrag(angleDelta)) return true;
+    if (!targets.length) return false;
     this._rotateTargets(targets, angleDelta);
     return true;
   }
@@ -2447,7 +2729,7 @@ export class SceneManager {
    * authorization. The card keeps its current world transform; source layout
    * closes immediately so it cannot be pulled back to its old slot.
    */
-  private _queuePendingHandTransfer(card: CardObject3D, targetPlayerIndex: number): void {
+  private _queuePendingHandTransfer(card: CardObject3D, targetPlayerIndex?: number): void {
     if (this._pendingTransfers.has(card.cardId)) return;
 
     const sourceZone = card.isInHand()
@@ -2498,6 +2780,9 @@ export class SceneManager {
       const deckPos = this._tableZoneManager.getDeckPosition();
       demoDeck.position.set(deckPos.x, TABLE_CONFIG.SURFACE_Y, deckPos.z);
     }
+
+    const actionAnchor = this._tableZoneManager.getDeckPosition();
+    this.tableActions.setAnchor(actionAnchor.x, actionAnchor.z, this._cameraController.getTheta());
 
     // 3b. Reposition discard stack if present (M1.4.3)
     const discardStack = this.getDiscardStack();
@@ -2556,7 +2841,7 @@ export class SceneManager {
    */
   applyLocalPlayerPerspective(animate = true): void {
     const playerIndex = this._activePlayerIndex ?? 0;
-    const playerCount = this._activePlayerCount ?? 4;
+    const playerCount = this._activePlayerCount;
     // M1.7.8: a seat change invalidates the old local-hand hover/fan state.
     this._resetLocalHandHover();
     this.onLocalHandChanged?.();
@@ -2567,6 +2852,8 @@ export class SceneManager {
     const computedCameraRadius = this._cameraController.computeAdaptiveRadius(outerRadius, cameraAspect);
     this._cameraController.setAdaptiveRadius(computedCameraRadius);
     this._cameraController.setPlayerPerspective(perspective.theta, true, animate);
+    const actionAnchor = this._tableZoneManager.getDeckPosition();
+    this.tableActions.setAnchor(actionAnchor.x, actionAnchor.z, perspective.theta);
     // Offline starts from the table centre. Preserve that framing online and
     // rotate only around the centre for each local seat.
     const tableTarget = new THREE.Vector3(0, TABLE_CONFIG.SURFACE_Y, 0);
@@ -2591,7 +2878,7 @@ export class SceneManager {
 
   /** True when the card currently belongs to the local player's own hand. */
   isLocalHandCard(card: CardObject3D | DeckObject3D | null | undefined): boolean {
-    if (!(card instanceof CardObject3D) || card.isDisposed()) return false;
+    if (this._roundSpectator || !(card instanceof CardObject3D) || card.isDisposed()) return false;
     if (!card.isInHand()) return false;
     const zoneId = card.getHandZoneId();
     if (!zoneId) return false;
@@ -2601,14 +2888,14 @@ export class SceneManager {
 
   /** Snapshot of the local player's hand, in authoritative HAND order. */
   getLocalHandCards(): CardObject3D[] {
-    const zone = this._handZoneManager.getHandZoneForPlayer(this._activePlayerIndex ?? 0);
+    const zone = this.getLocalHandZone();
     if (!zone) return [];
     return zone.getCards().filter((card) => !card.isDisposed());
   }
 
   /** Local hand zone for operations that need to preserve authoritative card IDs/order. */
   getLocalHandZone(): HandZoneObject3D | undefined {
-    return this._handZoneManager.getHandZoneForPlayer(this._activePlayerIndex ?? 0);
+    return this._roundSpectator || this._roundSetup ? undefined : this._handZoneManager.getHandZoneForPlayer(this._activePlayerIndex ?? 0);
   }
 
   /** True while the pointer is on a card of the local player's hand. */
@@ -2625,6 +2912,19 @@ export class SceneManager {
   setLocalHandFanDragActive(active: boolean): void {
     this._localHandDragActive = active;
     if (active) return;
+    if (this._handPointer && this.isLocalHandPreviewOpen?.()) {
+      // Đợi lá bài về slot mới trước khi đo vùng rê sau khi nhả chuột.
+      if (this._handLeaveTimer !== null) clearTimeout(this._handLeaveTimer);
+      this._handLeaveTimer = setTimeout(() => {
+        this._handLeaveTimer = null;
+        if (!this._localHandDragActive) this._updateLocalHandHover(null, true);
+      }, SceneManager.HAND_PREVIEW_SETTLE_MS);
+      return;
+    }
+    if (this._handPointer) {
+      this._updateLocalHandHover(null);
+      return;
+    }
     if (this.getLocalHandCards().length > 0) {
       this._localHandHovered = true;
       this.onLocalHandHoverChanged?.(true);
@@ -2633,15 +2933,32 @@ export class SceneManager {
     }
   }
 
-  private _updateLocalHandHover(card: CardObject3D | DeckObject3D | null): void {
-    const next = this.isLocalHandCard(card);
+  private _updateLocalHandHover(card: CardObject3D | DeckObject3D | null, checkPreviewBoundary = false): void {
+    const overHand = this._isPointerOverHandRegion();
+    if (!overHand) this._handPreviewDismissed = false;
+    const pointer = this._handPointer;
+    const previewOpen = this.isLocalHandPreviewOpen?.() && pointer;
+    const overPreview = pointer && this.getLocalHandCards().length > 0 &&
+      this.isPointOverLocalHandPreview?.(pointer.clientX, pointer.clientY);
+    if (checkPreviewBoundary && previewOpen && !overPreview && overHand) this._handPreviewDismissed = true;
+    // Chỉ đóng vì rời biên khi có chuột thật, không đóng vì lá đang chuyển động vào fan.
+    const next = previewOpen ? !!overPreview || (!checkPreviewBoundary && this._localHandHovered) :
+      !this._handPreviewDismissed && (this.isLocalHandCard(card) || overHand || !!overPreview);
     if (next === this._localHandHovered) return;
     this._localHandHovered = next;
     this.onLocalHandHoverChanged?.(next);
   }
 
+  private _isPointerOverHandRegion(): boolean {
+    const pointer = this._handPointer;
+    if (!pointer || this.getLocalHandCards().length === 0) return false;
+    const point = this.getTableIntersectionAtScreenPos(pointer.clientX, pointer.clientY);
+    return !!point && !!this.getLocalHandZone()?.containsPoint(point.x, point.z);
+  }
+
   /** Resets the local hand hover presentation state (drag start / seat change). */
   private _resetLocalHandHover(): void {
+    this._handPreviewDismissed = false;
     if (!this._localHandHovered) return;
     this._localHandHovered = false;
     this.onLocalHandHoverChanged?.(false);
@@ -2678,21 +2995,28 @@ export class SceneManager {
    * Returns world {x, z} coordinates on the tabletop, or null if no hit or outside valid interaction bounds. (M1.5.3 / M1.7.3 Fix)
    */
   getTableIntersectionAtScreenPos(clientX: number, clientY: number): { x: number; z: number } | null {
-    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+    if (!this._updateTablePointerRay(clientX, clientY)) return null;
+    return this._getTablePointerHit();
+  }
+
+  private _updateTablePointerRay(clientX: number, clientY: number): boolean {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
 
     const domEl = this._renderer.getDomElement();
     const rect = domEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
+    if (!rect.width || !rect.height) return false;
 
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-    if (!Number.isFinite(ndcX) || !Number.isFinite(ndcY)) return null;
+    this._tablePointerNdc.set(ndcX, ndcY);
+    this._tablePointerRaycaster.setFromCamera(this._tablePointerNdc, this._renderer.getCamera());
+    return true;
+  }
 
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this._renderer.getCamera());
+  private _getTablePointerHit(): { x: number; z: number } | null {
     const tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const hitPoint = new THREE.Vector3();
-    const hit = raycaster.ray.intersectPlane(tablePlane, hitPoint);
+    const hit = this._tablePointerRaycaster.ray.intersectPlane(tablePlane, hitPoint);
     if (!hit) return null;
 
     if (!Number.isFinite(hitPoint.x) || !Number.isFinite(hitPoint.z)) return null;
@@ -2808,7 +3132,8 @@ export class SceneManager {
     pos: { x: number; y: number; z: number },
     faceUp?: boolean,
     seq?: number,
-    rotation?: number
+    rotation?: number,
+    authoritativeTable = false,
   ): void {
     if (seq !== undefined) {
       const lastSeq = this._remoteDragSeq.get(objectId) ?? 0;
@@ -2823,7 +3148,7 @@ export class SceneManager {
     // An authorized transfer/room-state path already owns this card.
     if (this.isCardTransferAnimating(objectId)) return;
 
-    const targetHand = this._handZoneManager.findHandZoneAtPoint(pos.x, pos.z);
+    const targetHand = authoritativeTable ? undefined : this._handZoneManager.findHandZoneAtPoint(pos.x, pos.z);
     let card = this._cardRegistry.getCardObject(objectId);
 
     if (targetHand) {
@@ -2939,12 +3264,16 @@ export class SceneManager {
     this._running = false;
     this._localHandHovered = false;
     this._resizeAbortController.abort();
+    if (this._handLeaveTimer !== null) clearTimeout(this._handLeaveTimer);
+    this.isLocalHandPreviewOpen = null;
     this._playerAreaAbortController.abort();
     this.onDeckCountChanged = null;
     this.onCardTransferRequested = null;
     this.onLocalHandHoverChanged = null;
     this.onLocalHandChanged = null;
     this.isPointOverLocalHandPreview = null;
+    this.remoteDragPreview.clear();
+    this.deckViewRow.dispose();
     this._transferAnimator.dispose();
     this._pendingTransfers.clear();
     this._lastTransferSeq.clear();

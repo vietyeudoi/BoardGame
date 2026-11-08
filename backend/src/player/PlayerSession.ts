@@ -13,7 +13,7 @@ export class PlayerSession {
   public isAlive = true;
 
   constructor(
-    public readonly sessionId: string,
+    public sessionId: string,
     private readonly _ws: WebSocket
   ) {
     this._ws.on('pong', () => {

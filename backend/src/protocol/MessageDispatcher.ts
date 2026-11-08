@@ -1,7 +1,9 @@
 /**
  * MessageDispatcher.ts — Routes incoming WS messages to handlers
  */
-import type { ClientToServerMessage, Vector3Like } from '../../../shared/types/protocol.js';
+import { DEFAULT_TABLE_RADIUS, SHARED_CONFIG } from "../../../shared/constants/config.js";
+import type { ClientToServerMessage, CursorMovePayload, DragPreviewFrame, RemoteDragPreviewFrame, Vector3Like } from '../../../shared/types/protocol.js';
+import { getAnonymousHandSlotId } from '../../../shared/types/room.js';
 import type { RoomManager } from '../room/RoomManager.js';
 import type { PlayerSession } from '../player/PlayerSession.js';
 import type { Room } from '../room/Room.js';
@@ -14,9 +16,23 @@ const logger = Logger.create('MessageDispatcher');
 
 /** Minimum interval between object:drag-move messages per client (ms). */
 const DRAG_MOVE_THROTTLE_MS = 50;
+const PREVIEW_MOVE_THROTTLE_MS = 24;
+const TABLE_EDGE_TOLERANCE = 0.015;
+
+function isValidDefaultTableDrop(x: number, y: number, z: number): boolean {
+  if (y < 0 || y > 5) return false;
+  const sides = SHARED_CONFIG.MAX_PLAYERS_PER_ROOM;
+  const inradius = DEFAULT_TABLE_RADIUS * Math.cos(Math.PI / sides);
+  for (let side = 0; side < sides; side++) {
+    const angle = side * 2 * Math.PI / sides;
+    if (x * Math.sin(angle) + z * Math.cos(angle) > inradius + TABLE_EDGE_TOLERANCE) return false;
+  }
+  return true;
+}
 
 export class MessageDispatcher {
   /** Tracks the last drag-move timestamp per sessionId to enforce throttle. */
+  private readonly _dragPreviews = new Map<string, { dragId: number; roomId: string; cards: Set<string>; anonymousIds: Map<string, string>; lastMove: number; frame?: RemoteDragPreviewFrame }>();
   private readonly _dragMoveTimestamps = new Map<string, number>();
 
   constructor(
@@ -50,6 +66,41 @@ export class MessageDispatcher {
   }
 
   private _route(sessionId: string, session: PlayerSession, msg: ClientToServerMessage): void {
+
+    const room = session.roomId ? this._roomManager.getRoom(session.roomId) : undefined;
+
+    const deckView = room?.deckView;
+    const requiresUnlockedDeck = msg.type === 'card:draw' || msg.type === 'deck:take'
+      || msg.type === 'deck:insert' || msg.type === 'deck:shuffle'
+      || msg.type === 'deck:set-affected-count' || msg.type === 'deck:view-open';
+    if (deckView && requiresUnlockedDeck) {
+      const message = deckView.viewerName + (deckView.mode === 'alter' ? ' đang xếp bài.' : ' đang xem bài.');
+      if (msg.type === 'deck:insert') {
+        for (const id of msg.payload.cardIds) session.sendError(message, 'DRAG_END_FAILED', id);
+      } else session.sendError(message, 'DECK_LOCKED');
+      return;
+    }
+    const cardAction = /^(card|deck|object):/.test(msg.type) && msg.type !== 'object:drag-preview-stop';
+    if (room?.phase && cardAction) {
+
+      const flipTarget = msg.type === 'object:flip' ? room.getObject(msg.payload.objectId) : undefined;
+      const canSpectatorFlip = flipTarget?.location === 'TABLE' && flipTarget.takenFromDeck;
+      if (room.phase === 'SETUP' || (room.getPlayer(sessionId)?.spectator && !canSpectatorFlip)) {
+        session.sendError('Thao tác bài chỉ dành cho người đang chơi sau khi chia.', 'ROUND_ACTION_FORBIDDEN');
+        return;
+      }
+      if ('payload' in msg && msg.payload) {
+        const id = 'objectId' in msg.payload ? msg.payload.objectId : 'cardId' in msg.payload ? msg.payload.cardId : undefined;
+        if (id && !room.canAccessObject(room.getObject(id), sessionId)) {
+          session.sendError('Không thể thao tác lá bài này.', msg.type === 'object:flip' ? 'FLIP_REJECTED' : 'CARD_NOT_FOUND', id);
+          return;
+        }
+      }
+    }
+    if (room?.phase && (msg.type === 'room:create' || msg.type === 'room:join')) {
+      session.sendError('Hãy rời phòng hiện tại trước khi vào phòng khác.', 'ALREADY_IN_ROOM');
+      return;
+    }
     switch (msg.type) {
       case 'room:create':
         this._handleRoomCreate(sessionId, session, msg.payload);
@@ -57,8 +108,35 @@ export class MessageDispatcher {
       case 'room:join':
         this._handleRoomJoin(sessionId, session, msg.payload);
         break;
+
+      case 'room:resume':
+        this._handleRoomResume(session, msg.payload);
+        break;
       case 'room:leave':
         this._handleRoomLeave(sessionId, session);
+        break;
+
+
+      case 'round:configure':
+      case 'round:deal':
+      case 'round:reset':
+        this._handleRoundAction(room, session, msg);
+        break;
+
+
+      case 'deck:view-open':
+      case 'deck:view-order':
+      case 'deck:view-close':
+        this._handleDeckView(room, session, msg);
+        break;
+      case 'deck:insert':
+      case 'deck:shuffle':
+      case 'deck:set-affected-count':
+        this._handleDeckMutation(session, room, msg);
+        break;
+      case 'deck:set-draw-end':
+      case 'deck:take':
+        this._handleDeckAction(sessionId, session, msg);
         break;
       case 'card:draw':
         this._handleCardDraw(sessionId, session);
@@ -82,8 +160,24 @@ export class MessageDispatcher {
       case 'object:release':
         logger.debug('Object interaction lock', { type: msg.type });
         break;
+      case 'draw:hover': {
+        const room = session.roomId ? this._roomManager.getRoom(session.roomId) : undefined;
+        if (room?.setDrawHover(sessionId, msg.payload.hovering)) {
+          this._broadcastToRoom(room.id, sessionId, {
+            type: 'draw:hovered',
+            payload: { playerId: sessionId, playerName: room.getPlayer(sessionId)!.name, hovering: msg.payload.hovering },
+          });
+        }
+        break;
+      }
       case 'cursor:move':
         this._handleCursorMove(sessionId, session, msg.payload);
+        break;
+      case 'object:drag-preview':
+        this._handleDragPreview(sessionId, session, msg.payload);
+        break;
+      case 'object:drag-preview-stop':
+        this._stopDragPreview(sessionId, msg.payload.dragId);
         break;
       case 'object:drag-start':
         this._handleDragStart(sessionId, session, msg.payload);
@@ -98,24 +192,40 @@ export class MessageDispatcher {
   }
 
   private _enterRoom(session: PlayerSession, room: Room, sessionId: string): number {
+    this._stopDragPreview(sessionId);
     session.roomId = room.id;
     const playerIndex = room.getPlayerIndex(sessionId);
-    session.sendRaw({ type: 'room:joined', payload: { roomId: room.id, playerId: sessionId, playerIndex } });
+    session.sendRaw({ type: 'room:joined', payload: { roomId: room.id, playerId: sessionId, playerIndex, resumeToken: room.getPlayer(sessionId)?.resumeToken } });
     session.sendRaw({ type: 'room:state', payload: ViewStateBuilder.buildRoomState(room, sessionId) });
+    if (room.deckView) this._sendDeckView(room, sessionId);
+    for (const preview of this._dragPreviews.values()) {
+      if (preview.roomId === room.id && preview.frame && preview.frame.playerId !== sessionId) {
+
+        const cards = room.phase ? preview.frame.cards.filter(card => {
+          const location = room.getObject(card.objectId)?.location;
+          return location !== 'DECK' && location !== 'HAND';
+        }) : preview.frame.cards;
+        if (cards.length) session.sendRaw({ type: 'object:drag-preview', payload: { ...preview.frame, cards, phase: 'start' } });
+      }
+    }
+    for (const player of room.getDrawHoverPlayers()) {
+      session.sendRaw({ type: 'draw:hovered', payload: { playerId: player.id, playerName: player.name, hovering: true } });
+    }
     return playerIndex;
   }
 
   private _handleRoomCreate(
     sessionId: string,
     session: PlayerSession,
-    payload: { roomName: string; maxPlayers?: number; password?: string }
+    payload: Extract<ClientToServerMessage, { type: 'room:create' }>['payload']
   ): void {
+    session.playerName = payload.playerName ?? session.playerName ?? 'Player';
     const room = this._roomManager.createRoom({
       name: payload.roomName,
       hostSessionId: sessionId,
-      hostName: session.playerName ?? 'Player',
+      hostName: session.playerName,
       password: payload.password,
-      maxPlayers: payload.maxPlayers,
+      doubleDeck: payload.doubleDeck,
     });
     const playerIndex = this._enterRoom(session, room, sessionId);
     logger.info('Room created', { sessionId, roomId: room.id, playerIndex });
@@ -129,17 +239,50 @@ export class MessageDispatcher {
     session.playerName = payload.playerName;
     const room = this._roomManager.joinRoom(payload.roomId, sessionId, payload.playerName, payload.password);
     const playerIndex = this._enterRoom(session, room, sessionId);
-    const newPlayer = { id: sessionId, name: payload.playerName, isHost: false, isConnected: true, playerIndex };
+    const newPlayer = { id: sessionId, name: payload.playerName, isHost: false, isConnected: true, playerIndex,
+      spectator: room.getPlayer(sessionId)?.spectator };
     this._broadcastToRoom(room.id, sessionId, { type: 'room:player-joined', payload: newPlayer });
+    if (room.phase === 'SETUP') this._broadcastToRoom(room.id, sessionId, { type: 'round:configured', payload: room.round! });
     logger.info('Player joined room', { sessionId, roomId: room.id, playerIndex });
   }
 
-  public handleDisconnect(sessionId: string): void {
+
+  private _handleRoomResume(session: PlayerSession, { roomId, playerId, token }: { roomId: string; playerId: string; token: string }): void {
+
+    const previous = this._sessions.get(playerId);
+    const player = this._roomManager.getRoom(roomId)?.getPlayer(playerId);
+    if (!session.roomId && player?.resumeToken === token && previous?.roomId === roomId) {
+      // Mạng có thể đứt mà socket cũ chưa báo đóng. Chỉ mã hợp lệ mới thay được socket đó.
+      this.handleDisconnect(playerId);
+      this._sessions.delete(playerId);
+      previous.terminate();
+    }
+    const room = !session.roomId && !this._sessions.has(playerId)
+      ? this._roomManager.resumeRoom(roomId, playerId, token)
+      : undefined;
+    if (!room) {
+      session.sendError('Không thể kết nối lại phòng. Hãy trở về sảnh để vào phòng.', 'ROOM_RESUME_FAILED');
+      return;
+    }
+    // Gắn socket mới với ghế cũ để giữ quyền xem bài và trạng thái phòng.
+    this._sessions.delete(session.sessionId);
+    session.sessionId = playerId;
+    this._sessions.set(playerId, session);
+    this._enterRoom(session, room, playerId);
+    this._broadcastRoomState(room.id);
+  }
+
+  public handleDisconnect(sessionId: string, intentional = false): void {
     const session = this._sessions.get(sessionId);
     if (!session || !session.roomId) return;
     const roomId = session.roomId;
+    this._stopDragPreview(sessionId);
     const room = this._roomManager.getRoom(roomId);
     if (room) {
+      if (room.deckView?.viewerId === sessionId) {
+        room.closeDeckView();
+        this._broadcastDeckView(room);
+      }
       room.clearSessionLocks(sessionId).forEach((objectId) => {
         const obj = room.getObject(objectId);
         // Never broadcast a private hand card's raw transform.
@@ -152,20 +295,165 @@ export class MessageDispatcher {
             x: obj?.position.x ?? 0,
             y: obj?.position.y ?? 0,
             z: obj?.position.z ?? 0,
-            faceUp: obj?.faceUp,
+            faceUp: obj?.privateViewerId ? undefined : obj?.faceUp,
           },
         });
       });
     }
-    this._roomManager.handlePlayerDisconnect(roomId, sessionId);
+    this._roomManager.handlePlayerDisconnect(roomId, sessionId, intentional);
     this._broadcastToRoom(roomId, sessionId, { type: 'room:player-left', payload: { playerId: sessionId } });
+    if (room?.phase) this._broadcastRoomState(room.id);
     session.roomId = null;
     this._dragMoveTimestamps.delete(sessionId);
     logger.info('Player left / disconnected', { sessionId, roomId });
   }
 
   private _handleRoomLeave(sessionId: string, _session: PlayerSession): void {
-    this.handleDisconnect(sessionId);
+    this.handleDisconnect(sessionId, true);
+  }
+
+
+
+  private _handleRoundAction(
+    room: Room | undefined,
+    session: PlayerSession,
+    msg: Extract<ClientToServerMessage, { type: 'round:configure' | 'round:deal' | 'round:reset' }>,
+  ): void {
+    if (!room?.isHost(session.sessionId)) {
+      session.sendError('Chỉ chủ phòng được thiết lập, chia bài hoặc làm lại ván.', 'ROUND_HOST_REQUIRED');
+      return;
+    }
+    try {
+      if (msg.type === 'round:configure') {
+        room.configureRound(msg.payload);
+        this._broadcastToRoom(room.id, '', { type: 'round:configured', payload: room.round! });
+        return;
+      }
+      if (msg.type === 'round:deal') {
+        room.dealRound();
+      } else {
+        const hadView = Boolean(room.deckView);
+        room.resetRound();
+        if (hadView) this._broadcastDeckView(room);
+        for (const [id, preview] of this._dragPreviews) {
+          if (preview.roomId === room.id) this._stopDragPreview(id);
+        }
+      }
+      this._broadcastRoomState(room.id);
+    } catch (error) {
+      session.sendError(error instanceof Error ? error.message : 'Thao tác ván thất bại.', 'ROUND_INVALID');
+    }
+  }
+
+
+
+  private _sendDeckView(room: Room, sessionId: string): void {
+    this._sessions.get(sessionId)?.sendRaw({
+      type: 'deck:view-state', payload: room.deckView?.viewFor(sessionId) ?? null,
+    });
+  }
+
+  private _broadcastDeckView(room: Room): void {
+    for (const sessionId of room.getConnectedSessionIds()) this._sendDeckView(room, sessionId);
+  }
+
+  private _handleDeckView(
+    room: Room | undefined,
+    session: PlayerSession,
+    msg: Extract<ClientToServerMessage, { type: 'deck:view-open' | 'deck:view-order' | 'deck:view-close' }>,
+  ): void {
+    if (!room) return;
+    const viewerId = session.sessionId;
+    if (msg.type === 'deck:view-open') {
+      if (room.openDeckView(viewerId, msg.payload.mode)) this._broadcastDeckView(room);
+      else session.sendError('Không có lá để mở phiên xem.', 'DECK_VIEW_UNAVAILABLE');
+      return;
+    }
+    const view = room.deckView;
+    if (!view || view.id !== msg.payload.id || view.viewerId !== viewerId) {
+      session.sendError('Phiên xem không thuộc về bạn hoặc đã đóng.', 'DECK_VIEW_INVALID');
+      return;
+    }
+    if (msg.payload.order !== undefined) {
+      if (!view.setOrder(msg.payload.order)) {
+        session.sendError('Thứ tự phải chứa đúng các lá đã mở.', 'DECK_VIEW_INVALID');
+        return;
+      }
+      this._broadcastDeckView(room);
+      if (msg.type === 'deck:view-order') return;
+      room.commitDeckView();
+      const deck = room.getPublicDeckState();
+      this._broadcastToRoom(room.id, '', { type: 'deck:count', payload: { count: deck.count, deck } });
+    }
+    room.closeDeckView();
+    this._broadcastDeckView(room);
+  }
+
+  private _handleDeckMutation(
+    session: PlayerSession,
+    room: Room | undefined,
+    msg: Extract<ClientToServerMessage, { type: 'deck:insert' | 'deck:shuffle' | 'deck:set-affected-count' }>,
+  ): void {
+    const id = session.sessionId;
+    const player = room?.getPlayer(id);
+    if (room?.phase !== 'PLAYING' || !player?.isConnected || player.spectator) return;
+
+    if (msg.type === 'deck:shuffle') {
+      if (room.shuffleDeck()) this._broadcastToRoom(room.id, '', {
+        type: 'deck:shuffled', payload: { deck: room.getPublicDeckState(), playerName: player.name },
+      });
+      return;
+    }
+    if (msg.type === 'deck:set-affected-count') {
+      room.setDeckAffectedCount(msg.payload.count);
+      const deck = room.getPublicDeckState();
+      this._broadcastToRoom(room.id, '', { type: 'deck:count', payload: { count: deck.count, deck } });
+      return;
+    }
+
+    const { cardIds, cardsAbove, dragId } = msg.payload;
+    const active = this._dragPreviews.get(id);
+    const validDrag = dragId === undefined || (active?.dragId === dragId && cardIds.every(cardId =>
+      active.cards.has(cardId) && room.isLockedBy(cardId, id)));
+    if (!validDrag || !room.insertDeckCards(id, cardIds, cardsAbove)) {
+      for (const cardId of cardIds) session.sendError('Không thể chèn nhóm bài này.', 'DRAG_END_FAILED', cardId);
+      return;
+    }
+
+    // Xóa bản xem trước cũ để người mới vào phòng không nhận ID lá đã chèn.
+    this._stopDragPreview(id);
+    this._broadcastToRoom(room.id, '', { type: 'deck:inserted', payload: { count: cardIds.length } });
+    this._broadcastRoomState(room.id);
+  }
+
+  private _handleDeckAction(
+    sessionId: string,
+    session: PlayerSession,
+    msg: Extract<ClientToServerMessage, { type: 'deck:set-draw-end' | 'deck:take' }>,
+  ): void {
+    const room = session.roomId ? this._roomManager.getRoom(session.roomId) : undefined;
+    if (!room?.getPlayer(sessionId)?.isConnected) {
+      session.sendError('Bạn chưa vào phòng.', 'NOT_IN_ROOM');
+      return;
+    }
+    if (msg.type === 'deck:set-draw-end') {
+      room.setDeckDrawEnd(msg.payload.end);
+      this._broadcastRoomState(room.id);
+      return;
+    }
+    const card = room.takeDeckCard(sessionId, msg.payload?.cardsAbove);
+    if (!card) {
+      if (room.hasCardsInDeck()) {
+        session.sendError('Vị trí đã chọn không còn trong chồng bài.', 'DECK_POSITION_INVALID');
+      } else {
+        session.sendError('Chồng bài đã hết.', 'DECK_EMPTY');
+      }
+      return;
+    }
+    this._broadcastToRoom(room.id, '', {
+      type: 'deck:card-taken',
+      payload: { card: ViewStateBuilder.filterObjectForClient(card), ...(room.phase ? { deckCount: room.getDeckCount(), deck: room.getPublicDeckState() } : {}) },
+    });
   }
 
   private _handleCardDraw(sessionId: string, session: PlayerSession): void {
@@ -179,9 +467,13 @@ export class MessageDispatcher {
       return;
     }
 
+    if (!room.hasCardsInDeck()) return;
     const drawnCard = room.drawCard(sessionId);
     const playerIndex = room.getPlayerIndex(sessionId);
     RoomBroadcaster.broadcastCardDrawn(this._sessions, room, drawnCard, playerIndex);
+    if (room.phase) this._broadcastToRoom(room.id, '', { type: 'deck:count', payload: {
+      count: room.getDeckCount(), ownerId: sessionId, handCount: room.getHandCount(sessionId), deck: room.getPublicDeckState(),
+    } });
     logger.info('Card drawn & distributed securely', { roomId: room.id, drawerSessionId: sessionId, cardId: drawnCard.id });
   }
 
@@ -244,7 +536,7 @@ export class MessageDispatcher {
   }
 
   private _handleObjectFlip(
-    _sessionId: string,
+    sessionId: string,
     session: PlayerSession,
     payload: { objectId: string }
   ): void {
@@ -262,17 +554,31 @@ export class MessageDispatcher {
       return;
     }
 
+
+    if (targetObj.privateViewerId && targetObj.privateViewerId !== sessionId) {
+      session.sendError('Chỉ người lấy lá này mới được lật bài.', 'FLIP_REJECTED', payload.objectId);
+      return;
+    }
+
+    if (targetObj.lockedBy && targetObj.lockedBy !== sessionId) {
+      session.sendError("Card locked by another player", "FLIP_REJECTED", payload.objectId);
+      return;
+    }
     const flippedObj = room.flipObject(payload.objectId);
-    this._broadcastToRoom(room.id, '', {
-      type: 'object:flipped',
+
+    const flipMessage = {
+      type: 'object:flipped' as const,
       payload: {
         objectId: flippedObj.id,
         faceUp: flippedObj.faceUp,
         cardType: flippedObj.faceUp ? flippedObj.cardType : undefined,
         ownerId: flippedObj.ownerId ?? null,
+
         location: flippedObj.location,
       },
-    });
+    };
+    if (flippedObj.privateViewerId || (room.phase && flippedObj.location === 'HAND')) session.sendRaw(flipMessage);
+    else this._broadcastToRoom(room.id, '', flipMessage);
     this._broadcastRoomState(room.id);
   }
 
@@ -281,7 +587,7 @@ export class MessageDispatcher {
   private _handleCursorMove(
     sessionId: string,
     session: PlayerSession,
-    payload: { x: number; z: number; seq: number }
+    payload: CursorMovePayload
   ): void {
     if (!session.roomId) return;
     const room = this._roomManager.getRoom(session.roomId);
@@ -293,9 +599,76 @@ export class MessageDispatcher {
         playerId: sessionId,
         playerName: session.playerName ?? 'Player',
         x: payload.x,
+        y: payload.y,
         z: payload.z,
         seq: payload.seq,
       },
+    });
+  }
+
+  private _handleDragPreview(sessionId: string, session: PlayerSession, frame: DragPreviewFrame): void {
+    const room = session.roomId ? this._roomManager.getRoom(session.roomId) : undefined;
+    const player = room?.getPlayer(sessionId);
+    if (!room || !player?.isConnected) return;
+    const ids = new Set(frame.cards.map(card => card.objectId));
+    if (ids.size !== frame.cards.length) return;
+
+    if (frame.phase === "start") {
+      if (this._dragPreviews.has(sessionId)) return;
+      // Kiểm tra cả nhóm trước khi đặt khóa, tránh khóa nửa nhóm.
+      for (const id of ids) {
+        const card = room.getObject(id);
+        if (!card || !room.canAccessObject(card, sessionId) || card.type !== "card" || card.location === "DECK" || (card.lockedBy && card.lockedBy !== sessionId)) {
+          session.sendError("Card unavailable for drag", "OBJECT_LOCKED", frame.cards[0]!.objectId);
+          return;
+        }
+      }
+      for (const id of ids) room.dragLock(id, sessionId);
+
+      const anonymousIds = new Map<string, string>();
+      if (room.phase) {
+        let slot = room.getHandCount(sessionId) - 1;
+        for (const id of ids) {
+          if (room.getObject(id)?.location === 'HAND') anonymousIds.set(id, getAnonymousHandSlotId(sessionId, slot--));
+        }
+      }
+      this._dragPreviews.set(sessionId, { dragId: frame.dragId, roomId: room.id, cards: ids, anonymousIds, lastMove: 0 });
+    } else {
+      const active = this._dragPreviews.get(sessionId);
+      if (!active || active.dragId !== frame.dragId || [...ids].some(id => !active.cards.has(id) || !room.isLockedBy(id, sessionId))) return;
+      const now = Date.now();
+      if (now - active.lastMove < PREVIEW_MOVE_THROTTLE_MS) return;
+      active.lastMove = now;
+    }
+
+    // Chỉ trình diễn, không ghi tọa độ nhấc bài vào trạng thái phòng.
+    const active = this._dragPreviews.get(sessionId)!;
+    const preview: RemoteDragPreviewFrame = {
+        dragId: frame.dragId, phase: frame.phase, playerId: sessionId,
+        playerName: player.name, playerIndex: room.getPlayerIndex(sessionId),
+
+        cards: frame.cards.map(({ objectId, x, y, z, rotation }) => {
+          const anonymousId = active.anonymousIds.get(objectId);
+          if (anonymousId) return { objectId: anonymousId, x, y, z, rotation, faceUp: false, masked: true };
+          const card = room.getObject(objectId);
+          const faceUp = card?.location !== "HAND" && !card?.privateViewerId && card?.faceUp === true;
+          return { objectId, x, y, z, rotation, faceUp, masked: !faceUp };
+        }),
+    };
+    if (preview.cards.length === 0) return;
+    active.frame = preview;
+    this._broadcastToRoom(room.id, sessionId, { type: "object:drag-preview", payload: preview });
+  }
+
+  private _stopDragPreview(sessionId: string, dragId?: number): void {
+    const active = this._dragPreviews.get(sessionId);
+    if (!active || (dragId !== undefined && active.dragId !== dragId)) return;
+    this._dragPreviews.delete(sessionId);
+    const room = this._roomManager.getRoom(active.roomId);
+    if (!room) return;
+    for (const id of active.cards) room.dragUnlock(id, sessionId);
+    this._broadcastToRoom(room.id, sessionId, {
+      type: "object:drag-preview-stop", payload: { playerId: sessionId, dragId: active.dragId },
     });
   }
 
@@ -363,12 +736,17 @@ export class MessageDispatcher {
   private _handleCardTransfer(
     sessionId: string,
     session: PlayerSession,
-    payload: { cardId: string; targetPlayerIndex?: number; targetPlayerId?: string; handIndex?: number; seq?: number }
+    payload: { cardId: string; targetPlayerIndex?: number; targetPlayerId?: string; handIndex?: number; seq?: number; dragId?: number }
   ): void {
     if (!session.roomId) return;
     const room = this._roomManager.getRoom(session.roomId);
     if (!room) return;
 
+    const active = this._dragPreviews.get(sessionId);
+    if (payload.dragId !== undefined && (active?.dragId !== payload.dragId || !active.cards.has(payload.cardId) || !room.isLockedBy(payload.cardId, sessionId))) {
+      session.sendError("Drag lock not granted", "OBJECT_LOCKED", payload.cardId);
+      return;
+    }
     const targetSid = payload.targetPlayerId ??
       (payload.targetPlayerIndex !== undefined ? room.getPlayerByIndex(payload.targetPlayerIndex)?.sessionId : undefined);
     if (!targetSid) {
@@ -381,7 +759,7 @@ export class MessageDispatcher {
       session.sendError('Card not found', 'CARD_NOT_FOUND', payload.cardId);
       return;
     }
-    if (cardObj.location === 'DECK' || cardObj.location === 'DISCARD') {
+    if (cardObj.location === 'DECK' || (cardObj.location === 'DISCARD' && payload.dragId === undefined)) {
       session.sendError('Cannot transfer card from deck', 'INVALID_OPERATION', payload.cardId);
       return;
     }
@@ -407,6 +785,7 @@ export class MessageDispatcher {
     session: PlayerSession,
     payload: {
       objectId: string;
+      dragId?: number;
       x: number;
       y: number;
       z: number;
@@ -421,6 +800,18 @@ export class MessageDispatcher {
     const room = this._roomManager.getRoom(session.roomId);
     if (!room) return;
 
+    if (payload.dragId !== undefined) {
+      const active = this._dragPreviews.get(sessionId);
+      if (active?.dragId !== payload.dragId || !active.cards.has(payload.objectId) || !room.isLockedBy(payload.objectId, sessionId)) {
+        session.sendError("Drag lock not granted", "OBJECT_LOCKED", payload.objectId);
+        return;
+      }
+      if (payload.targetPlayerIndex == null && !isValidDefaultTableDrop(payload.x, payload.y, payload.z)) {
+        this._stopDragPreview(sessionId, payload.dragId);
+        session.sendError("Drop is outside the table", "DRAG_END_FAILED", payload.objectId);
+        return;
+      }
+    }
     const prevObj = room.getObject(payload.objectId);
     const prevOwner = prevObj?.ownerId ?? null;
     const prevLocation = prevObj?.location;
@@ -441,7 +832,7 @@ export class MessageDispatcher {
       session.sendError('Object is currently locked by another player', 'OBJECT_LOCKED', payload.objectId);
       return;
     }
-    if (prevObj.location === 'DECK' || prevObj.location === 'DISCARD') {
+    if (prevObj.location === 'DECK' || (prevObj.location === 'DISCARD' && payload.dragId === undefined)) {
       session.sendError('Cannot drag card in deck', 'INVALID_OPERATION', payload.objectId);
       return;
     }
@@ -451,10 +842,13 @@ export class MessageDispatcher {
       updated = room.updateObjectAfterDrag(
         payload.objectId, sessionId,
         { x: payload.x, y: payload.y, z: payload.z },
-        payload.faceUp, payload.targetPlayerIndex, payload.handIndex,
+        (prevObj.privateViewerId || (payload.dragId !== undefined && prevObj.location === "HAND"))
+          ? prevObj.faceUp : payload.faceUp,
+        payload.targetPlayerIndex, payload.handIndex,
         payload.rotation
       );
     } catch (err) {
+      if (payload.dragId !== undefined) this._stopDragPreview(sessionId, payload.dragId);
       const message = err instanceof Error ? err.message : 'Drag end failed';
       const code = message.includes('locked')
         ? 'OBJECT_LOCKED'
@@ -488,16 +882,21 @@ export class MessageDispatcher {
     // communicated by room:state / hand:card-transferred instead.
     if (updated.location === 'HAND') return;
 
-    const broadcastFaceUp = updated.faceUp ?? payload.faceUp;
+    // Với bài riêng, chỉ đồng bộ vị trí; từng máy giữ mặt bài theo quyền xem.
+    const broadcastFaceUp = updated.privateViewerId ? undefined : updated.faceUp ?? payload.faceUp;
 
-    this._broadcastToRoom(room.id, sessionId, {
-      type: 'object:drag-end',
+    const dropMessage = {
+      type: "object:drag-end" as const,
       payload: {
         ...payload,
+        x: updated.position.x, y: updated.position.y, z: updated.position.z,
         playerId: sessionId,
         faceUp: broadcastFaceUp,
       },
-    });
+    };
+
+    this._broadcastToRoom(room.id, sessionId, dropMessage);
+    if (payload.dragId !== undefined) session.sendRaw(dropMessage);
   }
 
   private _broadcastHandCardTransferred(

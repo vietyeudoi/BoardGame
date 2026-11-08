@@ -80,7 +80,7 @@ export class TableZoneObject3D extends THREE.Group {
 
     this._buildBorder();
     this._buildFill();
-    this._buildLabel(borderColor);
+    if (this._label) this._buildLabel(borderColor);
   }
 
   private _buildBorder(): void {

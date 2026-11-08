@@ -289,6 +289,13 @@ D:\BoardGame\
 
 ---
 
+
+### Thiết lập và chia bài online
+
+Phòng mới bắt đầu ở SETUP. Room giữ số lượng Mèo Nổ/Gỡ Bom, ghế tham gia và trạng thái ván. RoundDeck dùng danh mục chung, kiểm tra khả năng chia và tạo các lá vật lý khi chủ phòng chia bài. Deal/reset gửi một snapshot đầy đủ đã lọc theo người nhận. Cập nhật cấu hình và số lượng chồng gửi riêng.
+
+Trong PLAYING, snapshot chứa bài công khai và tay của người nhận. Chồng bài và tay đối thủ dùng số lượng. Bản trình diễn kéo bài từ tay dùng ID ô minh họa và mặt úp, không dùng ID vật lý của lá. Người vào giữa ván là khán giả tới khi có ghế ở ván tiếp theo.
+
 ## 8. 3D Object Architecture
 
 ### 8.1 CardObject3D Design & Implementation
@@ -1410,9 +1417,8 @@ Evaluated once, when the drop pipeline finishes:
 - Crossing above the screen-space fan hands the original card ID to `DragController`. During that phase the 2D source copy is hidden, leaving the real 3D card as the visible drag representation. Commit/rollback still follows the existing drop validation and authoritative server response.
 - A fan-local drag session prevents the 3D hover path from closing the overlay while the pointer crosses empty spaces between cards. Normal selection remains in `RaycastInteractionManager`; the fan does not own selection state.
 
+## 28. Phiên xem chồng bốc
 
-
-
-
-
-
+- Phòng giữ một phiên See hoặc Alter. Khi phiên mở, máy chủ từ chối thao tác đổi thành phần, thứ tự hoặc số lá tác động của chồng. Lá xem vẫn thuộc chồng.
+- Mỗi kết nối nhận một bản riêng của phiên, với mã lá chỉ có ý nghĩa trong phiên. Loại lá chỉ có trong bản của người mở hoặc khi lá đã ngửa công khai. Người vào muộn nhận phiên đang mở sau ảnh chụp trạng thái phòng.
+- Alter gửi thứ tự nháp để các máy cập nhật hàng 3D. Xác nhận áp hoán vị hợp lệ vào phần đầu của chồng. Hủy, mất kết nối và đặt lại ván đóng phiên.

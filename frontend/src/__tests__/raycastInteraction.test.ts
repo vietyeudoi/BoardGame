@@ -307,18 +307,14 @@ describe('RaycastInteractionManager (M1.3.1)', () => {
       expect(manager.getRegisteredCount()).toBe(1);
     });
 
-    it('excludes invisible deck mesh from raycasting', () => {
-      // Empty deck has visible = false
+    it('bộ rút rỗng vẫn nhận raycast', () => {
       const emptyDeck = new DeckObject3D({ id: 'empty_deck', cardIds: [] });
       manager.registerObject('empty_deck', emptyDeck);
       emptyDeck.updateMatrixWorld(true);
 
-      // Simulate mousemove — should not interact with invisible mesh
       fireMouseEvent(domElement, 'mousemove', { clientX: 400, clientY: 300 });
 
-      // State remains null for empty deck (invisible)
-      // (card was not registered, so nothing should be hovered)
-      expect(manager.getHoveredObject()).toBeNull();
+      expect(manager.getHoveredObject()).toBe(emptyDeck);
 
       emptyDeck.dispose();
     });

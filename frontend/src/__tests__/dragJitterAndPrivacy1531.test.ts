@@ -163,6 +163,47 @@ describe('M1.5.3.1 — Frontend Drag Anti-Jitter & Privacy', () => {
     expect(card!.isFaceUp()).toBe(true);
   });
 
+
+
+  it('dựng lại cùng ID khi lá từ tay đối thủ trở lại bàn', () => {
+    const players = [{ id: 'peer', name: 'Peer', isHost: false, isConnected: true, playerIndex: 1 }];
+    const card = {
+      id: 'transferred-card', type: 'card', location: 'TABLE', position: { x: 0, y: 0, z: 0 },
+      rotation: 0, faceUp: false, lockedBy: null,
+    } as const;
+    sceneManager.syncPrivateRoundObjects([card], players, {});
+    const first = sceneManager.getObject(card.id) as CardObject3D;
+    sceneManager.syncPrivateRoundObjects([], players, { peer: 1 });
+    expect(first.isDisposed()).toBe(true);
+    expect(sceneManager.getObject(card.id)).toBeUndefined();
+    expect(sceneManager.getHandZoneManager().getHandZoneForPlayer(1)?.getCardCount()).toBe(1);
+
+    sceneManager.syncPrivateRoundObjects([{ ...card, faceUp: true, cardType: 'skip' }], players, {});
+    const returned = sceneManager.getObject(card.id) as CardObject3D;
+    expect(returned).not.toBe(first);
+    expect(returned.visible).toBe(true);
+    expect(returned.isFaceUp()).toBe(true);
+    expect(returned.getCardType()).toBe('skip');
+    expect(sceneManager.getHandZoneManager().getHandZoneForPlayer(1)?.getCardCount()).toBe(0);
+
+    sceneManager.syncPrivateRoundObjects([], players, { peer: 1 });
+    expect(sceneManager.getHandZoneManager().getHandZoneForPlayer(1)?.getCardCount()).toBe(1);
+  });
+
+  it('giữ lá trên bàn theo máy chủ kể cả khi điểm thả trùng vùng tay', () => {
+    const hand = sceneManager.getHandZoneManager().getHandZoneForPlayer(0)!;
+    const { x, z } = hand.position;
+    expect(sceneManager.getHandZoneManager().findHandZoneAtPoint(x, z)).toBe(hand);
+
+    sceneManager.onRemoteDragEnd('public-drop', { x, y: 0, z }, false, 10, 0, true);
+
+    const card = sceneManager.getObject('public-drop') as CardObject3D;
+    expect(card.visible).toBe(true);
+    expect(card.isInHand()).toBe(false);
+    expect(card.isFaceUp()).toBe(false);
+    expect(hand.hasCard(card.cardId)).toBe(false);
+  });
+
   it('MessageHandler dispatches object:flipped and updates card faceUp state', () => {
     const store = new ClientStore();
     const handler = new MessageHandler(store, sceneManager);

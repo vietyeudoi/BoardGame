@@ -316,6 +316,11 @@ export class CardRegistry {
     }
   }
 
+
+  forgetDisposedCard(cardId: string): void {
+    if (this.isDisposed(cardId)) this._records.delete(cardId);
+  }
+
   // ─── Query Accessors ────────────────────────────────────────────────────────
 
   getRecord(cardId: string): Readonly<CardRecord> | undefined {

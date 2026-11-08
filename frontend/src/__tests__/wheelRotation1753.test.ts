@@ -145,18 +145,18 @@ describe('M1.7.5 Part 3 — Mouse-wheel free rotation', () => {
       expect(sceneManager.canRotateSelectionWithWheel()).toBe(true);
     });
 
-    it('active drag → wheel ignored (drag-vs-rotation conflict resolved)', () => {
+    it('lăn chuột xoay lá đang kéo', () => {
       const card = makeTableCard('c_wheel_drag');
       sceneManager.getInteractionManager().selectObject(card);
 
-      const dragCtrl = sceneManager.getDragController() as unknown as { _dragActive: boolean };
-      dragCtrl._dragActive = true;
+      const dragCtrl = sceneManager.getDragController();
+      dragCtrl.beginPreviewDrag(card, new MouseEvent("mousedown", { clientX: 400, clientY: 300 }), { x: 0, y: 0 });
       try {
-        expect(sceneManager.canRotateSelectionWithWheel()).toBe(false);
-        expect(sceneManager.rotateSelectionByWheel(-1)).toBe(false);
-        expect(card.getRotationY()).toBeCloseTo(0, 6);
+        expect(sceneManager.canRotateSelectionWithWheel()).toBe(true);
+        expect(sceneManager.rotateSelectionByWheel(-1)).toBe(true);
+        expect(card.getRotationY()).toBeCloseTo(Math.PI / 36, 6);
       } finally {
-        dragCtrl._dragActive = false;
+        dragCtrl.abortDrag(true);
       }
     });
 

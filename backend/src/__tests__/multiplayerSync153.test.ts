@@ -15,7 +15,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
 import { HttpServer } from '../server/HttpServer.js';
 import { WebSocketServer } from '../server/WebSocketServer.js';
-import { RoomManager } from '../room/RoomManager.js';
+import type { RoomManager } from '../room/RoomManager.js';
+import { LegacyRoomFixture } from './LegacyRoomFixture.js';
 import type { ServerToClientMessage } from '../../../shared/types/protocol.js';
 
 const TEST_PORT = 5200;
@@ -27,7 +28,7 @@ describe('M1.5.3 — Multiplayer Sync (cursor & drag)', () => {
   let roomManager: RoomManager;
 
   beforeAll(async () => {
-    roomManager = new RoomManager();
+    roomManager = new LegacyRoomFixture();
     httpServer = new HttpServer(TEST_PORT);
     wsServer = new WebSocketServer(httpServer.getServer(), roomManager);
     httpServer.start();
@@ -119,15 +120,91 @@ describe('M1.5.3 — Multiplayer Sync (cursor & drag)', () => {
     await bob.waitForMessage('room:joined');
 
     // Alice moves cursor
-    alice.send({ type: 'cursor:move', payload: { x: 3.5, z: -2.0, seq: 1 } });
+    alice.send({ type: 'cursor:move', payload: { x: 3.5, y: 0.8, z: -2.0, seq: 1 } });
 
     const cursorUpdate = await bob.waitForMessage('cursor:update');
     expect(cursorUpdate.payload.x).toBeCloseTo(3.5, 2);
+    expect(cursorUpdate.payload.y).toBeCloseTo(0.8, 2);
     expect(cursorUpdate.payload.z).toBeCloseTo(-2.0, 2);
     expect(cursorUpdate.payload.seq).toBe(1);
 
     alice.close();
     bob.close();
+  });
+
+  it('đồng bộ rê nút Rút cho người trong phòng, kể cả người vừa vào', async () => {
+    const alice = createClient();
+    const bob = createClient();
+    const late = createClient();
+    try {
+      await Promise.all([alice.ready, bob.ready, late.ready]);
+      alice.send({ type: 'room:create', payload: { roomName: 'Draw Hover' } });
+      const joined = await alice.waitForMessage('room:joined');
+      const roomId = joined.payload.roomId;
+      bob.send({ type: 'room:join', payload: { roomId, playerName: 'Bob' } });
+      await bob.waitForMessage('room:joined');
+      alice.send({ type: 'draw:hover', payload: { hovering: true } });
+      expect((await bob.waitForMessage('draw:hovered')).payload).toMatchObject({
+        playerId: joined.payload.playerId,
+        hovering: true,
+      });
+      late.send({ type: 'room:join', payload: { roomId, playerName: 'Late' } });
+      expect((await late.waitForMessage('draw:hovered')).payload.hovering).toBe(true);
+      bob.messages.splice(0);
+      alice.send({ type: 'draw:hover', payload: { hovering: false } });
+      expect((await bob.waitForMessage('draw:hovered')).payload.hovering).toBe(false);
+    } finally {
+      alice.close();
+      bob.close();
+      late.close();
+    }
+  });
+
+  it('khóa nhóm trình diễn, chỉ gửi mặt úp trong HAND và trả vị trí khi thả sai hoặc ngắt kết nối', async () => {
+    const alice = createClient();
+    const bob = createClient();
+    try {
+      await Promise.all([alice.ready, bob.ready]);
+      alice.send({ type: 'room:create', payload: { roomName: 'Preview Lock' } });
+      const joined = await alice.waitForMessage('room:joined');
+      const roomId = joined.payload.roomId;
+      bob.send({ type: 'room:join', payload: { roomId, playerName: 'Bob' } });
+      await bob.waitForMessage('room:joined');
+      alice.send({ type: 'card:draw' });
+      const publicCard = (await alice.waitForMessage('hand:card-drawn')).payload.card;
+      alice.send({ type: 'card:play-to-table', payload: { cardId: publicCard.id, position: { x: -3.6, y: 0, z: 0 } } });
+      alice.messages.splice(0);
+      alice.send({ type: 'card:draw' });
+      const hand = (await alice.waitForMessage('hand:card-drawn')).payload.card;
+      const room = roomManager.getRoom(roomId)!;
+      const original = { ...room.getObject(publicCard.id)!.position };
+      const cards = [{ objectId: publicCard.id, x: 1, y: 0.3, z: 1 },
+        { objectId: hand.id, x: 2, y: 0.3, z: 1, rotation: 0.8, faceUp: true }];
+      alice.send({ type: 'object:drag-preview', payload: { dragId: 1, phase: 'start', cards } });
+      const frame = await bob.waitForMessage('object:drag-preview');
+      expect(frame.payload.cards).toHaveLength(2);
+      expect(frame.payload.cards[1]).toMatchObject({ objectId: hand.id, rotation: 0.8, faceUp: false, masked: true });
+      expect(frame.payload.cards[1]).not.toHaveProperty('cardType');
+      expect(room.getObject(publicCard.id)?.position).toEqual(original);
+      bob.send({ type: 'object:drag-preview', payload: { dragId: 1, phase: 'start', cards } });
+      expect((await bob.waitForMessage('error')).payload.code).toBe('OBJECT_LOCKED');
+      alice.send({ type: 'object:drag-end', payload: { objectId: publicCard.id, dragId: 1, x: 30, y: 0, z: 0 } });
+      await bob.waitForMessage('object:drag-preview-stop');
+      expect((await alice.waitForMessage('error')).payload.code).toBe('DRAG_END_FAILED');
+      expect(room.getObject(publicCard.id)?.position).toEqual(original);
+      expect(room.getObject(hand.id)?.lockedBy).toBeNull();
+
+      alice.messages.splice(0);
+      bob.send({ type: 'object:drag-preview', payload: { dragId: 2, phase: 'start', cards } });
+      await alice.waitForMessage('object:drag-preview');
+      bob.close();
+      await alice.waitForMessage('object:drag-preview-stop');
+      expect(room.getObject(publicCard.id)?.lockedBy).toBeNull();
+      expect(room.getObject(publicCard.id)?.position).toEqual(original);
+    } finally {
+      alice.close();
+      bob.close();
+    }
   });
 
   // ─── 2. cursor:move from client NOT in a room — safely ignored ───────────

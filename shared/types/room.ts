@@ -2,6 +2,7 @@
  * room.ts — Room and Player Types
  * Shared between frontend and backend.
  */
+import type { CardPackId, CardType } from './gameObjects.js';
 import type { Vector3Like } from './protocol.js';
 
 export interface PlayerInfo {
@@ -10,7 +11,11 @@ export interface PlayerInfo {
   isHost: boolean;
   isConnected: boolean;
   playerIndex?: number;
+  spectator?: boolean;
 }
+
+export type DeckDrawEnd = 'TOP' | 'BOTTOM';
+export const DEFAULT_DECK_DRAW_END: DeckDrawEnd = 'TOP';
 
 export type ObjectLocation = 'TABLE' | 'DECK' | 'HAND' | 'DISCARD';
 
@@ -26,6 +31,48 @@ export interface SandboxObject {
   ownerId?: string | null;
   location?: ObjectLocation;
   handIndex?: number;
+  takenFromDeck?: boolean;
+  /** Chỉ phiên này được xem mặt bài đã lấy từ chồng. */
+  privateViewerId?: string;
+}
+
+
+
+export const ANONYMOUS_HAND_PREFIX = 'anonymous-hand:';
+
+// ID của ô minh họa, không liên hệ với ID lá thật trong phòng.
+export function getAnonymousHandSlotId(playerId: string, slot: number): string {
+  return ANONYMOUS_HAND_PREFIX + playerId + ':' + slot;
+}
+
+export interface DeckSetup {
+  enabledPacks?: CardPackId[];
+  cardCounts?: Partial<Record<CardType, number>>;
+  explodingKittens: number;
+  defuses: number;
+}
+
+export interface RoundSetup extends DeckSetup {
+  phase: 'SETUP' | 'PLAYING';
+  seatedCount: number;
+  ordinaryMultiplier: number;
+  totalCards: number;
+  remainingCards: number;
+  remainingDefuses: number;
+  packTotals?: Partial<Record<CardPackId, number>>;
+  bombCount?: number;
+  remainingBombs?: number;
+  streakingWarning?: boolean;
+  validationError?: string;
+}
+
+
+export const DEFAULT_DECK_AFFECTED_COUNT = 3;
+
+export interface PublicDeckState {
+  count: number;
+  affectedCount: number;
+  topCardType?: string;
 }
 
 export interface RoomState {
@@ -34,6 +81,11 @@ export interface RoomState {
   players: PlayerInfo[];
   objects: SandboxObject[];
   maxPlayers: number;
+  deckDrawEnd?: DeckDrawEnd;
+  round?: RoundSetup;
+  deckCount?: number;
+  deck?: PublicDeckState;
+  handCounts?: Record<string, number>;
 }
 
 export interface ObjectPosition {

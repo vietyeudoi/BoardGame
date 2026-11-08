@@ -2519,3 +2519,103 @@ vitest@^2.1.4           — testing
 | 2026-11-01 | M1.3.4 | Automatic stacking radius (1.0) caused newly drawn cards spawned near deck to automatically merge into demo card. | Tuned `STACK_DETECT_RADIUS` to 0.15 so intentional center-to-center drops or explicit HUD actions trigger stacking without false positives. |
 | 2026-11-01 | M1.3.4 | Microscopic Y offsets in LayeringManager altered physical tabletop card heights from authoritative `SURFACE_Y = 0.0`. | Separated visual rendering order from physical height: LayeringManager uses `renderOrder`, keeping table cards flush at $Y = 0.0$. |
 
+## 2026-11-07 — Sửa tương tác fan preview của HAND
+
+- **Kéo/sắp xếp/đánh bài:** CSS transition và stagger làm lá kéo chậm con trỏ; việc đổi `left` và slot của lá kéo gây nhảy. Chụp transform lúc nhấn, tắt transition riêng lá kéo, cập nhật theo requestAnimationFrame, dùng translate3d cho slot, giữ DOM khi reorder. Khi chuyển fan sang 3D, chuyển điểm cầm sang mặt phẳng kéo thay vì dùng tọa độ của HAND gốc. Tái sử dụng CardTransferAnimator để hạ/trả bài sau khi nhả layout; giao thức mạng giữ nguyên.
+- **Chuột xuyên xuống HAND:** root fan trước đây để pointer-events:none. Root mở nay chặn toàn vùng, HAND gốc bị loại khỏi raycast khi fan mở. Theo dõi vùng HAND + fan và vị trí chuột ở window, có thời gian chờ rời vùng ngắn; overlay đang đóng không chặn chuột.
+- **Không mở lại sau khi nhận bài:** DragController chỉ gọi onDragFinished khi từng chiếm layout của bài HAND, bỏ sót drag từ TABLE. Nay mọi drag thực sự đều kết thúc qua callback; không hủy khi chuyển canvas sang overlay. Xử lý Esc/pointercancel/blur và kiểm tra lại hover khi animation nhận bài hoàn tất, kể cả con trỏ đứng yên.
+- **Kiểm tra:** npm test (frontend 887 test, backend 41 test), npm run typecheck và npm run build. Có cảnh báo chunk Vite lớn hơn 500 kB; jsdom vẫn in cảnh báo getContext vốn đã xuất hiện ở baseline. Script test_cdp_drag.mjs kiểm tra chuỗi mouse events; test_fan_regression.mjs kiểm tra bằng Chrome thật luồng hover, chặn HAND, offset drag, reorder, đánh bài và kéo về HAND. Chạy với tham số 1/2/6 tương ứng nhận lại vào HAND rỗng/một/năm lá.
+- **Phạm vi:** Chỉ sửa frontend và kiểm thử; không thêm thư viện, không đổi backend/shared hay tên field giao thức. Animation do server xác nhận tiếp tục dùng cơ chế pending transfer hiện có.
+
+## 2026-11-07 — Bàn thập giác mặc định 10 ghế
+
+- Dùng SHARED_CONFIG.MAX_PLAYERS_PER_ROOM cho sức chứa mặc định ở server và bố cục mặc định ở client. Bỏ bộ chọn sức chứa trong sảnh và chế độ offline. Validator bỏ qua maxPlayers do client cũ gửi, còn snapshot phòng cũ vẫn được đọc theo cấu hình 2–8 ghế.
+- Bàn Three.js giữ tọa độ chung và đổi phương vị camera theo ghế local. Camera bàn nhìn xuống 55°, FOV dọc 52°, khoảng cách tính theo bán kính bàn và tỷ lệ khung hình với hệ số lề 1,12. Phối màu ghế, nhãn phẳng và vùng đặt bài nằm trong scene. Bài đối thủ xòe nhẹ và dùng raycast theo hình học lá bài, hàng bài local giữ đường tương tác fan preview hiện có.
+- Kiểm tra bố cục và tay bài trên Chrome với node verify_ten_seats.mjs sau npm run dev. Script kết nối WebSocket thật cho các mức 1, 2, 5 và 10 người, chụp khung ngang và khung dọc. Backend là sandbox, phòng lưu trong bộ nhớ và người chơi chủ động rút bài.
+
+## 2026-11-07 — Khung bàn rộng và fan theo ảnh tham chiếu
+
+- Hạ góc camera xuống 29°, FOV 54°, lề 1,055 để thấy phối cảnh rõ và bàn phủ nhiều chiều ngang hơn. Mở rộng vùng tay bài trên bàn 10 ghế. Dùng bảng màu và biểu tượng của dự án cho cả bài 3D và fan, mặt lưng đổi sang đỏ rượu.
+- Fan xếp thành hàng cong nhẹ sát đáy và co theo chiều cao màn hình. Khi bàn 3D nhận lá đang kéo, fan ẩn ngay và nhường tương tác cho cảnh 3D. Kéo sắp xếp trong fan và mở lại khi trả lá về tay vẫn dùng luồng hiện có.
+
+## 2026-11-07 — Cận cảnh bàn và con trỏ ở chồng rút
+
+- Camera gần hơn tối đa 6%, vẫn giữ giới hạn theo chiều ngang trên màn hình hẹp. Tăng cỡ tiêu đề trên mặt bài 3D và giảm kích thước fan khoảng 6%.
+- Rê qua chồng rút gửi điểm chạm trên lưới 3D. Rê qua nút Rút bài gửi tâm mặt trên của chồng rút. Server chuyển tiếp tọa độ chung và độ cao tùy chọn để người xem thấy con trỏ phía trên chồng bài từ góc ghế riêng.
+- Kiểm tra bằng hai cửa sổ Chrome với năm hướng camera khác nhau, cả trên chồng rút và trên nút Rút bài.
+
+## 2026-11-07 — Thu nhỏ fan và đồng bộ rê nút Rút
+
+- Thu fan 12% và đưa camera ngang tiến thêm 12%, giữ giới hạn chiều ngang cho khung hẹp. Fan chỉ giữ mở khi chuột nằm trên lá bài; kéo và đổi thứ tự vẫn giữ thao tác đang diễn ra.
+- Con trỏ trên bàn dùng giao điểm mặt bàn. Nút Rút gửi sự kiện rê riêng theo phòng, hiện tên cạnh nút trên các máy khác, kể cả người vừa vào phòng. See và Xáo hiện ở trạng thái chưa có chức năng.
+
+## 2026-11-07 — Tay bài sát mép, kéo nhóm và nút mặt bàn
+
+- Dịch vùng HAND của bàn 10 ghế về phía mép và giảm độ nâng. Bài vẫn nằm phẳng, dùng cùng cấu hình khoảng cách/chồng bài và giữ raycast, fan preview. Khung ngang dịch lên một ít để dành chỗ cho tay bài gần camera.
+- Gắn ba tấm nút Three.js vào tọa độ chung cạnh chồng rút. Chữ xoay theo góc ghế, raycast chỉ kích hoạt Rút, See và Xáo vẫn vô hiệu hóa. Nút Rút dùng chung nghiệp vụ với phím H và giữ đồng bộ trạng thái rê.
+- Thêm object:drag-preview (start/move theo nhóm) và object:drag-preview-stop. Server khóa cả nhóm trước khi phát, lọc mặt bài HAND, giữ vị trí chính thức cho tới khi thả và nhả khóa khi ngắt kết nối. Máy xem nội suy bản trình diễn, thêm viền theo màu ghế, bóng và tên người kéo. Gói object:drag-end và card:transfer cũ giữ tương thích, client mới có thể gửi dragId để ràng buộc thao tác thả vào phiên đã khóa.
+- Chạy verify_table_surface.mjs sau npm run dev để kiểm tra click 3D, kéo nhóm, tranh khóa và đóng tab qua Chrome. Kiểm thử WebSocket bao phủ riêng thả sai biên, khóa nhóm và mặt úp HAND.
+
+## 2026-11-07 — Một lá tượng trưng và tay bài dài
+
+- Bộ rút dùng một mesh có chiều cao một lá, badge số lá và ô mờ nhận raycast khi hết. Online đọc số lá từ snapshot/delta của server, offline vẫn dùng thứ tự ID trong bộ cục bộ. Rút từ mesh online đi qua WebSocket.
+- Bỏ lá mẫu trên mặt bàn online và dọn dữ liệu khi đổi chế độ. Bộ 20 lá của Room giữ thứ tự cũ. ID mẫu và bộ 30 lá cục bộ chỉ phục vụ offline/test. Tính năng chèn vào bộ offline vẫn hoạt động; online tránh tự sửa bộ bài cục bộ vì server chưa có thao tác chèn.
+- HAND giữ khoảng cách co theo chiều rộng ghế và giới hạn độ cao của hàng bài. Fan dùng các trang nhỏ với nút hoặc cuộn chuột, giữ đúng ID và chỉ dựng DOM của trang đang xem. Không có giới hạn số lá cầm tay; mốc 30 của trình diễn kéo nhóm vẫn là giới hạn gói tin.
+
+## 2026-11-08 — Hướng kéo từ HAND và lật ngay trên fan
+
+- DragController đưa lá và nhóm về góc ghế trong hệ tọa độ bàn bằng slerp 150 ms. R, Shift+R và cuộn chuột chỉnh góc đang kéo. Khi thả, SceneManager giữ góc nhìn thấy và trạng thái mặt bài.
+- object:drag-preview nhận thêm rotation và faceUp tùy chọn. Server lấy trạng thái mặt công khai từ Room và gửi mặt úp cho bản trình diễn HAND. Client cũ vẫn dùng được khung không có hai trường mới.
+- F, nút và menu lật dùng cùng trạng thái CardObject3D. Fan thay mặt lá tại node hiện có, lật quanh trục dọc mà không đổi slot. Server xác nhận hoặc trả lỗi để đồng bộ lại trạng thái.
+
+
+## 2026-11-08 — Đỉnh/Đáy chung và lấy bài trước ghế
+
+- Room giữ Đỉnh/Đáy và gửi qua room:state. Tùy chọn lấy theo số lá nằm phía trên, chỉ gửi kèm lần lấy của người chọn.
+- Nhấn chồng dùng deck:take và deck:card-taken. Máy chủ chuyển lá sang vùng trước ghế, lọc mặt bài theo người xem. Máy khách cập nhật badge và dùng lại hoạt ảnh chuyển bài. Rút và H vẫn đưa lá trên cùng vào tay.
+- Trộn thứ tự bộ bài lúc tạo phòng để ID công khai không suy ra mặt bài. Mã kết nối lại chỉ cấp cho đúng phiên và được đổi sau mỗi lần khôi phục. Phòng mất kết nối hết người được giữ trong 30 giây.
+
+
+## 2026-11-08 — Thiết lập bộ 56 lá và chia bài
+
+- Bộ bài gốc có 13 loại. Phòng mới vào SETUP với bàn 10 ghế và bảng thành phần bộ bài. Chủ phòng chỉnh số Mèo Nổ/Gỡ Bom, máy chủ gửi dự báo cho các máy khách.
+- Chia bài một lần mỗi ván, mỗi ghế có người kết nối nhận 1 Gỡ Bom và 5 lá khác. Khi đủ 10 người, nhân đôi 11 loại còn lại, giữ nguyên hai số đã chỉnh. Máy chủ xáo Fisher–Yates trước khi chia và xáo lại phần còn lại.
+- Snapshot mới chỉ có lá công khai, bài tay của chính người nhận và số lượng chồng/tay. Các máy dùng bài úp minh họa cho tay đối thủ. Người vào giữa ván xem bàn ở vai trò khán giả và được xếp ghế trống khi làm lại ván.
+- Test giao thức cũ dùng fixture riêng. Phòng online do máy chủ tạo thông thường luôn bắt đầu từ SETUP.
+
+
+## 2026-11-08 — Tùy chọn nhân đôi và lật bài trên bàn
+
+- Tùy chọn tạo phòng nhân đôi 11 loại ngoài Mèo Nổ/Gỡ Bom, mặc định tắt và không phụ thuộc số ghế.
+- Lá lấy bằng cách nhấn chồng xuất hiện úp trên bàn. Người trong phòng có thể lật, kể cả khán giả. Tay bài và chồng bốc vẫn dùng quyền xem hiện có.
+
+
+## 2026-11-08 — Đồng bộ lá lấy từ chồng sau khi chuyển tay
+
+- Người nhận nhận đủ dữ liệu lá, kể cả lúc lá đang úp. Khi chuyển tay, xóa bản trình diễn kéo và hiện lại lá thật; các máy còn lại dùng bài úp minh họa theo số lượng.
+- Máy xem bỏ bản ghi mô hình đã hủy khi lá đi vào tay riêng, để cùng ID dựng lại được lúc ra bàn. Vị trí máy chủ xác nhận được ưu tiên kể cả khi tọa độ trùng vùng tay.
+
+
+## 2026-11-08 — Chữ chức năng trên mặt ngửa
+
+- Tên và mô tả của 13 loại bài lấy từ danh mục chung. Bố cục đo và chia dòng một lần theo loại, dùng cho texture 3D và fan DOM.
+- Các lá cùng loại dùng chung texture mặt ngửa, hủy texture khi lá cuối cùng nhả tham chiếu. Mặt úp của fan chỉ dùng thiết kế lưng và ẩn loại bài khỏi thuộc tính DOM.
+
+
+## 2026-11-08 — Chèn, mặt trên và xáo chồng bốc online
+
+- Máy chủ chèn cả nhóm theo Đỉnh/Đáy hoặc vị trí riêng từ đỉnh. Chèn và xáo giữ trạng thái mặt của từng lá. Snapshot gửi số lá, số lá tác động và loại lá trên cùng khi ngửa.
+- HUD cho nhập vị trí chèn và số lá tác động. Nút Xáo phát hiệu ứng trên lá tượng trưng và hiện người thao tác. Mặt ngửa dùng texture chữ chức năng có sẵn.
+
+## 2026-11-08 — See và Alter trên chồng bốc
+
+- See và Alter dùng cùng phiên khóa chồng, lấy phần đầu theo số lá tác động. Mỗi máy nhận thứ tự bằng mã tạm của phiên. Chỉ người mở nhận loại lá úp, còn loại lá đã ngửa công khai gửi cho cả phòng.
+- Hàng bài 3D dùng hiệu ứng chuyển lá hiện có. Alter gửi thứ tự sau khi thả hoặc đổi chỗ. Chỉ xác nhận hợp lệ mới đổi thứ tự thật, còn hủy và mất kết nối nhả khóa và giữ nguyên chồng.
+
+- HUD của người mở Alter có hàng thẻ riêng để kéo trực tiếp. Hàng này dùng cùng yêu cầu đổi thứ tự với bàn 3D, hiện đích thả và tự đóng khi phiên kết thúc.
+
+## 2026-11-08 — Thiết lập bộ mở rộng
+
+- Danh mục chung chứa Bộ gốc, Imploding Kittens, Streaking Kittens và Barking Kittens. Máy chủ lưu bộ đang bật và số lá đã chỉnh, kể cả của bộ đang tắt.
+- Mỗi người nhận 1 Gỡ Bom và 5 lá không phải bom hoặc Gỡ Bom. Máy chủ xáo phần còn lại thành chồng. Cảnh báo Streaking chỉ để tham khảo.
+- Các lá mở rộng dùng mặt chữ kèm màu và nhãn của bộ. Tower of Power có dữ liệu lá bài, chưa có kho dự trữ.

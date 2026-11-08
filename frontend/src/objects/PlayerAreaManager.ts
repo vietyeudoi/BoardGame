@@ -3,8 +3,11 @@
  * Handles layout setup, selection, hover state, and spatial queries.
  */
 import * as THREE from 'three';
+import { SHARED_CONFIG } from '../../../shared/constants/config';
+
+import type { PlayerInfo } from '../../../shared/types/room';
 import { PlayerAreaObject3D } from './PlayerAreaObject3D';
-import { LAYOUT_CONFIGS, getLayoutForShape } from './PlayerAreaConfig';
+import { LAYOUT_CONFIGS, SEAT_COLORS, getLayoutForShape } from './PlayerAreaConfig';
 import { PLAYER_AREA_VISUAL_CONFIG } from './PlayerAreaConfig';
 import { PlayerCount } from './TableShapeConfig';
 import { Logger } from '../utils/Logger';
@@ -49,7 +52,11 @@ export class PlayerAreaManager {
         z: pos.z,
         rotationY: pos.rotationY,
         label,
-        areaWidth: PLAYER_AREA_VISUAL_CONFIG.AREA_WIDTH,
+        seatColor: SEAT_COLORS[i],
+        occupied: i === 0 || playerLabels?.[i] !== undefined,
+        areaWidth: playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM
+          ? PLAYER_AREA_VISUAL_CONFIG.SEAT_FRAME_WIDTH
+          : PLAYER_AREA_VISUAL_CONFIG.AREA_WIDTH,
         areaDepth: PLAYER_AREA_VISUAL_CONFIG.AREA_DEPTH,
       });
       area.visible = this._visible;
@@ -59,6 +66,16 @@ export class PlayerAreaManager {
 
     this._requestRender();
     logger.info(`Player layout set up for ${playerCount} players`);
+  }
+
+  updateOccupants(players: PlayerInfo[]): void {
+    const occupants = new Map(players.map((player, index) => [player.playerIndex ?? index, player]));
+    let changed = false;
+    this.getAllAreas().forEach((area, index) => {
+      const player = occupants.get(index);
+      if (area.setOccupant(player?.name ?? "", player !== undefined)) changed = true;
+    });
+    if (changed) this._requestRender();
   }
 
   clearLayout(): void {

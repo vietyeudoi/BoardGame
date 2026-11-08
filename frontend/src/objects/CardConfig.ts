@@ -28,7 +28,7 @@ export const CARD_CONFIG = {
 
   // Default color schemes
   DEFAULT_BG_FRONT: '#ffffff',
-  DEFAULT_BG_BACK: '#181b2e',
+  DEFAULT_BG_BACK: '#751f2c',
   DEFAULT_TEXT_COLOR: '#1a1a24',
   DEFAULT_ACCENT_COLOR: '#2563eb',
 } as const;

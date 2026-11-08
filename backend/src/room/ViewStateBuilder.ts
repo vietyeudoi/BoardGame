@@ -9,11 +9,9 @@ import type { Room } from './Room.js';
 export class ViewStateBuilder {
   /**
    * Filters a single SandboxObject for a specific viewing client session.
-   * Per M1.7.4.2: faceUp is the single source of truth for visibility everywhere.
-   * If a card has faceUp === false, or is in the deck, its cardType is stripped.
-   * If faceUp === true (in hand or on table), cardType and faceUp: true are visible to everyone.
+   * Trong ván online, người sở hữu tay bài nhận đủ dữ liệu để lật và hiển thị lá của mình.
    */
-  static filterObjectForClient(obj: SandboxObject, _viewingSessionId?: string): SandboxObject {
+  static filterObjectForClient(obj: SandboxObject, viewingSessionId?: string, privateHands = false): SandboxObject {
     if (obj.type !== 'card') {
       return { ...obj };
     }
@@ -34,8 +32,12 @@ export class ViewStateBuilder {
       return filtered;
     }
 
-    // Card in hand or on table with faceUp = false: hide front
-    if (!obj.faceUp) {
+
+    const restricted = obj.privateViewerId && obj.privateViewerId !== viewingSessionId;
+    if (privateHands && obj.location === 'HAND' && obj.ownerId === viewingSessionId && !restricted) {
+      return { ...obj };
+    }
+    if (!obj.faceUp || restricted || (privateHands && obj.location === 'HAND')) {
       const filtered: SandboxObject = {
         ...obj,
         faceUp: false,
@@ -53,15 +55,31 @@ export class ViewStateBuilder {
    */
   static buildRoomState(room: Room, viewingSessionId: string): RoomState {
     const publicState = room.getRawState();
-    const filteredObjects = publicState.objects.map((obj) =>
-      this.filterObjectForClient(obj, viewingSessionId)
-    );
+
+    if (publicState.round) {
+      const handCounts: Record<string, number> = {};
+      let deckCount = 0;
+      const objects = publicState.objects.flatMap(obj => {
+        if (obj.location === 'DECK') {
+          deckCount++;
+          return [];
+        }
+        if (obj.location === 'HAND' && obj.ownerId) {
+          handCounts[obj.ownerId] = (handCounts[obj.ownerId] ?? 0) + 1;
+          if (obj.ownerId !== viewingSessionId) return [];
+        }
+        return [this.filterObjectForClient(obj, viewingSessionId, true)];
+      });
+      return { ...publicState, objects, handCounts, deckCount, deck: room.getPublicDeckState() };
+    }
+    const filteredObjects = publicState.objects.map(obj => this.filterObjectForClient(obj, viewingSessionId));
 
     return {
       id: publicState.id,
       name: publicState.name,
       players: publicState.players,
       objects: filteredObjects,
+      deckDrawEnd: publicState.deckDrawEnd,
       maxPlayers: publicState.maxPlayers,
     };
   }

@@ -6,10 +6,12 @@
  * viewport. It never touches the 3D card transforms, the CardRegistry or the
  * game state, and it is never broadcast to other clients.
  *
- * The overlay is pointer-events:none so hover/drag keeps working on the 3D hand
- * underneath it; each rendered fan card opts back into pointer events
- * (M1.7.9 Part B) so hover / click / drag can be delegated to the real card.
+ * Khi mở, overlay nhận chuột trên toàn vùng fan để HAND 3D không nhận nhầm.
+ * Các callback vẫn ánh xạ về đúng id bài thật để chọn và kéo thả.
  */
+import { getCardFaceRules, RULE_FONT, RULE_PANEL } from '../../objects/CardFaceRules';
+import { CARD_CONFIG } from '../../objects/CardConfig';
+import { getExpansionCardArt } from '../../utils/CardArt';
 import {
   FAN_CARD_ART,
   FAN_CARD_BACK,
@@ -57,7 +59,7 @@ export interface FullHandFanPreviewHandlers {
   /** A fan card was clicked / selected — delegate selection to the real card. */
   onCardSelect: (sourceCardId: string, addToSelection: boolean) => void;
   /** A fan card primary-press began — run the real card drag pipeline. */
-  onCardDragStart: (sourceCardId: string, event: MouseEvent) => void;
+  onCardDragStart: (sourceCardId: string, event: MouseEvent, previewOffset?: { x: number; y: number }) => void;
   /** Commit a local hand reorder after a fan-only drag. */
   onCardReorder?: (sourceCardId: string, targetIndex: number) => void;
   onFanDragStateChanged?: (sourceCardId: string | null) => void;
@@ -177,17 +179,16 @@ function buildStylesheet(): string {
   opacity: 0; transition: opacity ${openMs}ms ease;
   contain: layout style;
 }
-.${ROOT_CLASS}.${OPEN_CLASS} { opacity: 1; }
+.${ROOT_CLASS}.${OPEN_CLASS} { opacity: 1; pointer-events: auto; }
 .fhfp-glow {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse 62% 95% at 50% 100%, rgba(6,10,24,.82) 0%, rgba(6,10,24,.46) 45%, rgba(6,10,24,0) 78%);
+  background: radial-gradient(ellipse 62% 95% at 50% 100%, rgba(6,10,24,.38) 0%, rgba(6,10,24,.18) 45%, rgba(6,10,24,0) 78%);
 }
 .fhfp-stage { position: absolute; inset: 0; }
 .fhfp-card {
   position: absolute;
   bottom: ${FAN_PREVIEW_LAYOUT.CARD_BOTTOM_OFFSET_PX}px;
-  /* M1.7.9 Part B: fan cards accept pointer events; the root stays transparent
-     so empty overlay areas never block the 3D canvas underneath. */
+  /* Lá bài nhận thao tác; root chặn chuột xuyên qua khoảng trống xuống canvas. */
   pointer-events: auto;
   user-select: none; -webkit-user-select: none; touch-action: none;
   display: flex; flex-direction: column;
@@ -197,7 +198,7 @@ function buildStylesheet(): string {
   box-shadow: 0 16px 32px rgba(0,0,0,.58), 0 1px 0 rgba(255,255,255,.35) inset;
   transform-origin: 50% 100%;
   /* M1.7.10: --dy-hover / --scale drive the hover / selection / drag lifts. */
-  transform: translateX(-50%) translate(var(--drag-x, 0px), calc(var(--dy, 0px) + var(--dy-hover, 0px) + var(--drag-y, 0px))) rotate(var(--rot, 0deg)) scale(var(--scale, 1));
+  transform: translateX(-50%) translate3d(calc(var(--slot-x, 0px) + var(--drag-x, 0px)), calc(var(--dy, 0px) + var(--dy-hover, 0px) + var(--drag-y, 0px)), 0) rotate(var(--rot, 0deg)) scale(var(--scale, 1));
   transition: transform ${closeMs}ms cubic-bezier(.2,.85,.25,1) var(--delay, 0ms),
               opacity ${openMs}ms ease var(--delay, 0ms);
   will-change: transform;
@@ -207,10 +208,12 @@ function buildStylesheet(): string {
   box-shadow: 0 26px 52px rgba(0,0,0,.7), 0 0 0 3px rgba(96,165,250,.9), 0 1px 0 rgba(255,255,255,.35) inset;
 }
 .fhfp-card--dragging {
+  transition: none;
   box-shadow: 0 30px 60px rgba(0,0,0,.76), 0 0 0 3px rgba(96,165,250,.95), 0 1px 0 rgba(255,255,255,.45) inset;
 }
 .fhfp-card--handed-off { opacity: 0; pointer-events: none; }
 .${ROOT_CLASS}:not(.${OPEN_CLASS}) .fhfp-card {
+  pointer-events: none;
   opacity: 0;
   transform: translateX(-50%) translateY(var(--dy-enter, 54px)) rotate(var(--rot-enter, 0deg)) scale(.9);
 }
@@ -222,6 +225,9 @@ function buildStylesheet(): string {
   letter-spacing: .07em; text-transform: uppercase;
   padding: 5px 7px 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fhfp-banner--expansion {
+  color: #fff; white-space: normal; letter-spacing: normal; overflow-wrap: anywhere;
 }
 .fhfp-art {
   position: relative;
@@ -240,6 +246,19 @@ function buildStylesheet(): string {
   line-height: 1;
   filter: drop-shadow(0 8px 12px rgba(0,0,0,.45));
 }
+
+.fhfp-pack-label {
+  z-index: 1; padding: 3px 6px; color: #334155; text-align: center;
+  font: 600 calc(var(--rule-unit) * 27) / 1.15 Arial, sans-serif;
+}
+.fhfp-upper { display: flex; flex-direction: column; height: 50%; }
+.fhfp-rules {
+  position: absolute; box-sizing: border-box;
+  border-radius: 4px; background: rgba(15, 23, 42, .92); color: #f1f5f9;
+  display: flex; flex-direction: column; overflow: hidden; pointer-events: none;
+}
+.fhfp-rules-name { font-weight: 700; color: #fff; white-space: nowrap; line-height: 1.15; }
+.fhfp-rules-description { white-space: pre; line-height: 1.21; }
 .fhfp-title {
   flex: 0 0 auto;
   background: #f8fafc; color: #0f172a;
@@ -286,10 +305,18 @@ export class FullHandFanPreviewUI {
   private _slotZ: number[] = [];
   private _layout: FanLayoutResult | null = null;
   private _visualOrderIds: string[] = [];
-  private _fanDrag: { cardId: string; startX: number; startY: number; currentX: number; currentY: number; startIndex: number; targetIndex: number; handedOff: boolean } | null = null;
+  private _fanDrag: { cardId: string; startX: number; startY: number; currentX: number; currentY: number; startIndex: number; targetIndex: number; handedOff: boolean; baseTransform: string; offsetX: number; offsetY: number } | null = null;
+  private _dragFrame: number | null = null;
   private _ignoreNextClickId: string | null = null;
+  private _handCards: FanCardData[] = [];
+  private _page = 0;
+  private _pageOffset = 0;
+  private _pager: HTMLDivElement | null = null;
+  private _pageLabel: HTMLSpanElement | null = null;
+  private _pagePrev: HTMLButtonElement | null = null;
+  private _pageNext: HTMLButtonElement | null = null;
   private _handleResize = (): void => {
-    if (this._open) this._relayout();
+    if (this._open) this._showPage();
   };
 
   constructor(container: HTMLElement) {
@@ -327,8 +354,24 @@ export class FullHandFanPreviewUI {
       return;
     }
 
+    this._handCards = cards;
+    this._showPage();
+  }
+
+  private _showPage(): void {
+    const viewport = this._root?.clientWidth || window.innerWidth;
+    const capacity = Math.max(4, Math.min(FAN_PREVIEW_LAYOUT.PAGE_MAX_CARDS,
+      Math.floor((viewport - FAN_PREVIEW_LAYOUT.PAGE_RESERVED_WIDTH_PX) / FAN_PREVIEW_LAYOUT.PAGE_VISIBLE_STRIP_PX)));
+    const pageCount = Math.ceil(this._handCards.length / capacity);
+    this._page = Math.max(0, Math.min(this._page, pageCount - 1));
+    this._pageOffset = this._page * capacity;
+    const cards = this._handCards.slice(this._pageOffset, this._pageOffset + capacity);
+    const previousCards = this._cards;
+    const previousElements = new Map(previousCards.map((card, index) => [card.id, this._cardEls[index]]));
+    const previousById = new Map(previousCards.map(card => [card.id, card]));
+    const canReuse = cards.length === previousCards.length && cards.every(card => previousById.has(card.id));
     this._cards = cards.map((card) => ({ ...card }));
-    this._visualOrderIds = this._cards.map((card) => card.id);
+    if (!this._fanDrag) this._visualOrderIds = this._cards.map((card) => card.id);
     this._ensureRoot();
     if (!this._root || !this._stage) return;
 
@@ -336,7 +379,21 @@ export class FullHandFanPreviewUI {
       .map((c) => `${c.id}:${c.cardType ?? ''}:${c.masked ? 1 : 0}:${c.title}`)
       .join('|');
     if (signature !== this._signature) {
-      this._buildCards();
+      if (canReuse) {
+        // Giữ DOM khi đổi thứ tự để transition đi từ slot cũ sang slot mới.
+        this._cardEls = this._cards.map((card) => previousElements.get(card.id)!);
+        if (cards.some((card, index) => card.id !== previousCards[index]?.id)) this._stage.append(...this._cardEls);
+        this._cardEls.forEach((el, index) => {
+          el.dataset.fanIndex = String(index);
+          const card = this._cards[index]!;
+          const old = previousById.get(card.id)!;
+          if (old.masked === card.masked && old.title === card.title && old.cardType === card.cardType) return;
+          this._paintCardFace(el, card);
+          if (old.masked !== card.masked) {
+            el.firstElementChild?.animate?.([{ transform: "rotateY(-82deg)" }, { transform: "rotateY(0)" }], { duration: 150, easing: "ease-out" });
+          }
+        });
+      } else this._buildCards();
       this._signature = signature;
     }
 
@@ -344,11 +401,16 @@ export class FullHandFanPreviewUI {
     this._open = true;
 
     this._root.style.display = 'block';
+    this._root.style.pointerEvents = 'auto';
     this._root.setAttribute('aria-hidden', 'false');
     this._root.dataset.fanOpen = 'true';
-    // Force a reflow so a freshly displayed root animates from the closed state.
-    void this._root.offsetWidth;
+    // Chỉ đo khi mở lần đầu; cập nhật HAND không ép layout lại liên tục.
+    if (!this._root.classList.contains(OPEN_CLASS)) void this._root.offsetWidth;
     this._root.classList.add(OPEN_CLASS);
+    this._pager!.hidden = pageCount <= 1;
+    this._pageLabel!.textContent = `${this._page + 1}/${pageCount} · ${this._handCards.length} lá`;
+    this._pagePrev!.disabled = this._page === 0;
+    this._pageNext!.disabled = this._page === pageCount - 1;
     this._relayout();
   }
 
@@ -362,6 +424,13 @@ export class FullHandFanPreviewUI {
     this.show(cards);
   }
 
+  /** Ẩn fan sau khi bàn 3D đã nhận lá bài và sở hữu thao tác kéo. */
+  closeAfterHandoff(): void {
+    if (!this._fanDrag?.handedOff) return;
+    this._fanDrag = null;
+    this.hide(true);
+  }
+
   /** Closes the fan. Logical state flips immediately; pixels fade out. */
   hide(immediate = false): void {
     if (this._disposed) return;
@@ -371,6 +440,7 @@ export class FullHandFanPreviewUI {
     }
     this._open = false;
     this._cancelCloseTimer();
+    this._cancelDragFrame();
     this._fanPointerDown = null;
     this._fanDrag = null;
     this._draggingSourceId = null;
@@ -381,6 +451,7 @@ export class FullHandFanPreviewUI {
     this._root.classList.remove(OPEN_CLASS);
     this._root.setAttribute('aria-hidden', 'true');
     this._root.dataset.fanOpen = 'false';
+    this._root.style.pointerEvents = 'none';
 
     if (immediate) {
       this._resetDom();
@@ -418,14 +489,9 @@ export class FullHandFanPreviewUI {
    */
   containsPoint(clientX: number, clientY: number): boolean {
     if (!this._open || !this._root) return false;
-    const rect = this._root.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return false;
-    return (
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom
-    );
+    // Hit-test theo lá bài đã xoay, cả khoảng trống trong overlay cũng tính là ngoài fan.
+    const card = document.elementFromPoint?.(clientX, clientY)?.closest(".fhfp-card, .fhfp-pager");
+    return !!card && this._root.contains(card);
   }
 
   /**
@@ -459,6 +525,7 @@ export class FullHandFanPreviewUI {
     if (this._disposed) return;
     this._disposed = true;
     this._cancelCloseTimer();
+    this._cancelDragFrame();
     this._abortController.abort();
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this._handleResize);
@@ -468,6 +535,7 @@ export class FullHandFanPreviewUI {
     this._stage = null;
     this._cardEls = [];
     this._cards = [];
+    this._handCards = [];
     this._open = false;
   }
 
@@ -479,8 +547,7 @@ export class FullHandFanPreviewUI {
 
     const root = doc.createElement('div');
     root.className = ROOT_CLASS;
-    // The fan is pointer-transparent so the 3D hand underneath keeps hover/drag.
-    root.style.setProperty('pointer-events', 'none');
+    // Toàn vùng fan chặn canvas, kể cả khoảng trống giữa các lá.
     root.setAttribute('role', 'presentation');
     root.setAttribute('aria-hidden', 'true');
     root.dataset.testid = 'full-hand-fan-preview';
@@ -494,11 +561,106 @@ export class FullHandFanPreviewUI {
     const stage = doc.createElement('div');
     stage.className = 'fhfp-stage';
 
-    root.append(style, glow, stage);
+    const pager = doc.createElement("div");
+    pager.className = "fhfp-pager";
+    pager.style.cssText = "position:absolute;bottom:2px;left:50%;transform:translateX(-50%);z-index:1000;background:#181523;color:white;border-radius:6px;padding:2px 6px;font:12px sans-serif;white-space:nowrap";
+    const previous = doc.createElement("button");
+    previous.textContent = "‹";
+    previous.setAttribute("aria-label", "Trang bài trước");
+    const label = doc.createElement("span");
+    label.style.margin = "0 6px";
+    const next = doc.createElement("button");
+    next.textContent = "›";
+    next.setAttribute("aria-label", "Trang bài sau");
+    const navigate = (direction: number) => {
+      if (this._fanDrag || (direction < 0 ? previous.disabled : next.disabled)) return;
+      this._hoveredSourceId = null;
+      this._page += direction;
+      this._showPage();
+    };
+    const options = { signal: this._abortController.signal };
+    previous.addEventListener("click", () => navigate(-1), options);
+    next.addEventListener("click", () => navigate(1), options);
+    root.addEventListener("wheel", (event) => {
+      if (!this._open || pager.hidden) return;
+      event.preventDefault();
+      const delta = event.deltaX || event.deltaY;
+      if (delta) navigate(Math.sign(delta));
+    }, { ...options, passive: false });
+    pager.append(previous, label, next);
+    this._pager = pager;
+    this._pageLabel = label;
+    this._pagePrev = previous;
+    this._pageNext = next;
+    root.append(style, glow, stage, pager);
     this._container.appendChild(root);
 
     this._root = root;
     this._stage = stage;
+  }
+
+  private _paintCardFace(el: HTMLElement, card: FanCardData): void {
+    const doc = this._container.ownerDocument;
+    const expansion = card.masked ? undefined : getExpansionCardArt(card.cardType);
+    const art: FanCardArt = card.masked
+      ? FAN_CARD_BACK
+      : (card.cardType ? FAN_CARD_ART[card.cardType] : undefined) ?? FAN_CARD_FALLBACK;
+
+    el.classList.toggle('fhfp-card--back', !!card.masked);
+    el.dataset.masked = String(!!card.masked);
+    el.dataset.cardType = card.masked ? "unknown" : card.cardType ?? "unknown";
+    el.style.setProperty('--accent', expansion?.color ?? art.accent);
+    el.style.setProperty('--surface', art.surface);
+
+    const banner = doc.createElement('div');
+    banner.className = expansion ? 'fhfp-banner fhfp-banner--expansion' : 'fhfp-banner';
+    banner.textContent = expansion?.name ?? art.shortName;
+
+    const artWrap = doc.createElement('div');
+    artWrap.className = 'fhfp-art';
+    const artLabel = doc.createElement('span');
+    artLabel.className = expansion ? 'fhfp-pack-label' : 'fhfp-art-icon';
+    artLabel.textContent = expansion?.pack ?? art.icon;
+    artWrap.appendChild(artLabel);
+
+
+    const face = doc.createElement('div');
+    face.style.cssText = 'position:relative;display:flex;flex-direction:column;flex:1;min-height:0';
+    const rules = card.masked ? undefined : getCardFaceRules(card.cardType);
+    if (rules) {
+      const upper = doc.createElement('div');
+      upper.className = 'fhfp-upper';
+      upper.append(banner, artWrap);
+      face.style.background = art.surface;
+      const panel = doc.createElement('div');
+      panel.className = 'fhfp-rules';
+      panel.style.left = RULE_PANEL.left * 100 + '%';
+      panel.style.top = RULE_PANEL.top * 100 + '%';
+      panel.style.width = RULE_PANEL.width * 100 + '%';
+      panel.style.height = RULE_PANEL.height * 100 + '%';
+      panel.style.padding = 'calc(var(--rule-unit) * ' + RULE_PANEL.padding + ')';
+      panel.style.gap = 'calc(var(--rule-unit) * ' + RULE_PANEL.gap + ')';
+      panel.style.fontFamily = RULE_FONT;
+      const title = doc.createElement('strong');
+      title.className = 'fhfp-rules-name';
+      title.textContent = rules.title;
+      title.style.fontSize = 'calc(var(--rule-unit) * ' + rules.titleSize + ')';
+      const description = doc.createElement('div');
+      description.className = 'fhfp-rules-description';
+      description.textContent = rules.lines.join('\n');
+      description.style.fontSize = 'calc(var(--rule-unit) * ' + rules.bodySize + ')';
+      panel.append(title, description);
+      face.append(upper, panel);
+    } else {
+      face.append(banner, artWrap);
+      if (!card.masked) {
+        const title = doc.createElement('div');
+        title.className = 'fhfp-title';
+        title.textContent = card.title || art.shortName;
+        face.appendChild(title);
+      }
+    }
+    el.replaceChildren(face);
   }
 
   private _buildCards(): void {
@@ -511,34 +673,10 @@ export class FullHandFanPreviewUI {
       const el = doc.createElement('div');
       el.className = 'fhfp-card';
       el.dataset.fanCardId = card.id;
-      el.dataset.cardType = card.cardType ?? 'unknown';
       el.dataset.fanIndex = String(index);
       el.dataset.masked = card.masked ? 'true' : 'false';
 
-      const art: FanCardArt = card.masked
-        ? FAN_CARD_BACK
-        : (card.cardType ? FAN_CARD_ART[card.cardType] : undefined) ?? FAN_CARD_FALLBACK;
-
-      if (card.masked) el.classList.add('fhfp-card--back');
-      el.style.setProperty('--accent', art.accent);
-      el.style.setProperty('--surface', art.surface);
-
-      const banner = doc.createElement('div');
-      banner.className = 'fhfp-banner';
-      banner.textContent = art.shortName;
-
-      const artWrap = doc.createElement('div');
-      artWrap.className = 'fhfp-art';
-      const icon = doc.createElement('span');
-      icon.className = 'fhfp-art-icon';
-      icon.textContent = art.icon;
-      artWrap.appendChild(icon);
-
-      const title = doc.createElement('div');
-      title.className = 'fhfp-title';
-      title.textContent = card.masked ? 'Lá bài (ẩn)' : card.title || art.shortName;
-
-      el.append(banner, artWrap, title);
+      this._paintCardFace(el, card);
       this._stage!.appendChild(el);
 
       // M1.7.9 Part B: fan cards are interactive. Hover / click / drag intents
@@ -560,7 +698,9 @@ export class FullHandFanPreviewUI {
         if (event.button !== 0 || event.shiftKey) return;
         this._fanPointerDown = { clientX: event.clientX, clientY: event.clientY };
         const startIndex = this._cards.findIndex((item) => item.id === card.id);
-        this._fanDrag = { cardId: card.id, startX: event.clientX, startY: event.clientY, currentX: event.clientX, currentY: event.clientY, startIndex, targetIndex: startIndex, handedOff: false };
+        const baseTransform = getComputedStyle(el).transform;
+        const rect = el.getBoundingClientRect();
+        this._fanDrag = { cardId: card.id, startX: event.clientX, startY: event.clientY, currentX: event.clientX, currentY: event.clientY, startIndex, targetIndex: startIndex, handedOff: false, baseTransform, offsetX: rect.width ? event.clientX - (rect.left + rect.width / 2) : 0, offsetY: rect.height ? event.clientY - (rect.top + rect.height / 2) : 0 };
         this._handlers?.onFanDragStateChanged?.(card.id);
         this._draggingSourceId = card.id;
         this._applyCardVisuals();
@@ -608,13 +748,23 @@ export class FullHandFanPreviewUI {
       const el = this._cardEls[index];
       if (!el) return;
       const slotIndex = Math.max(0, this._visualOrderIds.indexOf(card?.id ?? ''));
-      const visualSlot = layout.cards[slotIndex] ?? slot;
+      // Lá kéo giữ nguyên điểm neo ban đầu; chỉ các lá còn lại mở chỗ trống.
+      const visualSlot = this._fanDrag?.cardId === card?.id
+        ? layout.cards[this._fanDrag.startIndex] ?? slot
+        : layout.cards[slotIndex] ?? slot;
       this._slotZ[index] = visualSlot.zIndex;
 
-      el.style.left = `calc(50% + ${visualSlot.x.toFixed(2)}px)`;
+      el.style.left = '50%';
+      el.style.setProperty('--slot-x', `${visualSlot.x.toFixed(2)}px`);
+
+      // Chừa viền và sai số làm tròn khi chuyển chữ từ texture sang DOM.
+      const ruleUnit = Math.min((slot.width - 6) / CARD_CONFIG.TEXTURE_WIDTH,
+        (slot.height - 6) / CARD_CONFIG.TEXTURE_HEIGHT);
+      el.style.setProperty('--rule-unit', ruleUnit + 'px');
       el.style.width = `${visualSlot.width}px`;
       el.style.height = `${visualSlot.height}px`;
-      el.style.bottom = `${FAN_PREVIEW_LAYOUT.CARD_BOTTOM_OFFSET_PX}px`;
+      const pagerHeight = this._pager?.hidden === false ? FAN_PREVIEW_LAYOUT.PAGE_CONTROLS_HEIGHT_PX : 0;
+      el.style.bottom = `${FAN_PREVIEW_LAYOUT.CARD_BOTTOM_OFFSET_PX + pagerHeight}px`;
       el.style.zIndex = String(visualSlot.zIndex);
       el.style.setProperty('--dy', `${visualSlot.y.toFixed(2)}px`);
       el.style.setProperty('--rot', `${visualSlot.angleDeg.toFixed(3)}deg`);
@@ -622,7 +772,7 @@ export class FullHandFanPreviewUI {
       el.style.setProperty('--rot-enter', `${(visualSlot.angleDeg * 0.35).toFixed(3)}deg`);
       el.style.setProperty(
         '--delay',
-        `${(index * FAN_PREVIEW_LAYOUT.STAGGER_PER_CARD_MS).toFixed(0)}ms`
+        '0ms'
       );
 
       // Exposed for deterministic browser/unit checks.
@@ -672,8 +822,8 @@ export class FullHandFanPreviewUI {
       const originalDown = this._fanPointerDown;
       if (originalDown) {
         this._handlers?.onCardDragStart(drag.cardId, new MouseEvent('mousedown', {
-          bubbles: true, button: 0, clientX: originalDown.clientX, clientY: originalDown.clientY,
-        }));
+          bubbles: true, button: 0, clientX: event.clientX, clientY: event.clientY,
+        }), { x: drag.offsetX, y: drag.offsetY });
         window.dispatchEvent(new MouseEvent('mousemove', {
           bubbles: true, clientX: event.clientX, clientY: event.clientY,
         }));
@@ -697,13 +847,20 @@ export class FullHandFanPreviewUI {
     const nextOrder = this._cards.map((card) => card.id);
     nextOrder.splice(drag.startIndex, 1);
     nextOrder.splice(Math.max(0, Math.min(nextOrder.length, nearestIndex)), 0, drag.cardId);
+    const orderChanged = nextOrder.join('|') !== this._visualOrderIds.join('|');
     this._visualOrderIds = nextOrder;
-    this._relayout();
+    if (orderChanged) this._relayout();
+    // Gộp cập nhật con trỏ theo khung hình, không dựng lại HAND mỗi mousemove.
+    if (this._dragFrame === null) this._dragFrame = requestAnimationFrame(() => {
+      this._dragFrame = null;
+      this._applyCardVisuals();
+    });
   };
 
   private _onFanMouseUp = (): void => {
     const drag = this._fanDrag;
     if (!drag) return;
+    this._cancelDragFrame();
     this._fanDrag = null;
     this._draggingSourceId = null;
     this._fanPointerDown = null;
@@ -714,7 +871,7 @@ export class FullHandFanPreviewUI {
     }
     if (Math.hypot(drag.currentX - drag.startX, drag.currentY - drag.startY) >= FAN_CLICK_MAX_MOVE_PX) {
       this._ignoreNextClickId = drag.cardId;
-      this._handlers?.onCardReorder?.(drag.cardId, drag.targetIndex);
+      this._handlers?.onCardReorder?.(drag.cardId, this._pageOffset + drag.targetIndex);
     }
     this._handlers?.onFanDragStateChanged?.(null);
     this._visualOrderIds = this._cards.map((card) => card.id);
@@ -724,6 +881,10 @@ export class FullHandFanPreviewUI {
   private _onFanDragCancelled = (): void => {
     const drag = this._fanDrag;
     if (!drag) return;
+    this._cancelDragFrame();
+    if (Math.hypot(drag.currentX - drag.startX, drag.currentY - drag.startY) >= FAN_CLICK_MAX_MOVE_PX) {
+      this._ignoreNextClickId = drag.cardId;
+    }
     this._fanDrag = null;
     this._fanPointerDown = null;
     this._draggingSourceId = null;
@@ -756,6 +917,10 @@ export class FullHandFanPreviewUI {
       el.classList.toggle('fhfp-card--selected', isSelected);
       el.classList.toggle('fhfp-card--dragging', isDragging);
       el.classList.toggle('fhfp-card--handed-off', isHandedOff);
+      // Chụp transform đang hiển thị lúc nhấn, giữ đúng offset và tránh hover làm nhảy bài.
+      el.style.transform = isDragging && this._fanDrag && !isHandedOff
+        ? `translate3d(${this._fanDrag.currentX - this._fanDrag.startX}px, ${this._fanDrag.currentY - this._fanDrag.startY}px, 0) ${this._fanDrag.baseTransform}`
+        : '';
       el.style.setProperty('--dy-hover', isDragging ? '-20px' : isSelected ? '-19px' : isHovered ? '-10px' : '0px');
       el.style.setProperty('--scale', isDragging ? '1.06' : isSelected ? '1.05' : isHovered ? '1.04' : '1');
       el.style.setProperty('--drag-x', isDragging && this._fanDrag && !this._fanDrag.handedOff ? `${this._fanDrag.currentX - this._fanDrag.startX}px` : '0px');
@@ -777,5 +942,10 @@ export class FullHandFanPreviewUI {
       window.clearTimeout(this._closeTimer);
       this._closeTimer = null;
     }
+  }
+
+  private _cancelDragFrame(): void {
+    if (this._dragFrame !== null) cancelAnimationFrame(this._dragFrame);
+    this._dragFrame = null;
   }
 }

@@ -3,6 +3,7 @@
  * Manages the single WebGLRenderer instance for the entire app.
  */
 import * as THREE from 'three';
+import { TABLE_CAMERA_FOV } from './CameraController';
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('Renderer');
@@ -13,16 +14,18 @@ export class Renderer {
   private _needsRender = false;
 
   constructor(container: HTMLElement) {
-    this._renderer = new THREE.WebGLRenderer({ antialias: true });
+    this._renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this._renderer.setSize(container.clientWidth, container.clientHeight);
     this._renderer.shadowMap.enabled = true;
     this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // Nền gradient nằm sau WebGL để bàn và bài luôn sắc nét.
+    this._renderer.domElement.style.background = "radial-gradient(ellipse at 50% 28%, #a2794d, #583923 50%, #251813 90%)";
     container.appendChild(this._renderer.domElement);
 
     const aspect = container.clientWidth / container.clientHeight;
-    this._camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+    this._camera = new THREE.PerspectiveCamera(TABLE_CAMERA_FOV, aspect, 0.1, 1000);
     this._camera.position.set(0, 8, 10);
     this._camera.lookAt(0, 0, 0);
 

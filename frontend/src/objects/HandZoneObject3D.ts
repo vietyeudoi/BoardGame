@@ -31,6 +31,7 @@ export interface HandZoneObject3DOptions {
   isCardSelected?: (card: CardObject3D) => boolean;
   isCardHovered?: (card: CardObject3D) => boolean;
   isLocalPlayer?: boolean;
+  useSeatFrame?: boolean;
 }
 
 export class HandZoneObject3D extends THREE.Group {
@@ -40,6 +41,7 @@ export class HandZoneObject3D extends THREE.Group {
   readonly zoneDepth: number;
 
   private _label: string;
+  private readonly _useSeatFrame: boolean;
   private readonly _cards: CardObject3D[] = [];
   private _isHovered = false;
   private _isLocalPlayer = true;
@@ -69,6 +71,7 @@ export class HandZoneObject3D extends THREE.Group {
     this.zoneId = opts.id;
     this.playerIndex = opts.playerIndex;
     this._label = opts.label;
+    this._useSeatFrame = opts.useSeatFrame ?? false;
     this.zoneWidth = opts.width ?? HAND_ZONE_CONFIG.DEFAULT_WIDTH;
     this.zoneDepth = opts.depth ?? HAND_ZONE_CONFIG.DEFAULT_DEPTH;
     this._isCardSelectedCallback = opts.isCardSelected;
@@ -85,8 +88,10 @@ export class HandZoneObject3D extends THREE.Group {
       color: HAND_ZONE_CONFIG.FILL_COLOR, transparent: true, opacity: HAND_ZONE_CONFIG.FILL_OPACITY, side: THREE.DoubleSide, depthWrite: false,
     });
 
-    this._buildBorder();
-    this._buildFillPlane();
+    if (!this._useSeatFrame) {
+      this._buildBorder();
+      this._buildFillPlane();
+    }
     this._buildLabel();
   }
 
@@ -123,7 +128,7 @@ export class HandZoneObject3D extends THREE.Group {
    */
   private _buildLabel(): void {
     // Guard for headless test environments where `document` is undefined.
-    if (typeof document === 'undefined') {
+    if (this._useSeatFrame || typeof document === 'undefined') {
       return;
     }
 
@@ -403,14 +408,17 @@ export class HandZoneObject3D extends THREE.Group {
 
     const baseElevation =
       HAND_ZONE_CONFIG.SURFACE_Y +
-      (index * HAND_ZONE_CONFIG.ELEVATION_STEP) +
+      (index * Math.min(HAND_ZONE_CONFIG.ELEVATION_STEP, HAND_ZONE_CONFIG.MAX_ROW_ELEVATION / Math.max(1, N - 1))) +
       (isSelected ? HAND_ZONE_CONFIG.SELECTED_ELEVATION : 0);
 
     const cosRot = Math.cos(this.rotation.y);
     const sinRot = Math.sin(this.rotation.y);
 
-    const worldX = this.position.x + locX * cosRot;
-    const worldZ = this.position.z - locX * sinRot;
+    // Chỉ xòe bài đối thủ trong mặt phẳng XZ, giữ nguyên hàng bài local.
+    const fanOffset = this._useSeatFrame && !this._isLocalPlayer && totalSpan > 0 ? locX * 2 / totalSpan : 0;
+    const locZ = fanOffset ** 2 * HAND_ZONE_CONFIG.OPPONENT_FAN_ARC;
+    const worldX = this.position.x + locX * cosRot + locZ * sinRot;
+    const worldZ = this.position.z - locX * sinRot + locZ * cosRot;
 
     // M1.7.7.1: the only hand presentation is flat. Selection may lift the card
     // a little; hover (local player only) adds a subtle Y lift + tiny scale +
@@ -435,7 +443,7 @@ export class HandZoneObject3D extends THREE.Group {
 
     // Only the hand-zone Y rotation is applied; pitch/roll stay at 0 (flat card).
     const quaternion = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(0, this.rotation.y, 0, 'YXZ')
+      new THREE.Euler(HAND_ZONE_CONFIG.CARD_PITCH, this.rotation.y - fanOffset * HAND_ZONE_CONFIG.OPPONENT_FAN_ANGLE, 0, 'YXZ')
     );
 
     return {
@@ -469,6 +477,15 @@ export class HandZoneObject3D extends THREE.Group {
   findCardByRay(raycaster: THREE.Raycaster): CardObject3D | null {
     const N = this._cards.length;
     if (N === 0) return null;
+    // Dùng hình học lá bài thật khi đối thủ xòe bài.
+    if (this._useSeatFrame && !this._isLocalPlayer) {
+      for (let index = N - 1; index >= 0; index--) {
+        const card = this._cards[index]!;
+        card.updateWorldMatrix(true, true);
+        if (raycaster.intersectObject(card, true).length > 0) return card;
+      }
+      return null;
+    }
 
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.position.y);
     const hit = new THREE.Vector3();

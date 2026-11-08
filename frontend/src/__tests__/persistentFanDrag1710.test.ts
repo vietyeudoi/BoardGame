@@ -146,11 +146,12 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
         }
         fan.setSelectedSourceIds(interaction.getSelectedCards().map((c: any) => c.cardId));
       },
-      onCardDragStart: (sourceCardId: string, event: MouseEvent) => {
+      onCardDragStart: (sourceCardId: string, event: MouseEvent, offset) => {
         const card = sceneManager.getObject(sourceCardId) as any;
         if (!card) return;
         fan.setDraggingSourceId(sourceCardId);
-        dragCtrl.beginDrag(card, event);
+        if (offset) dragCtrl.beginPreviewDrag(card, event, offset);
+        else dragCtrl.beginDrag(card, event);
       },
       onCardReorder: (sourceCardId: string, targetIndex: number) => {
         const hand = localHandZone();
@@ -269,6 +270,7 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
   // ── F1710-02/03/04: drag lifecycle & fan updates ────────────────────────────
 
   it('F1710-02: dragging a preview card to the table keeps the fan open; drop updates preview', () => {
+    sceneManager.isPointOverLocalHandPreview = () => true;
     const { cards } = drawLocalHand('f1710_02', 3);
     hoverCard(sceneManager, cards[0]!);
     const els = fan.getCardElements();
@@ -287,6 +289,7 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
   });
 
   it('F1710-03: dragging a preview card to reorder the hand keeps the fan open', () => {
+    sceneManager.isPointOverLocalHandPreview = () => true;
     const { cards } = drawLocalHand('f1710_03', 3);
     hoverCard(sceneManager, cards[0]!);
     const els = fan.getCardElements();
@@ -334,6 +337,7 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
   });
 
   it('F1710-06: consecutive fan drags map to the correct source cards', () => {
+    sceneManager.isPointOverLocalHandPreview = () => true;
     const first = drawLocalHand('f1710_06a', 3);
     hoverCard(sceneManager, first.cards[0]!);
     dragFromFan(first.ids[0]!, 410, 400);
@@ -382,6 +386,8 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
   });
 
   it('F1711-01/02: dragging through the fan previews order, then commits one ID order on release', () => {
+    // jsdom không đo được root; con trỏ y=600 nằm trong vùng preview thật.
+    sceneManager.isPointOverLocalHandPreview = () => true;
     const { ids } = drawLocalHand('f1711_reorder', 5);
     hoverCard(sceneManager, localHandZone().getCard(ids[0]!)!);
     const original = localHandZone().getCardIds();
@@ -402,6 +408,7 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
   });
 
   it('F1711-03: pointer cancellation rolls back a fan-only reorder and clears drag state', () => {
+    sceneManager.isPointOverLocalHandPreview = () => true;
     const { ids, cards } = drawLocalHand('f1711_cancel', 4);
     hoverCard(sceneManager, cards[0]!);
     const original = localHandZone().getCardIds();
@@ -553,6 +560,7 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
   // ── F1710-15: repeated drags do not leak DOM / state ────────────────────────
 
   it('F1710-15: repeated fan drags keep working without DOM leaks', () => {
+    sceneManager.isPointOverLocalHandPreview = () => true;
     for (let i = 0; i < 30; i++) {
       const { ids, cards } = drawLocalHand(`f1710_15_${i}`, 2);
       hoverCard(sceneManager, cards[0]!);
@@ -566,6 +574,7 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
       fireMouseEvent(window, 'mouseup');
       expect(dragCtrl.isDragging()).toBe(false);
 
+      sceneManager.flushCardTransfers();
       // No orphaned nodes: rendered fan nodes always match the live hand size.
       expect(fan.getCardElements()).toHaveLength(sceneManager.getLocalHandCards().length);
       expect(document.querySelectorAll('.fhfp-card')).toHaveLength(
@@ -624,6 +633,37 @@ describe('M1.7.10 Part A+B — Persistent Interactive Fan Preview & Hover/Select
       false
     );
     // Preview is part of the interaction zone → fan remains visible.
+    expect(fan.isOpen()).toBe(true);
+  });
+
+  it.each([0, 1, 5])('Nhận bài vào HAND có %i lá: nhả drag và mở fan ngay tại con trỏ đứng yên', (count) => {
+    drawLocalHand('receive', count);
+    const zone = localHandZone();
+    vi.spyOn(sceneManager, 'getTableIntersectionAtScreenPos').mockReturnValue({ x: zone.position.x, z: zone.position.z });
+    const card = sceneManager.getAllCards().find((item) => !item.isInHand())!;
+    dragCtrl.beginDrag(card, new MouseEvent('mousedown', { button: 0, clientX: 400, clientY: 300 }));
+    fireMouseEvent(window, 'mousemove', { clientX: 430, clientY: 300 });
+    expect(sceneManager.isLocalHandDragActive()).toBe(true);
+    card.position.set(zone.position.x, zone.position.y, zone.position.z);
+    fireMouseEvent(window, 'mouseup', { clientX: 430, clientY: 300 });
+    expect(sceneManager.isLocalHandDragActive()).toBe(false);
+    expect(card.isInHand()).toBe(true);
+    expect(fan.isOpen()).toBe(true);
+    expect(fan.getRenderedCardIds()).toHaveLength(count + 1);
+    sceneManager.flushCardTransfers();
+    expect(fan.isOpen()).toBe(true);
+  });
+
+  it.each(['Escape', 'pointercancel', 'blur'])('Hủy kéo bài TABLE bằng %s không giữ cờ khóa hover', (kind) => {
+    drawLocalHand('cancel_table', 1);
+    const card = sceneManager.getAllCards().find((item) => !item.isInHand())!;
+    dragCtrl.beginDrag(card, new MouseEvent('mousedown', { button: 0, clientX: 400, clientY: 300 }));
+    fireMouseEvent(window, 'mousemove', { clientX: 430, clientY: 300 });
+    window.dispatchEvent(kind === 'Escape' ? new KeyboardEvent('keydown', { key: 'Escape' }) : new Event(kind));
+    expect(dragCtrl.isDragging()).toBe(false);
+    expect(sceneManager.isLocalHandDragActive()).toBe(false);
+    sceneManager.flushCardTransfers();
+    hoverCard(sceneManager, sceneManager.getLocalHandCards()[0]);
     expect(fan.isOpen()).toBe(true);
   });
 });

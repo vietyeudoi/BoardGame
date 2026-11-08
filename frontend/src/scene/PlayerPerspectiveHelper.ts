@@ -4,7 +4,7 @@
  * Determines the azimuthal angle (theta) and camera placement for each player seat
  * on 2–8 player tables (both rectangular and regular polygon layouts).
  */
-import type { PlayerCount } from '../objects/TableShapeConfig';
+import { resolveTableSeatCount, type PlayerCount } from '../objects/TableShapeConfig';
 import { computeTableZones } from '../objects/TableZonesConfig';
 
 export interface PlayerPerspective {
@@ -25,7 +25,7 @@ export function computePlayerPerspective(
   playerCount: PlayerCount,
   circumradius?: number
 ): PlayerPerspective {
-  const safeCount = Math.max(2, Math.min(8, playerCount)) as PlayerCount;
+  const safeCount = resolveTableSeatCount(playerCount);
   const zonesLayout = computeTableZones(safeCount, circumradius);
   const areas = zonesLayout.playerAreas;
 

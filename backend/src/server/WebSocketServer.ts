@@ -40,14 +40,17 @@ export class WebSocketServer {
       // Wrap per-message handler — one client error must NOT crash the server
       try {
         const data = JSON.parse(raw.toString()) as ClientToServerMessage;
-        this._dispatcher.dispatch(sessionId, data);
+        this._dispatcher.dispatch(session.sessionId, data);
       } catch (error) {
         logger.error('Failed to parse client message', { sessionId, error: String(error) });
         session.sendError('Invalid message format');
       }
     });
 
-    ws.on('close', () => this._onDisconnect(sessionId));
+
+    ws.on('close', () => {
+      if (this._sessions.get(session.sessionId) === session) this._onDisconnect(session.sessionId);
+    });
 
     ws.on('error', (error) => {
       // Log but do not re-throw — one client error must NOT affect other rooms

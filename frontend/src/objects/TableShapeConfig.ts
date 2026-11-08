@@ -5,9 +5,10 @@
  * Strict TypeScript, no magic numbers, files <= 400 lines.
  */
 
+import { DEFAULT_TABLE_RADIUS, SHARED_CONFIG } from '../../../shared/constants/config';
 import { TABLE_CONFIG } from './TableConfig';
 
-export type PlayerCount = 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type PlayerCount = 2 | 3 | 4 | 5 | 6 | 7 | 8 | typeof SHARED_CONFIG.MAX_PLAYERS_PER_ROOM;
 export type TableShapeType = 'rectangle' | 'polygon';
 
 export interface TableShapeParams {
@@ -36,6 +37,8 @@ export interface TableShapeParams {
 }
 
 // ─── Shape Parameters Map (M1.4.3 Scaled Dimensions) ──────────────────────────
+
+const SEAT_COUNT = SHARED_CONFIG.MAX_PLAYERS_PER_ROOM;
 
 export const TABLE_SHAPE_CONFIGS: Record<PlayerCount, TableShapeParams> = {
   2: {
@@ -157,7 +160,29 @@ export const TABLE_SHAPE_CONFIGS: Record<PlayerCount, TableShapeParams> = {
     legInset: 1.8,
     cameraRadius: 32.0,
   },
+  [SEAT_COUNT]: {
+    playerCount: SEAT_COUNT,
+    shapeType: 'polygon',
+    sideCount: SEAT_COUNT,
+    feltWidth: 0,
+    feltDepth: 0,
+    circumradius: DEFAULT_TABLE_RADIUS,
+    inradius: DEFAULT_TABLE_RADIUS * Math.cos(Math.PI / SEAT_COUNT),
+    railWidth: TABLE_CONFIG.RAIL_WIDTH,
+    railHeight: TABLE_CONFIG.RAIL_HEIGHT,
+    railLip: TABLE_CONFIG.RAIL_LIP,
+    apronThickness: TABLE_CONFIG.APRON_THICKNESS,
+    legRadius: TABLE_CONFIG.LEG_RADIUS,
+    legHeight: TABLE_CONFIG.LEG_HEIGHT,
+    legInset: 1.8,
+    cameraRadius: 30,
+  },
 };
+
+// Snapshot cũ có thể mang sức chứa 2–8. Giá trị lạ dùng bàn mặc định.
+export function resolveTableSeatCount(count: number): PlayerCount {
+  return Object.prototype.hasOwnProperty.call(TABLE_SHAPE_CONFIGS, count) ? count as PlayerCount : SEAT_COUNT;
+}
 
 /**
  * Returns configuration params for table shape corresponding to player count.

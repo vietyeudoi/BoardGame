@@ -7,6 +7,8 @@
 import * as THREE from 'three';
 import { CARD_CONFIG } from './CardConfig';
 import { TABLE_CONFIG } from './TableConfig';
+import { getCardFaceRules } from './CardFaceRules';
+import { getCardTitle } from './CardTypeHelper';
 import { CardTextureGenerator } from './CardTextureGenerator';
 import { Logger } from '../utils/Logger';
 
@@ -23,6 +25,7 @@ export interface CardContent {
 
 export interface CardOptions {
   id?: string;
+  cardType?: string;
   ownerId?: string | null;
   width?: number;
   height?: number;
@@ -56,6 +59,7 @@ export class CardObject3D extends THREE.Group {
   public readonly cornerRadius: number;
 
   private _faceUp = true;
+  private _flipStartZ = 0;
   private _isDisposed = false;
   public _ownerId: string | null = null;
   private _isMasked = false;
@@ -94,6 +98,8 @@ export class CardObject3D extends THREE.Group {
   private _frontCanvas: HTMLCanvasElement | null = null;
   private _backCanvas: HTMLCanvasElement | null = null;
   private _ownsFrontTexture = false;
+  private _externalFrontTexture = false;
+  private _sharedFrontKey: string | null = null;
   private _ownsBackTexture = false;
 
   constructor(options?: CardOptions) {
@@ -110,6 +116,7 @@ export class CardObject3D extends THREE.Group {
     this.cornerRadius = options?.cornerRadius ?? CARD_CONFIG.DEFAULT_CORNER_RADIUS;
 
     this._faceUp = options?.faceUp ?? true;
+    this._cardType = options?.cardType ?? null;
     this._ownerId = options?.ownerId ?? null;
 
     this._content = {
@@ -215,8 +222,9 @@ export class CardObject3D extends THREE.Group {
 
   /** Stores the canonical card type for display (screen-space fan preview). */
   setCardType(cardType: string | null): void {
-    if (this._isDisposed) return;
+    if (this._isDisposed || this._cardType === cardType) return;
     this._cardType = cardType;
+    this._refreshFrontTexture();
   }
 
   /**
@@ -288,7 +296,7 @@ export class CardObject3D extends THREE.Group {
   }
 
   /**
-   * M1.7.4: Animate a flip around the Y axis. The semantic face state is
+   * M1.7.4: Animate a flip around the card’s local Z axis. The semantic face state is
    * updated immediately so callers may keep broadcasting/authorizing while the
    * mesh completes its visual turn. Masked cards stay masked for the whole
    * animation, so opponent hand content is never exposed.
@@ -298,6 +306,7 @@ export class CardObject3D extends THREE.Group {
     if (!this._flipAnimating && this._faceUp === faceUp) return;
 
     this._cancelFlipAnimation(false);
+    this._flipStartZ = this._cardMesh.rotation.z;
 
     this._faceUp = faceUp;
     this._flipTargetFaceUp = faceUp;
@@ -368,8 +377,8 @@ export class CardObject3D extends THREE.Group {
       ? 1
       : Math.min(1, this._flipElapsedMs / this._flipDurationMs);
     const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    // Visual turn is around Y; at the end the canonical Z face state is applied.
-    this._cardMesh.rotation.y = Math.PI * eased;
+    // Lá nằm trong XZ, trục dọc của lá là Z.
+    this._cardMesh.rotation.z = THREE.MathUtils.lerp(this._flipStartZ, this._flipTargetFaceUp ? 0 : Math.PI, eased);
   }
 
   private _finishFlipAnimation(): void {
@@ -419,7 +428,7 @@ export class CardObject3D extends THREE.Group {
     // Front Texture
     if (options?.frontTexture) {
       this._frontTexture = options.frontTexture;
-      this._ownsFrontTexture = false;
+      this._externalFrontTexture = true;
     } else {
       this._generateProceduralFrontTexture();
     }
@@ -433,10 +442,25 @@ export class CardObject3D extends THREE.Group {
     }
   }
 
+
   private _generateProceduralFrontTexture(): void {
+    const { title, description, artwork, backgroundColor, textColor, accentColor } = this._content;
+    const type = this._cardType;
+    const canonical = type !== null && getCardFaceRules(type) !== undefined;
+    const standardTitle = !title || title === 'Card' || (canonical && title === getCardTitle(type!));
+    if (standardTitle && !description && !artwork && !backgroundColor && !textColor && !accentColor
+      && (type === null || canonical)) {
+      const key = type ?? '';
+      if (this._sharedFrontKey === key) return;
+      this._releaseFrontTexture();
+      this._frontTexture = CardTextureGenerator.acquireFrontTexture(key);
+      if (this._frontTexture) this._sharedFrontKey = key;
+      return;
+    }
+    if (this._sharedFrontKey !== null) this._releaseFrontTexture();
     this._frontCanvas = CardTextureGenerator.getOrCreateCanvas(this._frontCanvas);
     if (this._frontCanvas) {
-      CardTextureGenerator.drawFront(this._frontCanvas, this._content);
+      CardTextureGenerator.drawFront(this._frontCanvas, this._content, this._cardType);
       if (!this._frontTexture) {
         this._frontTexture = CardTextureGenerator.createTextureFromCanvas(this._frontCanvas);
         this._ownsFrontTexture = true;
@@ -459,13 +483,21 @@ export class CardObject3D extends THREE.Group {
     }
   }
 
-  setFrontTexture(texture: THREE.Texture): void {
-    if (this._isDisposed) return;
-    if (this._ownsFrontTexture && this._frontTexture) {
-      this._frontTexture.dispose();
-    }
-    this._frontTexture = texture;
+
+  private _releaseFrontTexture(): void {
+    if (this._sharedFrontKey !== null) CardTextureGenerator.releaseFrontTexture(this._sharedFrontKey);
+    else if (this._ownsFrontTexture) this._frontTexture?.dispose();
+    this._sharedFrontKey = null;
     this._ownsFrontTexture = false;
+    this._frontTexture = null;
+    this._frontCanvas = null;
+  }
+
+  setFrontTexture(texture: THREE.Texture): void {
+    if (this._isDisposed || this._frontTexture === texture) return;
+    this._releaseFrontTexture();
+    this._frontTexture = texture;
+    this._externalFrontTexture = true;
     if (!this._isMasked) {
       this._frontMaterial.map = texture;
       this._frontMaterial.needsUpdate = true;
@@ -486,17 +518,20 @@ export class CardObject3D extends THREE.Group {
   updateContent(content: CardContent): void {
     if (this._isDisposed) return;
 
-    this._content = {
-      ...this._content,
-      ...content,
-    };
+    const keys = Object.keys(content) as (keyof CardContent)[];
+    if (keys.every(key => content[key] === this._content[key])) return;
+    this._content = { ...this._content, ...content };
 
-    // If using procedural front texture, re-render on the existing canvas
-    if (this._ownsFrontTexture && this._frontCanvas) {
-      CardTextureGenerator.drawFront(this._frontCanvas, this._content);
-      if (this._frontTexture) {
-        this._frontTexture.needsUpdate = true;
-      }
+    this._refreshFrontTexture();
+  }
+
+  private _refreshFrontTexture(): void {
+
+    if (this._externalFrontTexture) return;
+    this._generateProceduralFrontTexture();
+    if (!this._isMasked && this._frontMaterial.map !== this._frontTexture) {
+      this._frontMaterial.map = this._frontTexture;
+      this._frontMaterial.needsUpdate = true;
     }
   }
 
@@ -525,14 +560,16 @@ export class CardObject3D extends THREE.Group {
 
   /** Returns rotation around Y axis normalized to [0, 2*PI) */
   getRotationY(): number {
-    let y = this.rotation.y % (Math.PI * 2);
-    if (y < 0) y += Math.PI * 2;
-    return y;
+    // Euler XYZ có thể biểu diễn yaw lớn bằng pitch/roll π sau khi slerp.
+    const { x, y, z, w } = this.quaternion;
+    const yaw = Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
+    return Math.abs(yaw) < Number.EPSILON * 4 ? 0 : THREE.MathUtils.euclideanModulo(yaw, Math.PI * 2);
   }
 
   /** Rotates card around Y axis by given radians */
   override rotateY(angleRadians: number): this {
     if (!this._isDisposed) {
+      if (this.rotation.order !== "YXZ") this.rotation.reorder("YXZ");
       this.rotation.y += angleRadians;
     }
     return this;
@@ -694,11 +731,8 @@ export class CardObject3D extends THREE.Group {
     this._backMaterial.dispose();
     this._sideMaterial.dispose();
 
-    // 3. Dispose textures ONLY if owned internally
-    if (this._ownsFrontTexture && this._frontTexture) {
-      this._frontTexture.dispose();
-      this._frontTexture = null;
-    }
+    // 3. Nhả texture dùng chung hoặc hủy texture riêng.
+    this._releaseFrontTexture();
     if (this._ownsBackTexture && this._backTexture) {
       this._backTexture.dispose();
       this._backTexture = null;

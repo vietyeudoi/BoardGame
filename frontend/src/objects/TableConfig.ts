@@ -27,11 +27,11 @@ export const TABLE_CONFIG = {
   LEG_INSET_Z: 1.2,
 
   // Visuals & Colors
-  FELT_COLOR: 0x1e5628,        // Classic casino green felt
+  FELT_COLOR: 0x19191e,        // Mặt bàn than tối
   FELT_ROUGHNESS: 0.90,
   FELT_METALNESS: 0.02,
 
-  WOOD_COLOR: 0x42220f,        // Rich polished walnut wood
+  WOOD_COLOR: 0x352923,        // Gỗ nâu sẫm
   WOOD_ROUGHNESS: 0.38,
   WOOD_METALNESS: 0.08,
 

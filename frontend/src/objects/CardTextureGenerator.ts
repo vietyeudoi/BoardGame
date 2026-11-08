@@ -4,7 +4,10 @@
  * Supports canvas reuse to eliminate memory allocation churn.
  */
 import * as THREE from 'three';
+import { getCardFaceRules, RULE_FONT, RULE_PANEL } from './CardFaceRules';
+import { getCardTitle } from './CardTypeHelper';
 import { CARD_CONFIG } from './CardConfig';
+import { FAN_CARD_ART, getExpansionCardArt } from '../utils/CardArt';
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('CardTextureGenerator');
@@ -18,7 +21,30 @@ export interface CardRenderContent {
   accentColor?: string;
 }
 
+
 export class CardTextureGenerator {
+  private static readonly _frontTextures = new Map<string, { texture: THREE.CanvasTexture; users: number }>();
+
+  static acquireFrontTexture(key: string): THREE.CanvasTexture | null {
+    const entry = this._frontTextures.get(key);
+    if (entry) {
+      entry.users++;
+      return entry.texture;
+    }
+    const canvas = this.getOrCreateCanvas();
+    if (!canvas) return null;
+    this.drawFront(canvas, key ? { title: getCardTitle(key) } : undefined, key);
+    const texture = this.createTextureFromCanvas(canvas);
+    if (texture) this._frontTextures.set(key, { texture, users: 1 });
+    return texture;
+  }
+
+  static releaseFrontTexture(key: string): void {
+    const entry = this._frontTextures.get(key);
+    if (!entry || --entry.users > 0) return;
+    this._frontTextures.delete(key);
+    entry.texture.dispose();
+  }
   /**
    * Checks if the runtime environment supports HTML Canvas 2D context.
    * Gracefully returns false in headless or JSDOM environments.
@@ -65,7 +91,7 @@ export class CardTextureGenerator {
   /**
    * Generates or re-draws the card's front face on the provided canvas.
    */
-  static drawFront(canvas: HTMLCanvasElement, content?: CardRenderContent): void {
+  static drawFront(canvas: HTMLCanvasElement, content?: CardRenderContent, cardType?: string | null): void {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -74,9 +100,12 @@ export class CardTextureGenerator {
 
     const bgColor = content?.backgroundColor ?? CARD_CONFIG.DEFAULT_BG_FRONT;
     const textColor = content?.textColor ?? CARD_CONFIG.DEFAULT_TEXT_COLOR;
-    const accentColor = content?.accentColor ?? CARD_CONFIG.DEFAULT_ACCENT_COLOR;
+    const art = cardType ? FAN_CARD_ART[cardType] : undefined;
+    const expansion = getExpansionCardArt(cardType);
+    const accentColor = content?.accentColor ?? art?.accent ?? expansion?.color ?? CARD_CONFIG.DEFAULT_ACCENT_COLOR;
     const title = content?.title ?? 'Card';
     const description = content?.description ?? '';
+    const rules = getCardFaceRules(cardType);
 
     // 1. Base card background
     ctx.fillStyle = bgColor;
@@ -99,19 +128,26 @@ export class CardTextureGenerator {
     ctx.fillRect(pad + 12, bannerY, w - (pad + 12) * 2, bannerH);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px sans-serif';
+    ctx.font = 'bold 40px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(title.toUpperCase(), w / 2, bannerY + bannerH / 2);
+    ctx.fillText(title.toUpperCase(), w / 2, bannerY + bannerH / 2, w - pad * 4);
 
     // 4. Central artwork area
     const artX = pad + 16;
     const artY = bannerY + bannerH + 16;
     const artW = w - artX * 2;
-    const artH = 340;
+    const artH = rules ? h * RULE_PANEL.top - artY - 12 : 340;
 
     ctx.fillStyle = '#f3f4f6';
     ctx.fillRect(artX, artY, artW, artH);
+    if (art) {
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(artX, artY, artW, artH);
+      ctx.restore();
+    }
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 2;
     ctx.strokeRect(artX, artY, artW, artH);
@@ -124,8 +160,46 @@ export class CardTextureGenerator {
         // Fallback to geometric icon
         CardTextureGenerator._drawDefaultArtIcon(ctx, artX, artY, artW, artH, accentColor);
       }
+    } else if (expansion) {
+      ctx.fillStyle = expansion.color;
+      ctx.font = '700 34px Arial, sans-serif';
+      ctx.fillText(expansion.name, w / 2, artY + artH * 0.42, artW - pad);
+      ctx.font = '600 22px Arial, sans-serif';
+      ctx.fillText(expansion.pack, w / 2, artY + artH * 0.68, artW - pad);
+    } else if (art) {
+      ctx.font = "140px Segoe UI Emoji, sans-serif";
+      ctx.fillStyle = accentColor;
+      ctx.fillText(art.icon, w / 2, artY + artH / 2);
     } else {
       CardTextureGenerator._drawDefaultArtIcon(ctx, artX, artY, artW, artH, accentColor);
+    }
+
+
+    if (rules) {
+      const x = w * RULE_PANEL.left;
+      const y = h * RULE_PANEL.top;
+      const width = w * RULE_PANEL.width;
+      const height = h * RULE_PANEL.height;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, 12);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 ' + rules.titleSize + 'px ' + RULE_FONT;
+      let lineY = y + RULE_PANEL.padding + rules.titleSize * 0.575;
+      const left = x + RULE_PANEL.padding;
+      const availableWidth = width - RULE_PANEL.padding * 2;
+      ctx.fillText(rules.title, left, lineY, availableWidth);
+      lineY += rules.titleSize * 0.575 + RULE_PANEL.gap + rules.lineHeight / 2;
+      ctx.fillStyle = '#f1f5f9';
+      ctx.font = rules.bodySize + 'px ' + RULE_FONT;
+      for (const line of rules.lines) {
+        ctx.fillText(line, left, lineY, availableWidth);
+        lineY += rules.lineHeight;
+      }
+      return;
     }
 
     // 5. Description text area

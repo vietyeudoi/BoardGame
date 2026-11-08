@@ -18,7 +18,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
 import { HttpServer } from '../server/HttpServer.js';
 import { WebSocketServer } from '../server/WebSocketServer.js';
-import { RoomManager } from '../room/RoomManager.js';
+import type { RoomManager } from '../room/RoomManager.js';
+import { LegacyRoomFixture } from './LegacyRoomFixture.js';
 import type { ServerToClientMessage } from '../../../shared/types/protocol.js';
 
 const TEST_PORT = 4999;
@@ -30,7 +31,7 @@ describe('Multiplayer Room Connection & Private Hand Verification (M1.5.1)', () 
   let roomManager: RoomManager;
 
   beforeAll(async () => {
-    roomManager = new RoomManager();
+    roomManager = new LegacyRoomFixture();
     httpServer = new HttpServer(TEST_PORT);
     wsServer = new WebSocketServer(httpServer.getServer(), roomManager);
     httpServer.start();

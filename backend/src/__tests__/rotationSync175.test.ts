@@ -17,7 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import WebSocket from 'ws';
 import { HttpServer } from '../server/HttpServer.js';
 import { WebSocketServer } from '../server/WebSocketServer.js';
-import { RoomManager } from '../room/RoomManager.js';
+import type { RoomManager } from '../room/RoomManager.js';
+import { LegacyRoomFixture } from './LegacyRoomFixture.js';
 import type { ServerToClientMessage, ClientToServerMessage } from '../../../shared/types/protocol.js';
 
 describe('M1.7.5 — Rotation sync (drag-end rotation + object:move)', () => {
@@ -27,7 +28,7 @@ describe('M1.7.5 — Rotation sync (drag-end rotation + object:move)', () => {
   const PORT = 5571;
 
   beforeAll(async () => {
-    roomManager = new RoomManager();
+    roomManager = new LegacyRoomFixture();
     httpServer = new HttpServer(PORT);
     wsServer = new WebSocketServer(httpServer.getServer(), roomManager);
     httpServer.start();

@@ -62,13 +62,14 @@ describe('M1.5.3 — RemoteCursorManager', () => {
 
   it('updates the cursor position when a new message arrives with higher seq', () => {
     manager.updateCursor(makePayload('player-bob', 'Bob', 0, 0, 0));
-    manager.updateCursor(makePayload('player-bob', 'Bob', 3, 5, 1));
+    manager.updateCursor({ ...makePayload('player-bob', 'Bob', 3, 5, 1), y: 0.8 });
 
     const cursorGroup = scene.children.find(
       (c) => c.name === 'RemoteCursor_player-bob'
     );
     expect(cursorGroup).toBeDefined();
     expect(cursorGroup!.position.x).toBeCloseTo(3, 3);
+    expect(cursorGroup!.position.y).toBeCloseTo(0.92, 3);
     expect(cursorGroup!.position.z).toBeCloseTo(5, 3);
   });
 

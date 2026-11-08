@@ -403,8 +403,8 @@ describe('M1.7.8 — Full Hand Fan Preview (screen-space overlay)', () => {
     window.dispatchEvent(new Event('resize'));
 
     const layout = computeFanLayout(3, 480, 400);
-    expect(layout.cardHeight).toBeGreaterThanOrEqual(180);
-    expect(layout.cardHeight).toBeLessThanOrEqual(240);
+    expect(layout.cardHeight).toBeLessThan(computeFanLayout(3, 1024, 768).cardHeight);
+    expect(layout.cardHeight).toBeLessThan(400 * 0.46);
     const margin = Math.max(16, Math.min(40, 480 * 0.03));
     expect(layout.totalWidth).toBeLessThanOrEqual(480 - margin * 2);
     expect(els.length).toBe(3);

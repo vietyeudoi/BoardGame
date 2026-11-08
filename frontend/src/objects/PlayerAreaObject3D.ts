@@ -14,6 +14,8 @@ export interface PlayerAreaObject3DOptions {
   z: number;
   rotationY: number;
   label: string;
+  seatColor?: number;
+  occupied?: boolean;
   areaWidth?: number;
   areaDepth?: number;
 }
@@ -23,6 +25,8 @@ export interface PlayerAreaObject3DOptions {
 export class PlayerAreaObject3D extends THREE.Group {
   readonly areaId: string;
   private _label: string;
+  private _occupied: boolean;
+  private readonly _seatColor: number;
   private _isHovered = false;
   private _isSelected = false;
   private _isVisible = true;
@@ -33,7 +37,7 @@ export class PlayerAreaObject3D extends THREE.Group {
   // Three.js sub-objects
   private _borderLine: THREE.LineLoop | null = null;
   private _slotLine: THREE.LineLoop | null = null;
-  private _labelSprite: THREE.Sprite | null = null;
+  private _labelMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
   private _avatar: THREE.Mesh | null = null;
 
   // Reusable materials (kept for dispose & color updates)
@@ -41,12 +45,14 @@ export class PlayerAreaObject3D extends THREE.Group {
   private readonly _slotMaterial: THREE.LineBasicMaterial;
   private readonly _avatarMaterial: THREE.MeshBasicMaterial;
   private _labelTexture: THREE.CanvasTexture | null = null;
-  private _labelMaterial: THREE.SpriteMaterial | null = null;
+  private _labelMaterial: THREE.MeshBasicMaterial | null = null;
 
   constructor(opts: PlayerAreaObject3DOptions) {
     super();
     this.areaId = opts.id;
     this._label = opts.label;
+    this._occupied = opts.occupied ?? true;
+    this._seatColor = opts.seatColor ?? PLAYER_AREA_VISUAL_CONFIG.BORDER_COLOR;
     this._areaWidth = opts.areaWidth ?? PLAYER_AREA_VISUAL_CONFIG.AREA_WIDTH;
     this._areaDepth = opts.areaDepth ?? PLAYER_AREA_VISUAL_CONFIG.AREA_DEPTH;
 
@@ -56,21 +62,21 @@ export class PlayerAreaObject3D extends THREE.Group {
 
     // Create shared materials
     this._borderMaterial = new THREE.LineBasicMaterial({
-      color: PLAYER_AREA_VISUAL_CONFIG.BORDER_COLOR,
+      color: this._seatColor,
       transparent: true,
       opacity: PLAYER_AREA_VISUAL_CONFIG.BORDER_OPACITY,
       depthWrite: false,
     });
 
     this._slotMaterial = new THREE.LineBasicMaterial({
-      color: PLAYER_AREA_VISUAL_CONFIG.SLOT_COLOR,
+      color: this._seatColor,
       transparent: true,
       opacity: PLAYER_AREA_VISUAL_CONFIG.SLOT_OPACITY,
       depthWrite: false,
     });
 
     this._avatarMaterial = new THREE.MeshBasicMaterial({
-      color: PLAYER_AREA_VISUAL_CONFIG.AVATAR_COLOR,
+      color: this._seatColor,
       side: THREE.DoubleSide,
     });
 
@@ -78,6 +84,7 @@ export class PlayerAreaObject3D extends THREE.Group {
     this._buildSlotIndicator();
     this._buildLabel();
     this._buildAvatarPlaceholder();
+    this._updateVisuals();
   }
 
   // ─── Build Helpers ────────────────────────────────────────────────────────
@@ -121,18 +128,17 @@ export class PlayerAreaObject3D extends THREE.Group {
 
     const canvas = this._createLabelCanvas(this._label);
     this._labelTexture = new THREE.CanvasTexture(canvas);
-    this._labelMaterial = new THREE.SpriteMaterial({
+    this._labelMaterial = new THREE.MeshBasicMaterial({
       map: this._labelTexture,
       transparent: true,
       depthWrite: false,
-      depthTest: false,
     });
-    this._labelSprite = new THREE.Sprite(this._labelMaterial);
-    // Scale sprite so it's legible — 2 wide, 0.5 tall
-    this._labelSprite.scale.set(2.0, 0.5, 1.0);
-    this._labelSprite.position.set(0, PLAYER_AREA_VISUAL_CONFIG.LABEL_Y, 0);
-    this._labelSprite.renderOrder = 2;
-    this.add(this._labelSprite);
+    const { LABEL_WIDTH, LABEL_HEIGHT, LABEL_Y, LABEL_OUTSET } = PLAYER_AREA_VISUAL_CONFIG;
+    this._labelMesh = new THREE.Mesh(new THREE.PlaneGeometry(LABEL_WIDTH, LABEL_HEIGHT), this._labelMaterial);
+    this._labelMesh.rotation.x = -Math.PI / 2;
+    this._labelMesh.position.set(0, LABEL_Y, LABEL_OUTSET);
+    this._labelMesh.renderOrder = 2;
+    this.add(this._labelMesh);
   }
 
   private _createLabelCanvas(text: string): HTMLCanvasElement {
@@ -147,11 +153,11 @@ export class PlayerAreaObject3D extends THREE.Group {
     ctx.beginPath();
     ctx.roundRect(4, 4, 248, 56, 8);
     ctx.fill();
-    ctx.font = 'bold 22px Arial';
-    ctx.fillStyle = '#00ccff';
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = '#' + this._seatColor.toString(16).padStart(6, '0');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 128, 32);
+    ctx.fillText(text, 128, 32, 240);
     return canvas;
   }
 
@@ -161,11 +167,8 @@ export class PlayerAreaObject3D extends THREE.Group {
       PLAYER_AREA_VISUAL_CONFIG.AVATAR_SEGMENTS
     );
     this._avatar = new THREE.Mesh(geom, this._avatarMaterial);
-    // Place at one corner (top-left in local space)
-    const hw = this._areaWidth / 2;
-    const hd = this._areaDepth / 2;
-    this._avatar.position.set(-hw + 0.35, 0.001, -hd + 0.35);
-    this._avatar.rotation.x = -Math.PI / 2; // lay flat
+    this._avatar.position.set(0, PLAYER_AREA_VISUAL_CONFIG.AVATAR_Y, PLAYER_AREA_VISUAL_CONFIG.AVATAR_OUTSET);
+    this._avatar.rotation.x = -Math.PI / 2;
     this._avatar.renderOrder = 1;
     this.add(this._avatar);
   }
@@ -173,16 +176,11 @@ export class PlayerAreaObject3D extends THREE.Group {
   // ─── Visual State ─────────────────────────────────────────────────────────
 
   private _updateVisuals(): void {
-    let color: number;
-    if (this._isSelected) {
-      color = PLAYER_AREA_VISUAL_CONFIG.SELECT_COLOR;
-    } else if (this._isHovered) {
-      color = PLAYER_AREA_VISUAL_CONFIG.HOVER_COLOR;
-    } else {
-      color = PLAYER_AREA_VISUAL_CONFIG.BORDER_COLOR;
-    }
-    this._borderMaterial.color.setHex(color);
-    this._borderMaterial.needsUpdate = true;
+    const { BORDER_OPACITY, EMPTY_OPACITY, SLOT_OPACITY } = PLAYER_AREA_VISUAL_CONFIG;
+    this._borderMaterial.opacity = this._isSelected || this._isHovered ? 1 : this._occupied ? BORDER_OPACITY : EMPTY_OPACITY;
+    this._slotMaterial.opacity = this._occupied ? SLOT_OPACITY : EMPTY_OPACITY;
+    if (this._labelMesh) this._labelMesh.visible = this._occupied;
+    if (this._avatar) this._avatar.visible = this._occupied;
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -197,9 +195,18 @@ export class PlayerAreaObject3D extends THREE.Group {
     this._updateVisuals();
   }
 
+  setOccupant(label: string, occupied: boolean): boolean {
+    if (this._label === label && this._occupied === occupied) return false;
+    this._occupied = occupied;
+    if (this._label !== label) this.setLabel(label);
+    this._updateVisuals();
+    return true;
+  }
+
   setLabel(label: string): void {
     this._label = label;
     this._buildLabel();
+    this._updateVisuals();
   }
 
   setVisible(visible: boolean): void {
@@ -257,9 +264,10 @@ export class PlayerAreaObject3D extends THREE.Group {
   // ─── Dispose ──────────────────────────────────────────────────────────────
 
   private _disposeLabel(): void {
-    if (this._labelSprite) {
-      this.remove(this._labelSprite);
-      this._labelSprite = null;
+    if (this._labelMesh) {
+      this._labelMesh.geometry.dispose();
+      this.remove(this._labelMesh);
+      this._labelMesh = null;
     }
     this._labelTexture?.dispose();
     this._labelTexture = null;

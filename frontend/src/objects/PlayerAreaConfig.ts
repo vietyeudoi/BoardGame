@@ -5,6 +5,7 @@
  * No magic numbers — all values defined as named constants per PROJECT_RULES.md.
  */
 
+import { SHARED_CONFIG } from '../../../shared/constants/config';
 import { TABLE_CONFIG } from './TableConfig';
 import { PlayerCount, TABLE_SHAPE_CONFIGS, getPolygonVertices } from './TableShapeConfig';
 import { computeTableZones } from './TableZonesConfig';
@@ -25,11 +26,17 @@ export interface PlayerAreaLayoutConfig {
 
 // ─── Visual Config ────────────────────────────────────────────────────────────
 
+export const SEAT_COLORS = [
+  0xffa34e, 0x89d76c, 0x63aaff, 0xb28bff, 0xff8ec9,
+  0xff6c65, 0xc99467, 0x54e0cc, 0xffdd70, 0xb5c4dc,
+] as const;
+
 export const PLAYER_AREA_VISUAL_CONFIG = {
   BORDER_COLOR: TABLE_CONFIG.PLAYER_AREA_BORDER_COLOR,
   HOVER_COLOR: TABLE_CONFIG.PLAYER_AREA_HOVER_COLOR,
   SELECT_COLOR: TABLE_CONFIG.PLAYER_AREA_SELECT_COLOR,
   BORDER_OPACITY: TABLE_CONFIG.PLAYER_AREA_BORDER_OPACITY,
+  SEAT_FRAME_WIDTH: 6.7,
   AREA_WIDTH: TABLE_CONFIG.PLAYER_AREA_WIDTH,
   AREA_DEPTH: TABLE_CONFIG.PLAYER_AREA_DEPTH,
   SURFACE_Y: TABLE_CONFIG.PLAYER_AREA_SURFACE_Y,
@@ -38,8 +45,14 @@ export const PLAYER_AREA_VISUAL_CONFIG = {
   SLOT_OPACITY: 0.3,
   /** Avatar placeholder color */
   AVATAR_COLOR: 0x334466,
-  LABEL_Y: 0.1,
-  AVATAR_RADIUS: 0.25,
+  LABEL_Y: 0.012,
+  LABEL_WIDTH: 4.8,
+  LABEL_HEIGHT: 0.62,
+  LABEL_OUTSET: 1.14,
+  AVATAR_Y: 0.16,
+  AVATAR_OUTSET: 1.93,
+  EMPTY_OPACITY: 0.24,
+  AVATAR_RADIUS: 0.31,
   AVATAR_SEGMENTS: 12,
   /** Safety distance from rail to player area border */
   RAIL_CLEARANCE: 0.35,
@@ -181,4 +194,8 @@ export const LAYOUT_CONFIGS: Record<PlayerCount, PlayerAreaLayoutConfig> = {
   6: { playerCount: 6, positions: buildEllipsePositions(6) },
   7: { playerCount: 7, positions: buildEllipsePositions(7) },
   8: { playerCount: 8, positions: buildEllipsePositions(8) },
+  [SHARED_CONFIG.MAX_PLAYERS_PER_ROOM]: {
+    playerCount: SHARED_CONFIG.MAX_PLAYERS_PER_ROOM,
+    positions: getLayoutForShape(SHARED_CONFIG.MAX_PLAYERS_PER_ROOM),
+  },
 };

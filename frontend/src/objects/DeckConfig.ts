@@ -24,8 +24,6 @@ export const DECK_CONFIG = {
   EDGE_METALNESS: 0.0,
 
   // Layered paper striation texture configuration
-  EDGE_TEXTURE_WIDTH: 64,
-  EDGE_TEXTURE_HEIGHT: 64,
 
   // Default color schemes
   DEFAULT_BG_BACK: CARD_CONFIG.DEFAULT_BG_BACK,

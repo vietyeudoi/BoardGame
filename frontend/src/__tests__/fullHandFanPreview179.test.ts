@@ -161,10 +161,11 @@ describe('M1.7.9 Part B — Interactive Full Hand Fan Preview', () => {
           interaction.selectObject(card, false);
         }
       },
-      onCardDragStart: (sourceCardId: string, event: MouseEvent) => {
+      onCardDragStart: (sourceCardId: string, event: MouseEvent, offset) => {
         const card = sceneManager.getObject(sourceCardId) as any;
         if (!card) return;
-        dragCtrl.beginDrag(card, event);
+        if (offset) dragCtrl.beginPreviewDrag(card, event, offset);
+        else dragCtrl.beginDrag(card, event);
       },
     });
 

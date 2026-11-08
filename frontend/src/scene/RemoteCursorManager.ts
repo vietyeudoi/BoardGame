@@ -73,7 +73,7 @@ export class RemoteCursorManager {
    * Ignores stale messages (seq < last received seq).
    */
   updateCursor(payload: CursorUpdatePayload): void {
-    const { playerId, playerName, x, z, seq } = payload;
+    const { playerId, playerName, x, y = 0, z, seq } = payload;
 
     // Never render our own cursor
     if (playerId === this._localPlayerId) return;
@@ -94,7 +94,7 @@ export class RemoteCursorManager {
     }
 
     entry.lastSeq = seq;
-    entry.group.position.set(x, CURSOR_Y, z);
+    entry.group.position.set(x, y + CURSOR_Y, z);
     this._requestRender();
   }
 

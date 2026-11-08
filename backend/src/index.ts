@@ -13,7 +13,11 @@ async function main(): Promise<void> {
   logger.info('Cat Boom Online Backend starting (M0)');
 
   const roomManager = new RoomManager();
-  const httpServer = new HttpServer(HTTP_PORT);
+  const port = Number(process.env['PORT'] ?? HTTP_PORT);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('PORT phải là số nguyên từ 1 đến 65535.');
+  }
+  const httpServer = new HttpServer(port);
   const wsServer = new WebSocketServer(httpServer.getServer(), roomManager);
 
   httpServer.start();

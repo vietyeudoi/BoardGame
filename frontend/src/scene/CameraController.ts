@@ -17,6 +17,7 @@ export interface CameraControllerOptions {
   initialTheta?: number;
   initialPhi?: number;
   initialRadius?: number;
+  fitTablePerspective?: boolean;
   initialTarget?: THREE.Vector3;
 }
 
@@ -26,6 +27,7 @@ interface ResolvedCameraOptions {
   zoomSpeed: number;
   minDistance: number;
   maxDistance: number;
+  fitTablePerspective: boolean;
   minPolarAngle: number;
   maxPolarAngle: number;
   initialTheta: number;
@@ -34,6 +36,13 @@ interface ResolvedCameraOptions {
   maxPanExtentX: number;
   maxPanExtentZ: number;
 }
+
+export const TABLE_CAMERA_FOV = 54;
+const TABLE_CAMERA_ELEVATION = 29;
+const TABLE_CAMERA_MARGIN = 1.055;
+const TABLE_CAMERA_CLOSE_FRAMING = 0.94 * 0.88;
+const TABLE_CAMERA_WIDE_ASPECT = 1.45;
+const TABLE_CAMERA_HAND_ROOM = 0.075;
 
 const DEFAULT_OPTIONS: ResolvedCameraOptions = {
   orbitSpeed: 0.005,
@@ -44,8 +53,9 @@ const DEFAULT_OPTIONS: ResolvedCameraOptions = {
   minPolarAngle: 0.12,                  // ~7° from overhead view
   maxPolarAngle: Math.PI / 2 - 0.08,    // Restrict from penetrating below table surface
   initialTheta: 0,
-  initialPhi: Math.PI / 3.4,            // Comfortable ~53° tabletop perspective angle
-  initialRadius: 13.5,                  // Frames the full table with margins
+  initialPhi: Math.PI / 3.4,
+  initialRadius: 13.5,
+  fitTablePerspective: false,
   maxPanExtentX: 8.0,
   maxPanExtentZ: 5.5,
 };
@@ -91,11 +101,14 @@ export class CameraController {
       panSpeed: options?.panSpeed ?? DEFAULT_OPTIONS.panSpeed,
       zoomSpeed: options?.zoomSpeed ?? DEFAULT_OPTIONS.zoomSpeed,
       minDistance: options?.minDistance ?? DEFAULT_OPTIONS.minDistance,
+      fitTablePerspective: options?.fitTablePerspective ?? DEFAULT_OPTIONS.fitTablePerspective,
       maxDistance: options?.maxDistance ?? DEFAULT_OPTIONS.maxDistance,
       minPolarAngle: options?.minPolarAngle ?? DEFAULT_OPTIONS.minPolarAngle,
       maxPolarAngle: options?.maxPolarAngle ?? DEFAULT_OPTIONS.maxPolarAngle,
       initialTheta: options?.initialTheta ?? DEFAULT_OPTIONS.initialTheta,
-      initialPhi: options?.initialPhi ?? DEFAULT_OPTIONS.initialPhi,
+      initialPhi: options?.initialPhi ?? (options?.fitTablePerspective
+        ? THREE.MathUtils.degToRad(90 - TABLE_CAMERA_ELEVATION)
+        : DEFAULT_OPTIONS.initialPhi),
       initialRadius: options?.initialRadius ?? DEFAULT_OPTIONS.initialRadius,
       maxPanExtentX: DEFAULT_OPTIONS.maxPanExtentX,
       maxPanExtentZ: DEFAULT_OPTIONS.maxPanExtentZ,
@@ -159,7 +172,7 @@ export class CameraController {
     const zoomFactor = e.deltaY * 0.01 * this._options.zoomSpeed * this._spherical.radius;
     this._spherical.radius = Math.max(
       this._options.minDistance,
-      Math.min(this._options.maxDistance, this._spherical.radius + zoomFactor)
+      Math.min(Math.max(this._options.maxDistance, this._options.initialRadius), this._spherical.radius + zoomFactor)
     );
     this._updateCamera();
   }
@@ -198,6 +211,7 @@ export class CameraController {
       this._target.z + radius * Math.sin(phi) * Math.cos(theta)
     );
     this._camera.lookAt(this._target);
+    this._camera.updateMatrixWorld();
 
     // Notify scene manager that a frame render is requested
     this.onChange?.();
@@ -267,21 +281,21 @@ export class CameraController {
    * Ensures the entire table is comfortably framed without being cut off or excessively small.
    */
   computeAdaptiveRadius(tableRadius: number, aspect?: number): number {
-    const asp = aspect ?? this._camera.aspect ?? 1.777;
+    const viewportAspect = aspect ?? this._camera.aspect;
+    const asp = Number.isFinite(viewportAspect) && viewportAspect > 0 ? viewportAspect : 16 / 9;
     const fovY = (this._camera.fov * Math.PI) / 180;
-    const fovX = 2 * Math.atan(asp * Math.tan(fovY / 2));
+    const tanHalfFov = Math.tan(fovY / 2);
+    if (!this._options.fitTablePerspective) {
+      const vertical = (tableRadius * Math.sin(this._options.initialPhi) + 1.2) / tanHalfFov;
+      const horizontal = (tableRadius + 1) / (asp * tanHalfFov);
+      return THREE.MathUtils.clamp(Math.max(vertical, horizontal) * 1.10, this._options.minDistance, this._options.maxDistance);
+    }
     const phi = this._options.initialPhi;
 
-    // Required distance along vertical perspective and horizontal perspective
-    const distVertical = (tableRadius * Math.sin(phi) + 1.2) / Math.tan(fovY / 2);
-    const distHorizontal = (tableRadius + 1.0) / Math.tan(fovX / 2);
-
-    const requiredDist = Math.max(distVertical, distHorizontal) * 1.10;
-
-    return Math.max(
-      this._options.minDistance,
-      Math.min(this._options.maxDistance, requiredDist)
-    );
+    // Tính cả phần cạnh gần được phóng lớn do phối cảnh.
+    const vertical = Math.cos(phi) / tanHalfFov + Math.sin(phi);
+    const horizontal = Math.hypot(1 / (asp * tanHalfFov), Math.sin(phi));
+    return Math.max(this._options.minDistance, tableRadius * Math.max(vertical * TABLE_CAMERA_CLOSE_FRAMING, horizontal) * TABLE_CAMERA_MARGIN);
   }
 
   /**
@@ -290,10 +304,15 @@ export class CameraController {
    * Clamped within configured minDistance and maxDistance per M1.4.1 / M1.4.2.
    */
   setAdaptiveRadius(radius: number): void {
-    const clampedRadius = Math.max(
-      this._options.minDistance,
-      Math.min(this._options.maxDistance, radius)
-    );
+    // Dịch khung lên để chừa phần tay bài ở sát mép trong góc nhìn cận.
+    if (this._options.fitTablePerspective) {
+      const aspect = this._camera.aspect;
+      if (aspect >= TABLE_CAMERA_WIDE_ASPECT) {
+        this._camera.setViewOffset(aspect, 1, 0, TABLE_CAMERA_HAND_ROOM, aspect, 1);
+      } else if (this._camera.view?.enabled) this._camera.clearViewOffset();
+    }
+    const maxDistance = this._options.fitTablePerspective ? Infinity : this._options.maxDistance;
+    const clampedRadius = THREE.MathUtils.clamp(radius, this._options.minDistance, maxDistance);
     this._options.initialRadius = clampedRadius;
     this._spherical.radius = clampedRadius;
     this._updateCamera();

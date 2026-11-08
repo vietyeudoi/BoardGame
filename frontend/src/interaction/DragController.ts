@@ -7,6 +7,7 @@ import type { RaycastInteractionManager } from './RaycastInteractionManager';
 import type { CameraController } from '../scene/CameraController';
 import { Logger } from '../utils/Logger';
 
+const HAND_DRAG_TURN_MS = 150;
 const logger = Logger.create('DragController');
 
 // ─── Internal Types ───────────────────────────────────────────────────────────
@@ -95,6 +96,42 @@ export class DragController {
    * Optional callback invoked once a real drag becomes active (M1.7.8).
    * Used by the screen-space hand fan preview to close immediately.
    */
+  getSeatDragYaw?: () => number;
+  private _handDragYaw: number | undefined;
+  private _orientationFrame: number | null = null;
+  private readonly _orientationTarget = new THREE.Quaternion();
+
+  getDropYaw(card: CardObject3D): number | undefined {
+    return this._handDragYaw === undefined || !this.getDraggedCards().includes(card) ? undefined : card.getRotationY();
+  }
+
+  rotateDrag(delta: number): boolean {
+    if (!this._dragActive) return false;
+    this._cancelOrientationFrame();
+    if (this._handDragYaw !== undefined) this._handDragYaw += delta;
+    for (const card of this.getDraggedCards()) {
+      const yaw = this._handDragYaw ?? (card.getRotationY() + delta);
+      card.rotation.set(0, Math.atan2(Math.sin(yaw), Math.cos(yaw)), 0, "YXZ");
+    }
+    this.onDragPreviewMove?.();
+    this._requestRender();
+    return true;
+  }
+
+  private _cancelOrientationFrame(): void {
+    if (this._orientationFrame !== null) cancelAnimationFrame(this._orientationFrame);
+    this._orientationFrame = null;
+  }
+
+  public onDragPreviewStart?: () => void;
+  public onDragPreviewMove?: () => void;
+  public onDragPreviewStop?: () => void;
+  private readonly _followerOrigins = new Map<CardObject3D, DragOrigin>();
+
+  getDraggedCards(): CardObject3D[] {
+    return this._draggedCard ? [this._draggedCard, ...this._groupOffsets.keys()] : [];
+  }
+
   public onDragStarted: ((card: CardObject3D) => void) | null = null;
 
   /**
@@ -145,6 +182,8 @@ export class DragController {
    * transfers stay controlled and are therefore skipped by the layout pass.
    */
   public onDragFinished: (() => void) | null = null;
+  /** Giao phần hạ/trả bài cho animator sau khi xử lý drop và nhả layout. */
+  public onDragSettled: ((card: CardObject3D, start: DragOrigin) => void) | null = null;
 
   /**
    * Optional callback to retrieve active table shape parameters for dynamic containment clamping.
@@ -171,10 +210,10 @@ export class DragController {
       this._onCardPointerDown(card, event);
     };
 
-    // Safety: cancel drag when canvas loses pointer (e.g., browser steals focus mid-drag)
+    // Chuyển từ canvas sang fan vẫn thuộc cùng thao tác; chỉ hủy khi rời cửa sổ.
     this._domElement.addEventListener(
       'mouseleave',
-      () => this.cancelDrag(),
+      (event: MouseEvent) => { if (!event.relatedTarget) this.cancelDrag(); },
       { signal: this._permanentAbortController.signal }
     );
 
@@ -246,6 +285,13 @@ export class DragController {
       card.scale.copy(this._dragOrigin.scale);
     }
 
+    if (restoreTransform) {
+      for (const [follower, origin] of this._followerOrigins) {
+        follower.position.copy(origin.position);
+        follower.rotation.copy(origin.rotation);
+        follower.scale.copy(origin.scale);
+      }
+    }
     this.onDragCancel?.();
     this._removeDragHighlights();
     this._requestRender();
@@ -261,6 +307,22 @@ export class DragController {
    */
   beginDrag(card: CardObject3D, event: MouseEvent): void {
     this._onCardPointerDown(card, event);
+  }
+
+  /** Giữ điểm cầm khi chuyển từ fan 2D sang mặt phẳng kéo 3D. */
+  beginPreviewDrag(card: CardObject3D, event: MouseEvent, offset: { x: number; y: number }): void {
+    this._onCardPointerDown(card, event);
+    if (this._draggedCard !== card) return;
+    this._updateNDC(event.clientX - offset.x, event.clientY - offset.y);
+    this._raycaster.setFromCamera(this._ndc, this._camera);
+    const center = this._raycaster.ray.intersectPlane(this._dragPlane, new THREE.Vector3());
+    if (!center) return;
+    this._pickOffset.copy(this._prevIntersectPoint).sub(center);
+    this._activateDrag();
+    this._moveGroupTo(center.x, center.z);
+    this.onQueryDropTarget?.(card);
+    this.onDragPreviewMove?.();
+    this._requestRender();
   }
 
   // ─── Drag Start (triggered by RaycastInteractionManager callback) ─────────
@@ -293,6 +355,8 @@ export class DragController {
     if (selectedCards.length > 1 && selectedCards.some((c) => c.cardId === card.cardId)) {
       for (const selCard of selectedCards) {
         if (selCard.cardId !== card.cardId) {
+          if (this.canDragCard && !this.canDragCard(selCard)) continue;
+          this._followerOrigins.set(selCard, this._captureTransform(selCard));
           this._groupOffsets.set(selCard, {
             offsetX: selCard.position.x - card.position.x,
             offsetZ: selCard.position.z - card.position.z,
@@ -371,14 +435,38 @@ export class DragController {
     const targetX = this._intersectPoint.x - this._pickOffset.x;
     const targetZ = this._intersectPoint.z - this._pickOffset.z;
 
+    this._moveGroupTo(targetX, targetZ);
+
+    // M1.3.4.3: Query drop target preview candidate
+    this.onQueryDropTarget?.(this._draggedCard);
+    this.onDragPreviewMove?.();
+
+    // M1.5.3 / M1.7.4.1: only table cards have broadcastable drag positions —
+    // hand transforms stay private and are never sent to peers.
+    if (!this._draggedCard.isInHand()) {
+      this.onDragMoveBroadcast?.(this._draggedCard.cardId, {
+        x: this._draggedCard.position.x,
+        y: this._draggedCard.position.y,
+        z: this._draggedCard.position.z,
+      });
+    }
+
+    this._requestRender();
+  }
+
+  // ─── Drag End (mouse button released) ────────────────────────────────────
+
+  private _moveGroupTo(targetX: number, targetZ: number): void {
+    const leader = this._draggedCard;
+    if (!leader) return;
     // Table boundary clamp for the primary card
     const shapeParams = this.getTableShapeParams ? this.getTableShapeParams() : undefined;
     const clampedLeader = clampTablePosition(
       targetX,
       targetZ,
-      this._draggedCard.getRotationY(),
-      this._draggedCard.cardWidth,
-      this._draggedCard.cardHeight,
+      leader.getRotationY(),
+      leader.cardWidth,
+      leader.cardHeight,
       shapeParams
     );
 
@@ -407,7 +495,7 @@ export class DragController {
     }
 
     // Position primary card at DRAG_LIFT_Y elevation
-    this._draggedCard.position.set(
+    leader.position.set(
       finalLeaderX,
       TABLE_CONFIG.SURFACE_Y + INTERACTION_CONFIG.DRAG_LIFT_Y,
       finalLeaderZ
@@ -422,23 +510,7 @@ export class DragController {
       );
     }
 
-    // M1.3.4.3: Query drop target preview candidate
-    this.onQueryDropTarget?.(this._draggedCard);
-
-    // M1.5.3 / M1.7.4.1: only table cards have broadcastable drag positions —
-    // hand transforms stay private and are never sent to peers.
-    if (!this._draggedCard.isInHand()) {
-      this.onDragMoveBroadcast?.(this._draggedCard.cardId, {
-        x: this._draggedCard.position.x,
-        y: this._draggedCard.position.y,
-        z: this._draggedCard.position.z,
-      });
-    }
-
-    this._requestRender();
   }
-
-  // ─── Drag End (mouse button released) ────────────────────────────────────
 
   private _onMouseUp(event?: MouseEvent): void {
     if (event) {
@@ -450,6 +522,9 @@ export class DragController {
       return;
     }
 
+    const settledCard = this._dragActive ? this._draggedCard : null;
+    const settleStart = settledCard ? this._captureTransform(settledCard) : null;
+    const followerStarts = settledCard ? Array.from(this._groupOffsets.keys(), card => [card, this._captureTransform(card)] as const) : [];
     if (this._dragActive) {
       const card = this._draggedCard;
       const followers = Array.from(this._groupOffsets.keys());
@@ -481,11 +556,14 @@ export class DragController {
       // The suppression hook prevents a duplicate ownership path when an
       // explicit card:transfer request was already sent for this drop.
       this._broadcastDragEnd(card);
+      for (const follower of followers) this._broadcastDragEnd(follower);
 
       this._requestRender();
     }
 
     this._cleanup();
+    if (settledCard && settleStart) this.onDragSettled?.(settledCard, settleStart);
+    for (const [follower, origin] of followerStarts) this.onDragSettled?.(follower, origin);
   }
 
   // ─── Cancel Drag (private implementation) ────────────────────────────────
@@ -496,6 +574,8 @@ export class DragController {
       return;
     }
 
+    const settledCard = this._dragActive ? this._draggedCard : null;
+    const settleStart = settledCard ? this._captureTransform(settledCard) : null;
     if (this._dragActive) {
       this.onDragCancel?.();
       // Reset Y to table surface if not in stack, keep last valid XZ
@@ -519,6 +599,11 @@ export class DragController {
     }
 
     this._cleanup();
+    if (settledCard && settleStart) this.onDragSettled?.(settledCard, settleStart);
+  }
+
+  private _captureTransform(card: CardObject3D): DragOrigin {
+    return { position: card.position.clone(), rotation: card.rotation.clone(), scale: card.scale.clone() };
   }
 
   // ─── Activation & Cleanup Helpers ─────────────────────────────────────────
@@ -527,8 +612,7 @@ export class DragController {
     if (!this._draggedCard) return;
     this._dragActive = true;
 
-    // M1.7.8: a drag owns the pointer — the screen-space fan preview must close
-    // before the card starts moving. The overlay never keeps a reference to it.
+    // Drag sở hữu con trỏ; SceneManager giữ fan mở cho tới khi kết thúc thao tác.
     this.onDragStarted?.(this._draggedCard);
 
     // M1.7.4.1: the drag becomes the single writer for its cards. Hand layout
@@ -539,12 +623,24 @@ export class DragController {
       this._claimLayoutControl(follower);
     }
 
-    // A hand card carries a local-only standing presentation. It must become a
-    // canonical flat world object before the pointer starts driving its mesh;
-    // otherwise the HandZone rotation leaks into TABLE drag/drop transforms.
+    // Góc ghế được tính trong hệ bàn. Slerp chọn đường xoay ngắn nhất.
     if (this._draggedCard.isInHand()) {
-      this._draggedCard.rotation.order = 'XYZ';
-      this._draggedCard.rotation.set(0, 0, 0);
+      const cards = this.getDraggedCards();
+      this._handDragYaw = this.getSeatDragYaw?.() ?? 0;
+      const origins = cards.map(card => {
+        card.rotation.reorder("YXZ");
+        return card.quaternion.clone();
+      });
+      this._orientationTarget.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this._handDragYaw);
+      const started = performance.now();
+      const advance = (now: number): void => {
+        const t = Math.max(0, Math.min(1, (now - started) / HAND_DRAG_TURN_MS));
+        cards.forEach((card, index) => card.quaternion.slerpQuaternions(origins[index]!, this._orientationTarget, 1 - (1 - t) ** 2));
+        this.onDragPreviewMove?.();
+        this._requestRender();
+        this._orientationFrame = t < 1 ? requestAnimationFrame(advance) : null;
+      };
+      this._orientationFrame = requestAnimationFrame(advance);
       this._draggedCard.position.y = TABLE_CONFIG.SURFACE_Y + INTERACTION_CONFIG.DRAG_LIFT_Y;
     }
 
@@ -558,6 +654,7 @@ export class DragController {
       this._applyDragHighlight(follower);
     }
 
+    this.onDragPreviewStart?.();
     this._requestRender();
     logger.debug('Drag activated', { id: this._draggedCard.cardId, groupCount: this._groupOffsets.size });
 
@@ -624,6 +721,8 @@ export class DragController {
   }
 
   private _cleanup(): void {
+    this._cancelOrientationFrame();
+    this._handDragYaw = undefined;
     this._unregisterDragListeners();
     this._removeDragHighlights();
 
@@ -635,14 +734,17 @@ export class DragController {
 
     // M1.7.4.1: hand out layout ownership before the layout settles. Transfers
     // that took over keep their own control, so the settle pass skips them.
-    const hadLayoutClaim = this._layoutClaimedCards.size > 0;
+    const hadDrag = this._dragActive;
     this._releaseLayoutControl();
 
     this._draggedCard = null;
     this._groupOffsets.clear();
+    this._followerOrigins.clear();
     this._dragActive = false;
 
-    if (hadLayoutClaim) {
+    // Bài từ TABLE cũng phải kết thúc phiên drag để hover HAND hoạt động lại.
+    if (hadDrag) {
+      this.onDragPreviewStop?.();
       this.onDragFinished?.();
     }
   }
@@ -671,6 +773,10 @@ export class DragController {
       () => this.cancelDrag(),
       { signal }
     );
+    window.addEventListener('pointercancel', () => this.cancelDrag(), { signal });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') this.cancelDrag();
+    }, { signal });
   }
 
   private _unregisterDragListeners(): void {
@@ -737,6 +843,9 @@ export class DragController {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   dispose(): void {
+    // Teardown không khởi động thêm animation hay sắp xếp HAND đã bị dispose.
+    this.onDragSettled = null;
+    this.onDragFinished = null;
     this._cancelDrag();
     this._permanentAbortController.abort();
     this._interactionManager.onCardMouseDown = null;
@@ -744,6 +853,7 @@ export class DragController {
     this.shouldBroadcastDragEnd = null;
     this.shouldReleaseLayoutControl = null;
     this.onDragFinished = null;
+    this.onDragSettled = null;
     this._dragOrigin = null;
     this._dragOriginCardId = null;
     this._dragEmissiveBackup.clear();

@@ -46,10 +46,11 @@ export class RoomBroadcaster {
     playerIndex: number
   ): void {
     room.getConnectedSessionIds().forEach((sid) => {
+      if (room.phase && sid !== card.ownerId) return;
       sessions.get(sid)?.sendRaw({
         type: 'hand:card-drawn',
         payload: {
-          card: ViewStateBuilder.filterObjectForClient(card, sid),
+          card: ViewStateBuilder.filterObjectForClient(card, sid, Boolean(room.phase)),
           playerIndex,
         },
       });
@@ -65,13 +66,14 @@ export class RoomBroadcaster {
     seq?: number
   ): void {
     room.getConnectedSessionIds().forEach((sid) => {
+      if (room.phase && sid !== card.ownerId) return;
       sessions.get(sid)?.sendRaw({
         type: 'hand:card-transferred',
         payload: {
           cardId: card.id,
           fromPlayerIndex: fromIdx,
           toPlayerIndex: toIdx,
-          card: ViewStateBuilder.filterObjectForClient(card, sid),
+          card: ViewStateBuilder.filterObjectForClient(card, sid, Boolean(room.phase)),
           ...(seq !== undefined ? { seq } : {}),
         },
       });

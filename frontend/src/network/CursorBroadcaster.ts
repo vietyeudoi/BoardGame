@@ -11,6 +11,7 @@
  * - Maintains monotonically increasing sequence number.
  * - Dispose cleans up the interval.
  */
+import type { Vector3Like } from '@shared/types/protocol';
 import type { NetworkClient } from './NetworkClient';
 import type { ClientStore } from '../store/ClientStore';
 import { Logger } from '../utils/Logger';
@@ -24,10 +25,8 @@ const DEAD_ZONE = 0.05;
 
 export class CursorBroadcaster {
   private _seq = 0;
-  private _lastX = NaN;
-  private _lastZ = NaN;
-  private _pendingX: number | null = null;
-  private _pendingZ: number | null = null;
+  private _lastPosition: Vector3Like | null = null;
+  private _pendingPosition: Vector3Like | null = null;
   private _intervalId: ReturnType<typeof setInterval> | null = null;
   private _active = false;
 
@@ -45,8 +44,7 @@ export class CursorBroadcaster {
     if (this._active) return;
     this._active = true;
     this._seq = 0;
-    this._lastX = NaN;
-    this._lastZ = NaN;
+    this._lastPosition = null;
 
     this._intervalId = setInterval(() => this._flush(), THROTTLE_INTERVAL_MS);
     logger.debug('CursorBroadcaster enabled');
@@ -59,8 +57,7 @@ export class CursorBroadcaster {
     if (!this._active) return;
     this._active = false;
     this._clearInterval();
-    this._pendingX = null;
-    this._pendingZ = null;
+    this._pendingPosition = null;
     logger.debug('CursorBroadcaster disabled');
   }
 
@@ -68,20 +65,19 @@ export class CursorBroadcaster {
    * Receives the world-space XZ cursor position (from SceneManager raycasting).
    * The position is queued and sent on the next throttle tick.
    */
-  onCursorMoved(x: number, z: number): void {
-    if (!this._active) return;
-    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
-    if (Math.abs(x) > 50 || Math.abs(z) > 50) return;
+  onCursorMoved(x: number, z: number, y = 0): void {
+    if (!this._active || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+    if (Math.abs(x) > 50 || Math.abs(z) > 50 || y < 0 || y > 50) return;
 
-    // Dead zone check against last successfully sent position
-    if (!Number.isNaN(this._lastX)) {
-      const dx = Math.abs(x - this._lastX);
-      const dz = Math.abs(z - this._lastZ);
-      if (dx < DEAD_ZONE && dz < DEAD_ZONE) return;
-    }
+    const last = this._lastPosition;
+    const unchanged = last && Math.abs(x - last.x) < DEAD_ZONE &&
+      Math.abs(z - last.z) < DEAD_ZONE && Math.abs(y - last.y) < DEAD_ZONE;
+    this._pendingPosition = unchanged ? null : { x, y, z };
+  }
 
-    this._pendingX = x;
-    this._pendingZ = z;
+  resetPosition(): void {
+    this._pendingPosition = null;
+    this._lastPosition = null;
   }
 
   /** Dispose and stop broadcasting. */
@@ -94,31 +90,15 @@ export class CursorBroadcaster {
 
   private _flush(): void {
     if (!this._active) return;
-    if (this._pendingX === null || this._pendingZ === null) return;
-    if (!this._store.getRoomId()) return;
+    const position = this._pendingPosition;
+    if (!position || !this._store.getRoomId()) return;
 
-    const x = this._pendingX;
-    const z = this._pendingZ;
-    this._pendingX = null;
-    this._pendingZ = null;
-
-    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
-    if (Math.abs(x) > 50 || Math.abs(z) > 50) return;
-
-    // Avoid sending unnecessary updates if position has not changed
-    if (!Number.isNaN(this._lastX) && !Number.isNaN(this._lastZ)) {
-      if (Math.abs(x - this._lastX) < 1e-4 && Math.abs(z - this._lastZ) < 1e-4) {
-        return;
-      }
-    }
-
-    this._seq += 1;
-    this._lastX = x;
-    this._lastZ = z;
-
+    this._pendingPosition = null;
+    this._lastPosition = position;
+    const { x, y, z } = position;
     this._networkClient.send({
       type: 'cursor:move',
-      payload: { x, z, seq: this._seq },
+      payload: { x, z, ...(y > 0 ? { y } : {}), seq: ++this._seq },
     });
   }
 

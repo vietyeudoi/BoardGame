@@ -13,7 +13,7 @@ describe('TableObject3D (M1.1)', () => {
   let table: TableObject3D;
 
   beforeEach(() => {
-    table = new TableObject3D();
+    table = new TableObject3D(4);
   });
 
   afterEach(() => {

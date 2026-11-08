@@ -15,13 +15,12 @@ export class LobbyScreen {
   private _joinRoomBtn: HTMLButtonElement | null = null;
   private _playerNameInput: HTMLInputElement | null = null;
   private _roomNameInput: HTMLInputElement | null = null;
-  private _maxPlayersInput: HTMLSelectElement | null = null;
   private _roomIdInput: HTMLInputElement | null = null;
   private _errorEl: HTMLElement | null = null;
   private readonly _abortController = new AbortController();
 
   public onEnterSandbox: (() => void) | null = null;
-  public onCreateRoom: ((roomName: string, playerName: string, maxPlayers: number) => void) | null = null;
+  public onCreateRoom: ((roomName: string, playerName: string, doubleDeck: boolean) => void) | null = null;
   public onJoinRoom: ((roomId: string, playerName: string) => void) | null = null;
   public onRetryConnect: (() => void) | null = null;
 
@@ -81,10 +80,12 @@ export class LobbyScreen {
             padding:7px 14px;font-size:0.85rem;font-weight:600;cursor:pointer;white-space:nowrap;
           ">Tạo phòng</button>
         </div>
-        <label style="display:block;font-size:0.75rem;color:#cbd5e1;font-weight:600;margin:0 0 5px;">SỐ NGƯỜI CHƠI TỐI ĐA</label>
-        <select id="input-max-players" style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:7px 10px;color:#f8fafc;font-size:0.85rem;margin-bottom:10px;">
-          <option value="2">2 người</option><option value="3">3 người</option><option value="4" selected>4 người</option><option value="5">5 người</option><option value="6">6 người</option><option value="7">7 người</option><option value="8">8 người</option>
-        </select>
+
+
+        <label style="display:block;margin:0 0 10px;color:#cbd5e1;font-size:0.8rem;cursor:pointer">
+          <input id="input-double-deck" type="checkbox" />
+          Nhân đôi bộ bài <small>(trừ Mèo Nổ và Gỡ Bom)</small>
+        </label>
 
         <!-- Join Room -->
         <div style="display:flex;gap:6px;">
@@ -124,7 +125,6 @@ export class LobbyScreen {
     this._joinRoomBtn = el.querySelector<HTMLButtonElement>('#btn-join-room');
     this._playerNameInput = el.querySelector<HTMLInputElement>('#input-player-name');
     this._roomNameInput = el.querySelector<HTMLInputElement>('#input-room-name');
-    this._maxPlayersInput = el.querySelector<HTMLSelectElement>('#input-max-players');
     this._roomIdInput = el.querySelector<HTMLInputElement>('#input-room-id');
 
     return el;
@@ -147,10 +147,10 @@ export class LobbyScreen {
       () => {
         const playerName = this._playerNameInput?.value.trim() || 'Player';
         const roomName = this._roomNameInput?.value.trim() || 'Phòng Chơi';
-        const maxPlayers = Number(this._maxPlayersInput?.value ?? '4');
         this.clearError();
         logger.info('Create Room clicked', { roomName, playerName });
-        this.onCreateRoom?.(roomName, playerName, maxPlayers);
+        const doubleDeck = this._element.querySelector<HTMLInputElement>('#input-double-deck')?.checked ?? false;
+        this.onCreateRoom?.(roomName, playerName, doubleDeck);
       },
       { signal }
     );

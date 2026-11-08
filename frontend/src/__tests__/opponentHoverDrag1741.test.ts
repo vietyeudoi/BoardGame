@@ -416,6 +416,9 @@ describe('M1.7.4.1 — opponent card drag pipeline', () => {
 
     drag.cancelDrag();
 
+    // Chờ animation trả bài rồi mới kiểm tra slot cuối.
+    sceneManager.flushCardTransfers();
+
     expect(drag.isDragging()).toBe(false);
     expect(card.isLayoutControlled()).toBe(false);
     expect(card.getHandZoneId()).toBe(sourceZone.zoneId);
@@ -435,6 +438,7 @@ describe('M1.7.4.1 — opponent card drag pipeline', () => {
     // Drop at the table centre (outside every hand zone).
     dragCardTo(sceneManager, card, 0, 0);
     pointerUp(clientForWorldPoint(sceneManager, 0, 0));
+    sceneManager.flushCardTransfers();
 
     expect(sceneManager.getDragController().isDragging()).toBe(false);
     expect(card.getHandZoneId()).toBeNull();
@@ -496,6 +500,7 @@ describe('M1.7.4.1 — opponent card drag pipeline', () => {
 
     // Drop back onto the local hand zone.
     pointerUp(clientForWorldPoint(sceneManager, localZone.position.x, localZone.position.z));
+    sceneManager.flushCardTransfers();
 
     expect(requestSpy).not.toHaveBeenCalled();
     expect(card.getHandZoneId()).toBe(localZone.zoneId);
@@ -518,6 +523,7 @@ describe('M1.7.4.1 — opponent card drag pipeline', () => {
       expect(card.isLayoutControlled()).toBe(true);
 
       sceneManager.getDragController().cancelDrag();
+      sceneManager.flushCardTransfers();
 
       expect(card.isLayoutControlled()).toBe(false);
       expect(card.position.distanceTo(slot)).toBeLessThan(1e-6);

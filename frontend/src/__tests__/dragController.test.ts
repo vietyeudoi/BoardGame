@@ -135,6 +135,38 @@ describe('DragController (M1.3.2)', () => {
       expect(dragController.isDragging()).toBe(true);
     });
 
+    it('lấy góc ghế cho cả nhóm HAND và giữ góc chỉnh khi thả', () => {
+      const follower = new CardObject3D({ id: 'follower', faceUp: false, position: { x: 2, y: 0, z: 0 } });
+      const seatYaw = 4 * Math.PI / 5;
+      const origins: FrameRequestCallback[] = [];
+      const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => origins.push(cb));
+      try {
+        card.setHandZoneId('hand-4');
+        follower.setHandZoneId('hand-4');
+        card.rotation.y = -0.15;
+        follower.rotation.y = 0.25;
+        dragController.getSeatDragYaw = () => seatYaw;
+        interactionManager.selectObjects([card, follower]);
+        dragController.beginPreviewDrag(card, new MouseEvent('mousedown', { clientX: 400, clientY: 300 }), { x: 0, y: 0 });
+        expect(card.rotation.y).toBeCloseTo(-0.15);
+        expect(follower.position.x - card.position.x).toBeCloseTo(2);
+        expect(follower.position.z - card.position.z).toBeCloseTo(0);
+        origins[0]!(performance.now() + 200);
+        expect(card.getRotationY()).toBeCloseTo(seatYaw);
+        expect(follower.getRotationY()).toBeCloseTo(seatYaw);
+        dragController.rotateDrag(Math.PI / 2);
+        const expected = seatYaw + Math.PI / 2;
+        expect(dragController.getDropYaw(card)).toBeCloseTo(expected);
+        expect(dragController.getDropYaw(follower)).toBeCloseTo(expected);
+        expect(follower.isFaceUp()).toBe(false);
+        expect(card.isFaceUp()).toBe(true);
+      } finally {
+        dragController.abortDrag(true);
+        follower.dispose();
+        raf.mockRestore();
+      }
+    });
+
     it('onCardMouseDown callback is registered on interactionManager', () => {
       expect(interactionManager.onCardMouseDown).not.toBeNull();
       expect(typeof interactionManager.onCardMouseDown).toBe('function');

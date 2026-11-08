@@ -345,7 +345,7 @@ describe('M1.5.0 — Private Hand Zone & Card Arrangement', () => {
       expect(demoCard.isInHand()).toBe(true);
 
       // Drag out to table center
-      demoCard.position.set(0, TABLE_CONFIG.SURFACE_Y, 0);
+      demoCard.position.set(0, TABLE_CONFIG.SURFACE_Y, 3);
       sceneManager.getDragController().onCardDropped?.(demoCard, false, []);
 
       expect(demoCard.isInHand()).toBe(false);

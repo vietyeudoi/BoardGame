@@ -1,7 +1,6 @@
 /**
  * DeckObject3D.ts — 3D Tabletop Deck Stack & Card ID Collection Manager
- * Represents a physical 3D stack of playing cards with dynamic thickness,
- * layered paper edge texture, card back top face, and Fisher-Yates shuffle.
+ * Hiển thị bộ rút bằng một lá úp và số lá còn lại.
  * Adheres strictly to PROJECT_RULES.md (M1.2.2).
  */
 import * as THREE from 'three';
@@ -34,6 +33,10 @@ export class DeckObject3D extends THREE.Group {
 
   private _cardIds: string[] = [];
   private _isDisposed = false;
+  private _onlineCount: number | null = null;
+  private readonly _emptyOutline: THREE.LineLoop;
+  private _badge: THREE.Sprite | null = null;
+  private _badgeCount = -1;
 
   // 3D Visual Mesh & Materials
   private readonly _deckMesh: THREE.Mesh;
@@ -43,9 +46,13 @@ export class DeckObject3D extends THREE.Group {
 
   // Textures & Ownership
   private _topTexture: THREE.Texture | null = null;
-  private _edgeTexture: THREE.Texture | null = null;
+
   private _ownsTopTexture = false;
-  private _ownsEdgeTexture = false;
+  private _onlineTopType?: string;
+  private _onlineTopTexture: THREE.CanvasTexture | null = null;
+  private _activityFrame?: number;
+  private _flippingFace = false;
+  private _activityCards: THREE.Mesh[] = [];
 
 
   constructor(options?: DeckOptions) {
@@ -87,7 +94,6 @@ export class DeckObject3D extends THREE.Group {
     });
 
     this._sideMaterial = new THREE.MeshStandardMaterial({
-      map: this._edgeTexture,
       color: DECK_CONFIG.EDGE_COLOR,
       roughness: DECK_CONFIG.EDGE_ROUGHNESS,
       metalness: DECK_CONFIG.EDGE_METALNESS,
@@ -103,6 +109,14 @@ export class DeckObject3D extends THREE.Group {
     this._deckMesh.castShadow = true;
     this._deckMesh.receiveShadow = true;
     this.add(this._deckMesh);
+    const w = this.deckWidth / 2;
+    const h = this.deckHeight / 2;
+    this._emptyOutline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-w, 0, -h), new THREE.Vector3(w, 0, -h),
+      new THREE.Vector3(w, 0, h), new THREE.Vector3(-w, 0, h),
+    ]), new THREE.LineBasicMaterial({ color: 0xb29a76, transparent: true, opacity: 0.45 }));
+    this._emptyOutline.position.y = this.cardThickness + 0.002;
+    this.add(this._emptyOutline);
 
     // 5. Initial Visual Mesh Scaling & Height
     this._updateVisualMesh();
@@ -161,7 +175,23 @@ export class DeckObject3D extends THREE.Group {
   }
 
   getCount(): number {
-    return this._cardIds.length;
+    return this._onlineCount ?? this._cardIds.length;
+  }
+
+  resetLocalCards(cardIds: string[], online: boolean): void {
+    this._clearActivity();
+    this.setOnlineTopType(undefined);
+    this._validateInitialCardIds(cardIds);
+    this._cardIds = [...cardIds];
+    this._onlineCount = online ? 0 : null;
+    this._updateVisualMesh();
+  }
+
+  setOnlineCount(count: number): boolean {
+    if (this._onlineCount === null || this._onlineCount === count) return false;
+    this._onlineCount = count;
+    this._updateVisualMesh();
+    return true;
   }
 
   /**
@@ -313,11 +343,11 @@ export class DeckObject3D extends THREE.Group {
   // ─── Visual & Transform API ───────────────────────────────────────────────
 
   /**
-   * Returns current physical visual height of the stack: count * cardThickness.
+   * Chiều cao biểu tượng của bộ bài, cố định bằng một lá khi còn bài.
    * Returns 0 if empty.
    */
   getVisualHeight(): number {
-    return this._cardIds.length * this.cardThickness;
+    return this.getCount() > 0 ? this.cardThickness : 0;
   }
 
   getMesh(): THREE.Mesh {
@@ -336,7 +366,7 @@ export class DeckObject3D extends THREE.Group {
    */
   getBoundingBox(): THREE.Box3 {
     this.updateWorldMatrix(true, true);
-    if (this._cardIds.length === 0) {
+    if (this.getCount() === 0) {
       // Empty deck footprint at current position
       const halfW = this.deckWidth / 2;
       const halfH = this.deckHeight / 2;
@@ -345,7 +375,7 @@ export class DeckObject3D extends THREE.Group {
         new THREE.Vector3(this.position.x + halfW, this.position.y, this.position.z + halfH)
       );
     }
-    return new THREE.Box3().setFromObject(this);
+    return new THREE.Box3().setFromObject(this._deckMesh);
   }
 
   getBottomY(): number {
@@ -371,6 +401,67 @@ export class DeckObject3D extends THREE.Group {
     this.scale.set(x, y, z);
   }
 
+
+  setOnlineTopType(cardType?: string): boolean {
+    if (this._onlineTopType === cardType) return false;
+    if (this._onlineTopType) CardTextureGenerator.releaseFrontTexture(this._onlineTopType);
+    this._onlineTopType = cardType;
+    this._onlineTopTexture = cardType ? CardTextureGenerator.acquireFrontTexture(cardType) : null;
+    this._updateVisualMesh();
+    return true;
+  }
+
+  private _clearActivity(): void {
+    if (this._activityFrame !== undefined) cancelAnimationFrame(this._activityFrame);
+    this._activityFrame = undefined;
+    this._flippingFace = false;
+    this._deckMesh.rotation.y = 0;
+    this._deckMesh.scale.x = 1;
+    for (const card of this._activityCards) {
+      card.removeFromParent();
+      (card.material as THREE.Material[])[0]?.dispose();
+    }
+    this._activityCards = [];
+  }
+
+  animateActivity(kind: 'flip' | 'shuffle' | 'insert', requestRender: () => void, count = 0): void {
+
+    if (typeof requestAnimationFrame === 'undefined') return;
+    if (kind === 'flip' && this._activityFrame !== undefined) {
+      this._flippingFace = true;
+      return;
+    }
+    const flip = kind === 'flip' || (kind === 'shuffle' && this._flippingFace);
+    this._clearActivity();
+    this._flippingFace = flip;
+    // Lá minh họa bay vào chồng chỉ dùng mặt lưng, không gắn với ID lá thật.
+    for (let index = 0; index < Math.min(count, 3); index++) {
+      const back = new THREE.MeshStandardMaterial({ map: this._topTexture });
+      const card = new THREE.Mesh(this._deckMesh.geometry, [back, this._bottomMaterial, this._sideMaterial]);
+      this._activityCards.push(card);
+      this.add(card);
+    }
+    const start = performance.now();
+    const duration = kind === 'shuffle' ? 340 : 210;
+    const animate = (now: number): void => {
+      const t = Math.min(1, (now - start) / duration);
+      if (t >= 1) {
+        this._clearActivity();
+        requestRender();
+        return;
+      }
+      if (this._flippingFace) this._deckMesh.scale.x = 0.12 + 0.88 * t;
+      if (kind === 'shuffle') this._deckMesh.rotation.y = Math.sin(t * Math.PI * 4) * 0.24 * (1 - t);
+      this._activityCards.forEach((card, index) => {
+        const distance = (1 - t) ** 2;
+        card.position.set((index - 0.5) * 0.38 * distance, this.cardThickness + 0.5 * distance, 1.35 * distance);
+      });
+      requestRender();
+      this._activityFrame = requestAnimationFrame(animate);
+    };
+    animate(start);
+  }
+
   setTopTexture(texture: THREE.Texture, ownsTexture = false): void {
     if (this._isDisposed) return;
     if (this._ownsTopTexture && this._topTexture) {
@@ -378,7 +469,7 @@ export class DeckObject3D extends THREE.Group {
     }
     this._topTexture = texture;
     this._ownsTopTexture = ownsTexture;
-    this._topMaterial.map = texture;
+    this._topMaterial.map = this.getCount() > 0 ? texture : null;
     this._topMaterial.needsUpdate = true;
   }
 
@@ -394,9 +485,7 @@ export class DeckObject3D extends THREE.Group {
       this._ownsTopTexture = true;
     }
 
-    // 2. Edge Texture (Layered paper core striations)
-    this._edgeTexture = this._createLayeredPaperTexture();
-    this._ownsEdgeTexture = true;
+
   }
 
   private _createDefaultTopTexture(): THREE.Texture {
@@ -410,70 +499,6 @@ export class DeckObject3D extends THREE.Group {
     return CardTextureGenerator.createTextureFromCanvas(canvas) ?? new THREE.Texture();
   }
 
-  /**
-   * Generates a seamless layered paper texture with horizontal striations.
-   * Simulates individual paper layers and seam lines between stacked cards.
-   */
-  private _createLayeredPaperTexture(): THREE.Texture {
-    if (!CardTextureGenerator.isCanvasSupported()) {
-      const fallback = new THREE.Texture();
-      fallback.wrapS = THREE.RepeatWrapping;
-      fallback.wrapT = THREE.RepeatWrapping;
-      return fallback;
-    }
-
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = DECK_CONFIG.EDGE_TEXTURE_WIDTH;
-      canvas.height = DECK_CONFIG.EDGE_TEXTURE_HEIGHT;
-      const ctx = canvas.getContext('2d');
-
-      if (!ctx) return new THREE.Texture();
-
-      // Ivory paper base color
-      ctx.fillStyle = '#f4f1ea';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Subtle paper grain & fine horizontal layer striations
-      ctx.lineWidth = 1;
-      const h = canvas.height;
-      const w = canvas.width;
-
-      for (let y = 0; y < h; y += 4) {
-        ctx.strokeStyle = y % 8 === 0 ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.45)';
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-
-      // Card-separation dark seam at bottom border
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, h - 1);
-      ctx.lineTo(w, h - 1);
-      ctx.stroke();
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.generateMipmaps = false;
-      return texture;
-    } catch {
-      return new THREE.Texture();
-    }
-  }
-
-  /**
-   * Constructs base extruded rounded rectangle with unit card depth.
-   * Uses 3 discrete material groups:
-   * - Group 0: Top Cap (+Y normal, displaying card back)
-   * - Group 1: Bottom Cap (-Y normal)
-   * - Group 2: Side Edges (layered paper core)
-   */
   private _buildGeometry(): THREE.BufferGeometry {
     const W = this.deckWidth;
     const H = this.deckHeight;
@@ -546,23 +571,51 @@ export class DeckObject3D extends THREE.Group {
    * Performs zero geometry re-allocation for optimal 60 FPS performance.
    */
   private _updateVisualMesh(): void {
-    const count = this._cardIds.length;
-    if (count === 0) {
-      this._deckMesh.visible = false;
-      this._deckMesh.scale.set(1, 0, 1);
-      this._deckMesh.position.set(0, 0, 0);
-    } else {
-      this._deckMesh.visible = true;
-      const visualHeight = count * this.cardThickness;
-      this._deckMesh.scale.set(1, count, 1);
-      // Center of scaled mesh sits at visualHeight / 2 so bottom touches table at Y = 0
-      this._deckMesh.position.set(0, visualHeight / 2, 0);
-
-      // Repeat edge striations vertically for each card in the stack
-      if (this._edgeTexture) {
-        this._edgeTexture.repeat.set(1, count);
-      }
+    const count = this.getCount();
+    const empty = count === 0;
+    this._deckMesh.position.y = this.cardThickness / 2;
+    this._deckMesh.castShadow = !empty;
+    this._emptyOutline.visible = empty;
+    const map = empty ? null : this._onlineTopTexture ?? this._topTexture;
+    if (this._topMaterial.map !== map) {
+      this._topMaterial.map = map;
+      this._topMaterial.needsUpdate = true;
     }
+    this._topMaterial.color.setHex(empty ? 0x272324 : 0xffffff);
+    this._updateCountBadge(count);
+  }
+
+  private _updateCountBadge(count: number): void {
+    if (this._badgeCount === count || !CardTextureGenerator.isCanvasSupported()) return;
+    if (!this._badge) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 192;
+      canvas.height = 96;
+      const map = new THREE.CanvasTexture(canvas);
+      map.colorSpace = THREE.SRGBColorSpace;
+      this._badge = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false }));
+      this._badge.scale.set(1.4, 0.7, 1);
+      this._badge.position.set(this.deckWidth / 2, 0.36, -this.deckHeight / 2);
+      this.add(this._badge);
+    }
+    const map = this._badge.material.map!;
+    const ctx = (map.image as HTMLCanvasElement).getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, 192, 96);
+    ctx.fillStyle = "#29211d";
+    ctx.beginPath();
+    ctx.roundRect(2, 2, 188, 92, 20);
+    ctx.fill();
+    ctx.strokeStyle = "#d1a778";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.font = "bold 58px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff1d9";
+    ctx.fillText(String(count), 96, 48, 160);
+    map.needsUpdate = true;
+    this._badgeCount = count;
   }
 
   // ─── Lifecycle & Disposal ─────────────────────────────────────────────────
@@ -574,6 +627,11 @@ export class DeckObject3D extends THREE.Group {
   dispose(): void {
     if (this._isDisposed) return;
     this._isDisposed = true;
+
+    this._clearActivity();
+    if (this._onlineTopType) CardTextureGenerator.releaseFrontTexture(this._onlineTopType);
+    this._onlineTopType = undefined;
+    this._onlineTopTexture = null;
 
     // 1. Dispose geometry
     if (this._deckMesh.geometry) {
@@ -593,10 +651,10 @@ export class DeckObject3D extends THREE.Group {
       this._topTexture.dispose();
       this._topTexture = null;
     }
-    if (this._ownsEdgeTexture && this._edgeTexture) {
-      this._edgeTexture.dispose();
-      this._edgeTexture = null;
-    }
+    this._emptyOutline.geometry.dispose();
+    (this._emptyOutline.material as THREE.Material).dispose();
+    this._badge?.material.map?.dispose();
+    this._badge?.material.dispose();
 
     // 4. Remove children and clear
     this.remove(this._deckMesh);
