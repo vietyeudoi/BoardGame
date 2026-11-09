@@ -9,7 +9,7 @@
  * Khi mở, overlay nhận chuột trên toàn vùng fan để HAND 3D không nhận nhầm.
  * Các callback vẫn ánh xạ về đúng id bài thật để chọn và kéo thả.
  */
-import { paintCardFace } from './CardFaceDOM';
+import { paintCardFace, upgradeCardFace } from './CardFaceDOM';
 import { FAN_PREVIEW_LAYOUT } from '../FanPreviewConfig';
 
 /** Minimal display data the overlay needs. */
@@ -566,6 +566,7 @@ export class FullHandFanPreviewUI {
       // (no gameplay copy, no preview-only card).
       el.addEventListener('mouseover', () => {
         this._hoveredSourceId = card.id;
+        upgradeCardFace(el);
         this._applyCardVisuals();
         this._handlers?.onCardHover(card.id);
       });

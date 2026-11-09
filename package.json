@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Cat Boom Online — Digital Tabletop Sandbox 3D",
   "scripts": {
+    "optimize:card-faces": "python -X utf8 scripts/optimize-card-faces.py && npm run generate:card-faces",
     "generate:card-faces": "node scripts/generate-card-face-manifest.mjs",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",

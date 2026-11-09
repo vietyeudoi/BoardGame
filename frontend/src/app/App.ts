@@ -5,6 +5,7 @@
 import type { DeckViewState } from '@shared/types/protocol';
 import { cardsAtTablePile, DEFAULT_DECK_DRAW_END } from '@shared/types/room';
 import { TABLE_ROLL, tableRollLabel, type TableRollKind } from '@shared/types/tableRoll';
+import { preloadCardFacePacks } from '../objects/CardFaceImages';
 import { CARD_FACE_IMAGE_READY } from '../objects/CardTextureGenerator';
 import { SceneManager } from '../scene/SceneManager';
 import { SeatPrompt } from '../ui/components/SeatPrompt';
@@ -32,6 +33,7 @@ import { Logger } from '../utils/Logger';
 const logger = Logger.create('App');
 
 export class App {
+  private _cardFacePreloadTimer?: ReturnType<typeof setTimeout>;
   private _rollCooldownTimer?: ReturnType<typeof setTimeout>;
   private readonly _sceneManager: SceneManager;
   private readonly _uiManager: UIManager;
@@ -1102,6 +1104,7 @@ export class App {
     });
 
     let setupRoomId: string | null = null;
+    let preloadedPacks = '';
     let lastDrawSetting: { roomId: string; end: 'TOP' | 'BOTTOM' } | undefined;
     // Subscribe to room state changes to show game screen when room is joined
     this._store.subscribe(() => {
@@ -1200,6 +1203,19 @@ export class App {
           this._uiManager.updateDeckCount(count);
         }
 
+        const packs = roomState.round?.phase === 'PLAYING'
+          ? roomState.round.enabledPacks ?? [roomState.round.basePackId ?? 'base'] : [];
+        const preloadKey = packs.length ? roomId + '|' + packs.join(',') : '';
+        if (preloadedPacks !== preloadKey) {
+          preloadedPacks = preloadKey;
+          clearTimeout(this._cardFacePreloadTimer);
+          preloadCardFacePacks([]);
+          if (packs.length) {
+            // Nhường lượt đầu cho lá đang hiển thị, sau đó mới nạp nền theo bộ.
+            this._cardFacePreloadTimer = setTimeout(() => preloadCardFacePacks(packs), 2_000);
+          }
+        }
+
         this._uiManager.updateRoomInfo(
           roomId,
           localPlayer.name,
@@ -1209,6 +1225,9 @@ export class App {
           localPlayer.isHost
         );
       } else {
+        preloadedPacks = '';
+        clearTimeout(this._cardFacePreloadTimer);
+        preloadCardFacePacks([]);
         lastDrawSetting = undefined;
       }
     });
@@ -1240,6 +1259,8 @@ export class App {
   }
 
   dispose(): void {
+    clearTimeout(this._cardFacePreloadTimer);
+    preloadCardFacePacks([]);
     clearTimeout(this._rollCooldownTimer);
     this._cursorPointerListeners.abort();
     this._cursorBroadcaster.dispose();

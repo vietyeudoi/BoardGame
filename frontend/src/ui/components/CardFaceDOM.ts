@@ -1,4 +1,4 @@
-import { getCardFaceImage } from '../../objects/CardFaceImages';
+import { getCardFaceImage, loadCardFaceImage } from '../../objects/CardFaceImages';
 import { CARD_CONFIG } from '../../objects/CardConfig';
 import { getCardFaceStyle } from '../../objects/CardFaceStyle';
 import { CardTextureGenerator, type CardTextureSize } from '../../objects/CardTextureGenerator';
@@ -39,7 +39,7 @@ export function paintCardFace(
   const doc = el.ownerDocument;
   const style = getCardFaceStyle(card.cardType, !card.masked);
   const type = style.back ? '' : card.cardType!;
-  const artwork = style.back ? undefined : getCardFaceImage(type, card.faceImage);
+  const artwork = style.back ? undefined : getCardFaceImage(type, card.faceImage, size === 'large' ? 'large' : 'small');
   const url = artwork ?? getFaceImage(type, size);
   el.classList.toggle('fhfp-card--back', style.back);
   el.dataset.masked = String(style.back);
@@ -50,7 +50,7 @@ export function paintCardFace(
 
   // Giữ nội dung đọc được cho trình đọc màn hình và môi trường không có Canvas.
   const text = doc.createElement('div');
-  text.className = url ? 'card-face-text card-face-text--hidden' : 'card-face-text';
+  text.className = url && !artwork ? 'card-face-text card-face-text--hidden' : 'card-face-text';
   const banner = doc.createElement('span');
   banner.className = 'fhfp-banner';
   banner.textContent = style.back ? 'Mặt úp' : style.banner;
@@ -81,21 +81,56 @@ export function paintCardFace(
   image.className = 'card-face-image';
   image.alt = '';
   image.draggable = false;
-  if (artwork) {
-    image.style.objectFit = 'cover';
-    image.addEventListener('error', () => {
-      const fallback = getFaceImage(type, size);
-      if (fallback) {
-        image.style.removeProperty('object-fit');
-        image.src = fallback;
-      } else {
-        image.remove();
-        text.classList.remove('card-face-text--hidden');
-      }
-    }, { once: true });
+  if (!artwork) {
+    image.src = url;
+    el.replaceChildren(image, text);
+    return;
   }
-  image.src = url;
+
+  image.style.objectFit = 'cover';
+  image.classList.add('card-face-artwork');
+  image.decoding = 'async';
+  if (size !== 'large') {
+    const large = getCardFaceImage(type, card.faceImage, 'large');
+    if (large && large !== artwork) image.dataset.largeFace = large;
+  }
+  const reveal = () => {
+    image.classList.add('card-face-artwork--ready');
+    text.classList.add('card-face-text--hidden');
+  };
+  const fallback = () => {
+    if (!el.contains(image)) return;
+    const canvas = getFaceImage(type, size);
+    if (canvas) {
+      image.classList.remove('card-face-artwork', 'card-face-artwork--ready');
+      image.style.removeProperty('object-fit');
+      image.src = canvas;
+      text.classList.add('card-face-text--hidden');
+    } else {
+      image.remove();
+      text.classList.remove('card-face-text--hidden');
+    }
+  };
+  image.addEventListener('load', reveal, { once: true });
+  image.addEventListener('error', fallback, { once: true });
   el.replaceChildren(image, text);
+  void loadCardFaceImage(artwork).then(loaded => {
+    if (!el.contains(image) || image.dataset.upgraded) return;
+    if (loaded) image.src = artwork;
+    else fallback();
+  });
+}
+
+export function upgradeCardFace(el: HTMLElement): void {
+  const image = el.querySelector<HTMLImageElement>('[data-large-face]');
+  const url = image?.dataset.largeFace;
+  if (!image || !url) return;
+  delete image.dataset.largeFace;
+  void loadCardFaceImage(url).then(loaded => {
+    if (!loaded || !el.contains(image)) return;
+    image.dataset.upgraded = 'true';
+    image.src = url;
+  });
 }
 
 export function createCardFace(document: Document, type?: string | null, size: CardTextureSize = 'standard', faceImage?: string): HTMLElement {

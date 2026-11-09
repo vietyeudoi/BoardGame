@@ -31,6 +31,15 @@ describe('Danh mục ảnh mặt bài', () => {
         expect(faces?.map(face => face.sha256) ?? []).toHaveLength(new Set(hashes).size);
         expect(new Set(faces?.map(face => face.sha256))).toEqual(new Set(hashes));
         expect(card.faceImage).toEqual(faces?.map(face => face.path));
+        for (const face of faces ?? []) {
+          for (const [tier, width] of [['small', 384], ['large', 768]] as const) {
+            const variant = face.variants[tier];
+            expect(variant.url).toMatch(new RegExp('^/card-faces/' + tier + '/[a-f0-9]{24}\\.webp$'));
+            expect(variant.width).toBe(Math.min(width, face.width));
+            expect(Math.abs(variant.height - face.height * variant.width / face.width)).toBeLessThanOrEqual(.5);
+            expect(variant.bytes).toBeGreaterThan(0);
+          }
+        }
       }
     }
     expect(CARD_FACE_MANIFEST[CardType.Shuffle]).toHaveLength(4);

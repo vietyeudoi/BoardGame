@@ -1,422 +1,212 @@
 // Tệp sinh tự động bằng npm run generate:card-faces.
-import face0 from "../../../shared/constants/Original/Exploding-Kitten1.png?url";
-import face1 from "../../../shared/constants/Original/Exploding-Kitten2.png?url";
-import face2 from "../../../shared/constants/Original/Exploding-Kitten3.png?url";
-import face3 from "../../../shared/constants/Original/Exploding-Kitten4.png?url";
-import face4 from "../../../shared/constants/Original/Defuse1.png?url";
-import face5 from "../../../shared/constants/Original/Defuse2.png?url";
-import face6 from "../../../shared/constants/Original/Defuse3.png?url";
-import face7 from "../../../shared/constants/Original/Defuse4.png?url";
-import face8 from "../../../shared/constants/Original/Defuse5.png?url";
-import face9 from "../../../shared/constants/Original/Attack1.png?url";
-import face10 from "../../../shared/constants/Original/Attack2.png?url";
-import face11 from "../../../shared/constants/Original/Attack3.png?url";
-import face12 from "../../../shared/constants/Original/Attack4.png?url";
-import face13 from "../../../shared/constants/Original/Skip1.png?url";
-import face14 from "../../../shared/constants/Original/Skip2.png?url";
-import face15 from "../../../shared/constants/Original/Skip3.png?url";
-import face16 from "../../../shared/constants/Original/Skip4.png?url";
-import face17 from "../../../shared/constants/Original/Favor1.png?url";
-import face18 from "../../../shared/constants/Original/Favor2.png?url";
-import face19 from "../../../shared/constants/Original/Favor3.png?url";
-import face20 from "../../../shared/constants/Original/Favor4.png?url";
-import face21 from "../../../shared/constants/Original/Shuffle1.png?url";
-import face22 from "../../../shared/constants/Original/Shuffle2.png?url";
-import face23 from "../../../shared/constants/Original/Shuffle3.png?url";
-import face24 from "../../../shared/constants/Original/Shuffle4.png?url";
-import face25 from "../../../shared/constants/Original/See-the-Future1.png?url";
-import face26 from "../../../shared/constants/Original/See-the-Future2.png?url";
-import face27 from "../../../shared/constants/Original/See-the-Future3.png?url";
-import face28 from "../../../shared/constants/Original/See-the-Future4.png?url";
-import face29 from "../../../shared/constants/Original/See-the-Future5.png?url";
-import face30 from "../../../shared/constants/Original/Nope1.png?url";
-import face31 from "../../../shared/constants/Original/Nope2.png?url";
-import face32 from "../../../shared/constants/Original/Nope3.png?url";
-import face33 from "../../../shared/constants/Original/Nope4.png?url";
-import face34 from "../../../shared/constants/Original/Nope5.png?url";
-import face35 from "../../../shared/constants/Original/Tacocat.png?url";
-import face36 from "../../../shared/constants/Original/Cattermelon.png?url";
-import face37 from "../../../shared/constants/Original/Hairy-Potato-Cat.png?url";
-import face38 from "../../../shared/constants/Original/Beard-Cat.png?url";
-import face39 from "../../../shared/constants/Original/Rainbow-Ralphing-Cat.png?url";
-import face40 from "../../../shared/constants/Zombie/Exploding-Kitten1.png?url";
-import face41 from "../../../shared/constants/Zombie/Exploding-Kitten2.png?url";
-import face42 from "../../../shared/constants/Zombie/Exploding-Kitten3.png?url";
-import face43 from "../../../shared/constants/Zombie/Exploding-Kitten4.png?url";
-import face44 from "../../../shared/constants/Zombie/Zombie-Kitten1.png?url";
-import face45 from "../../../shared/constants/Zombie/Zombie-Kitten3.png?url";
-import face46 from "../../../shared/constants/Zombie/Zombie-Kitten4.png?url";
-import face47 from "../../../shared/constants/Zombie/Zombie-Kitten5.png?url";
-import face48 from "../../../shared/constants/Zombie/Zombie4.png?url";
-import face49 from "../../../shared/constants/Zombie/Attack1.png?url";
-import face50 from "../../../shared/constants/Zombie/Attack2.png?url";
-import face51 from "../../../shared/constants/Zombie/Attack-Of-The-Dead1.png?url";
-import face52 from "../../../shared/constants/Zombie/Attack-Of-The-Dead2.png?url";
-import face53 from "../../../shared/constants/Zombie/Attack-Of-The-Dead3.png?url";
-import face54 from "../../../shared/constants/Zombie/Skip1.png?url";
-import face55 from "../../../shared/constants/Zombie/Skip2.png?url";
-import face56 from "../../../shared/constants/Zombie/Skip3.png?url";
-import face57 from "../../../shared/constants/Zombie/Super-Skip1.png?url";
-import face58 from "../../../shared/constants/Zombie/Super-Skip2.png?url";
-import face59 from "../../../shared/constants/Zombie/See-the-Future1.png?url";
-import face60 from "../../../shared/constants/Zombie/See-The-Future2.png?url";
-import face61 from "../../../shared/constants/Zombie/See-the-Future3.png?url";
-import face62 from "../../../shared/constants/Zombie/See-The-Future4.png?url";
-import face63 from "../../../shared/constants/Zombie/Shuffle1.png?url";
-import face64 from "../../../shared/constants/Zombie/Shuffle2.png?url";
-import face65 from "../../../shared/constants/Zombie/Clairvoyance.png?url";
-import face66 from "../../../shared/constants/Zombie/Clairvoyance1.png?url";
-import face67 from "../../../shared/constants/Zombie/Feed-The-Dead1.png?url";
-import face68 from "../../../shared/constants/Zombie/Feed-The-Dead2.png?url";
-import face69 from "../../../shared/constants/Zombie/Grave-Robber.png?url";
-import face70 from "../../../shared/constants/Zombie/Clone1.png?url";
-import face71 from "../../../shared/constants/Zombie/Clone2.png?url";
-import face72 from "../../../shared/constants/Zombie/Clone3.png?url";
-import face73 from "../../../shared/constants/Zombie/Dig-Deeper1.png?url";
-import face74 from "../../../shared/constants/Zombie/Dig-Deeper2.png?url";
-import face75 from "../../../shared/constants/Zombie/Dig-Deeper3.png?url";
-import face76 from "../../../shared/constants/Zombie/Dig-Deeper4.png?url";
-import face77 from "../../../shared/constants/Zombie/Favor1.png?url";
-import face78 from "../../../shared/constants/Zombie/Favor2.png?url";
-import face79 from "../../../shared/constants/Zombie/Favor3.png?url";
-import face80 from "../../../shared/constants/Zombie/Nope1.png?url";
-import face81 from "../../../shared/constants/Zombie/Nope2.png?url";
-import face82 from "../../../shared/constants/Zombie/Nope3.png?url";
-import face83 from "../../../shared/constants/Zombie/Nope4.png?url";
-import face84 from "../../../shared/constants/Zombie/Nope5.png?url";
-import face85 from "../../../shared/constants/Zombie/Cat-O-Lantern.png?url";
-import face86 from "../../../shared/constants/Zombie/De-Cat-Ipated.png?url";
-import face87 from "../../../shared/constants/Zombie/Electrocat.png?url";
-import face88 from "../../../shared/constants/Zombie/Vampire-Cat.png?url";
-import face89 from "../../../shared/constants/ImplodingKittens/Imploding-Kitten.png?url";
-import face90 from "../../../shared/constants/ImplodingKittens/Reverse1.png?url";
-import face91 from "../../../shared/constants/ImplodingKittens/Reverse2.png?url";
-import face92 from "../../../shared/constants/ImplodingKittens/Reverse3.png?url";
-import face93 from "../../../shared/constants/ImplodingKittens/Reverse4.png?url";
-import face94 from "../../../shared/constants/ImplodingKittens/Draw-from-the-Bottom1.png?url";
-import face95 from "../../../shared/constants/ImplodingKittens/Draw-from-the-Bottom2.png?url";
-import face96 from "../../../shared/constants/ImplodingKittens/Draw-from-the-Bottom3.png?url";
-import face97 from "../../../shared/constants/ImplodingKittens/Draw-from-the-Bottom4.png?url";
-import face98 from "../../../shared/constants/ImplodingKittens/Alter-the-Future1.png?url";
-import face99 from "../../../shared/constants/ImplodingKittens/Alter-the-Future2.png?url";
-import face100 from "../../../shared/constants/ImplodingKittens/Alter-the-Future3.png?url";
-import face101 from "../../../shared/constants/ImplodingKittens/Alter-the-Future4.png?url";
-import face102 from "../../../shared/constants/ImplodingKittens/Targeted-Attack1.png?url";
-import face103 from "../../../shared/constants/ImplodingKittens/Targeted-Attack2.png?url";
-import face104 from "../../../shared/constants/ImplodingKittens/Targeted-Attack3.png?url";
-import face105 from "../../../shared/constants/ImplodingKittens/Feral-Cat.png?url";
-import face106 from "../../../shared/constants/StreakingKittens/Streaking-Kitten.png?url";
-import face107 from "../../../shared/constants/StreakingKittens/Exploding-Kitten.png?url";
-import face108 from "../../../shared/constants/StreakingKittens/Super-Skip.png?url";
-import face109 from "../../../shared/constants/StreakingKittens/See-the-Future.png?url";
-import face110 from "../../../shared/constants/StreakingKittens/Alter-the-Future.png?url";
-import face111 from "../../../shared/constants/StreakingKittens/Swap-Top-and-Bottom.png?url";
-import face112 from "../../../shared/constants/StreakingKittens/Mark.png?url";
-import face113 from "../../../shared/constants/StreakingKittens/Catomic-Bomb.png?url";
-import face114 from "../../../shared/constants/StreakingKittens/Garbage-Collection.png?url";
-import face115 from "../../../shared/constants/StreakingKittens/Curse-of-the-Cat-Butt.png?url";
-import face116 from "../../../shared/constants/BarkingKittens/Barking-Kitten1.png?url";
-import face117 from "../../../shared/constants/BarkingKittens/Barking-Kitten2.png?url";
-import face118 from "../../../shared/constants/BarkingKittens/Alter-the-Future.png?url";
-import face119 from "../../../shared/constants/BarkingKittens/Bury1.png?url";
-import face120 from "../../../shared/constants/BarkingKittens/Bury2.png?url";
-import face121 from "../../../shared/constants/BarkingKittens/Personal-Attack1.png?url";
-import face122 from "../../../shared/constants/BarkingKittens/Personal-Attack2.png?url";
-import face123 from "../../../shared/constants/BarkingKittens/Personal-Attack3.png?url";
-import face124 from "../../../shared/constants/BarkingKittens/Personal-Attack4.png?url";
-import face125 from "../../../shared/constants/BarkingKittens/Share-the-Future1.png?url";
-import face126 from "../../../shared/constants/BarkingKittens/Share-the-Future2.png?url";
-import face127 from "../../../shared/constants/BarkingKittens/Tower-of-Power.png?url";
-import face128 from "../../../shared/constants/BarkingKittens/Ill-Take-That1.png?url";
-import face129 from "../../../shared/constants/BarkingKittens/Ill-Take-That2.png?url";
-import face130 from "../../../shared/constants/BarkingKittens/Ill-Take-That3.png?url";
-import face131 from "../../../shared/constants/BarkingKittens/Ill-Take-That4.png?url";
-import face132 from "../../../shared/constants/BarkingKittens/Super-Skip.png?url";
-import face133 from "../../../shared/constants/BarkingKittens/Pot-Luck1.png?url";
-import face134 from "../../../shared/constants/BarkingKittens/Pot-Luck2.png?url";
-import face135 from "../../../shared/constants/CoffeeKittens/Coffee Kitten.png?url";
-import face136 from "../../../shared/constants/CoffeeKittens/Caffeine.png?url";
-import face137 from "../../../shared/constants/CoffeeKittens/Amateur archaeology.png?url";
-import face138 from "../../../shared/constants/CoffeeKittens/Change Seats-1.png?url";
-import face139 from "../../../shared/constants/CoffeeKittens/Change Seats-2.png?url";
-import face140 from "../../../shared/constants/CoffeeKittens/Change Seats-3.png?url";
-import face141 from "../../../shared/constants/CoffeeKittens/Coin Toss-1.png?url";
-import face142 from "../../../shared/constants/CoffeeKittens/Coin Toss-2.png?url";
-import face143 from "../../../shared/constants/CoffeeKittens/Copycat-1.png?url";
-import face144 from "../../../shared/constants/CoffeeKittens/Copycat-2.png?url";
-import face145 from "../../../shared/constants/CoffeeKittens/Copycat-3.png?url";
-import face146 from "../../../shared/constants/CoffeeKittens/Disable-1.png?url";
-import face147 from "../../../shared/constants/CoffeeKittens/Disable-2.png?url";
-import face148 from "../../../shared/constants/CoffeeKittens/Disable-3.png?url";
-import face149 from "../../../shared/constants/CoffeeKittens/Force Play-1.png?url";
-import face150 from "../../../shared/constants/CoffeeKittens/Force Play-2.png?url";
-import face151 from "../../../shared/constants/CoffeeKittens/Force Play-3.png?url";
-import face152 from "../../../shared/constants/CoffeeKittens/Force Play-4.png?url";
-import face153 from "../../../shared/constants/CoffeeKittens/Foresight v1.png?url";
-import face154 from "../../../shared/constants/CoffeeKittens/Foresight v2.png?url";
-import face155 from "../../../shared/constants/CoffeeKittens/NOW+.png?url";
-import face156 from "../../../shared/constants/CoffeeKittens/Super NOPE.png?url";
-import face157 from "../../../shared/constants/CoffeeKittens/The Choosen One-1.png?url";
-import face158 from "../../../shared/constants/CoffeeKittens/The Choosen One-2.png?url";
-import face159 from "../../../shared/constants/CoffeeKittens/Garbage Pile.png?url";
-import face160 from "../../../shared/constants/CoffeeKittens/Evil Plot.png?url";
-import face161 from "../../../shared/constants/TimebombKittens/Timebomb-Kitten1.png?url";
-import face162 from "../../../shared/constants/TimebombKittens/Timebomb-Kitten2.png?url";
-import face163 from "../../../shared/constants/TimebombKittens/Defuse-Timebomb1.png?url";
-import face164 from "../../../shared/constants/TimebombKittens/Defuse-Timebomb2.png?url";
-import face165 from "../../../shared/constants/TimebombKittens/Defuse-Timebomb3.png?url";
-import face166 from "../../../shared/constants/TimebombKittens/Blind.png?url";
-import face167 from "../../../shared/constants/TimebombKittens/Search1.png?url";
-import face168 from "../../../shared/constants/TimebombKittens/Search2.png?url";
-import face169 from "../../../shared/constants/TimebombKittens/Search3.png?url";
-import face170 from "../../../shared/constants/TimebombKittens/Discard1.png?url";
-import face171 from "../../../shared/constants/TimebombKittens/Discard2.png?url";
-import face172 from "../../../shared/constants/TimebombKittens/Discard3.png?url";
-import face173 from "../../../shared/constants/TimebombKittens/Copy1.png?url";
-import face174 from "../../../shared/constants/TimebombKittens/Copy2.png?url";
-import face175 from "../../../shared/constants/TimebombKittens/Copy3.png?url";
-import face176 from "../../../shared/constants/UnrylyKittens/Kitty Rick.png?url";
-import face177 from "../../../shared/constants/UnrylyKittens/Corona Kitten.png?url";
-import face178 from "../../../shared/constants/UnrylyKittens/Corona Defuse.png?url";
-import face179 from "../../../shared/constants/UnrylyKittens/Streaking Corona Kitten.png?url";
-import face180 from "../../../shared/constants/UnrylyKittens/Impending Imploding Kitten.png?url";
-import face181 from "../../../shared/constants/UnrylyKittens/Black Hole-V1.png?url";
-import face182 from "../../../shared/constants/UnrylyKittens/Black Hole-V2.png?url";
-import face183 from "../../../shared/constants/UnrylyKittens/Counting Kitten.png?url";
-import face184 from "../../../shared/constants/UnrylyKittens/Odd Exploding Kitten.png?url";
-import face185 from "../../../shared/constants/UnrylyKittens/Unholy Kitten.png?url";
-import face186 from "../../../shared/constants/UnrylyKittens/Super Defuse.png?url";
-import face187 from "../../../shared/constants/UnrylyKittens/Caternator.png?url";
-import face188 from "../../../shared/constants/UnrylyKittens/The twins.png?url";
-import face189 from "../../../shared/constants/UnrylyKittens/NOPE-1.png?url";
-import face190 from "../../../shared/constants/UnrylyKittens/NOPE-2.png?url";
-import face191 from "../../../shared/constants/UnrylyKittens/Self Attack-1.png?url";
-import face192 from "../../../shared/constants/UnrylyKittens/Self Attack-2.png?url";
-import face193 from "../../../shared/constants/UnrylyKittens/Self Attack-3.png?url";
-import face194 from "../../../shared/constants/UnrylyKittens/Creepy Peeky.png?url";
-import face195 from "../../../shared/constants/UnrylyKittens/Annoy Diarrhea Kitty-1.png?url";
-import face196 from "../../../shared/constants/UnrylyKittens/Annoy Diarrhea Kitty-2.png?url";
-import face197 from "../../../shared/constants/UnrylyKittens/Battle hamster.png?url";
-import face198 from "../../../shared/constants/UnrylyKittens/Hip bat.png?url";
-import face199 from "../../../shared/constants/UnholyKittens/Disable.png?url";
-import face200 from "../../../shared/constants/UnholyKittens/Gambler.png?url";
-import face201 from "../../../shared/constants/UnholyKittens/Dig Deep.png?url";
-import face202 from "../../../shared/constants/UnholyKittens/Unholy Kitten.png?url";
-import face203 from "../../../shared/constants/UnholyKittens/Loaded Dice.png?url";
-import face204 from "../../../shared/constants/UnholyKittens/Alter Dice.png?url";
-import face205 from "../../../shared/constants/UnholyKittens/Future Dice.png?url";
-import face206 from "../../../shared/constants/UnholyKittens/Unholy Hybrid-1.png?url";
-import face207 from "../../../shared/constants/UnholyKittens/Unholy Hybrid-2.png?url";
-import face208 from "../../../shared/constants/UnholyKittens/Unholy Hybrid-3.png?url";
-
-export const CARD_FACE_ASSET_URLS: Readonly<Partial<Record<string, string>>> = {
-  "Original/Exploding-Kitten1.png": face0,
-  "Original/Exploding-Kitten2.png": face1,
-  "Original/Exploding-Kitten3.png": face2,
-  "Original/Exploding-Kitten4.png": face3,
-  "Original/Defuse1.png": face4,
-  "Original/Defuse2.png": face5,
-  "Original/Defuse3.png": face6,
-  "Original/Defuse4.png": face7,
-  "Original/Defuse5.png": face8,
-  "Original/Attack1.png": face9,
-  "Original/Attack2.png": face10,
-  "Original/Attack3.png": face11,
-  "Original/Attack4.png": face12,
-  "Original/Skip1.png": face13,
-  "Original/Skip2.png": face14,
-  "Original/Skip3.png": face15,
-  "Original/Skip4.png": face16,
-  "Original/Favor1.png": face17,
-  "Original/Favor2.png": face18,
-  "Original/Favor3.png": face19,
-  "Original/Favor4.png": face20,
-  "Original/Shuffle1.png": face21,
-  "Original/Shuffle2.png": face22,
-  "Original/Shuffle3.png": face23,
-  "Original/Shuffle4.png": face24,
-  "Original/See-the-Future1.png": face25,
-  "Original/See-the-Future2.png": face26,
-  "Original/See-the-Future3.png": face27,
-  "Original/See-the-Future4.png": face28,
-  "Original/See-the-Future5.png": face29,
-  "Original/Nope1.png": face30,
-  "Original/Nope2.png": face31,
-  "Original/Nope3.png": face32,
-  "Original/Nope4.png": face33,
-  "Original/Nope5.png": face34,
-  "Original/Tacocat.png": face35,
-  "Original/Cattermelon.png": face36,
-  "Original/Hairy-Potato-Cat.png": face37,
-  "Original/Beard-Cat.png": face38,
-  "Original/Rainbow-Ralphing-Cat.png": face39,
-  "Zombie/Exploding-Kitten1.png": face40,
-  "Zombie/Exploding-Kitten2.png": face41,
-  "Zombie/Exploding-Kitten3.png": face42,
-  "Zombie/Exploding-Kitten4.png": face43,
-  "Zombie/Zombie-Kitten1.png": face44,
-  "Zombie/Zombie-Kitten3.png": face45,
-  "Zombie/Zombie-Kitten4.png": face46,
-  "Zombie/Zombie-Kitten5.png": face47,
-  "Zombie/Zombie4.png": face48,
-  "Zombie/Attack1.png": face49,
-  "Zombie/Attack2.png": face50,
-  "Zombie/Attack-Of-The-Dead1.png": face51,
-  "Zombie/Attack-Of-The-Dead2.png": face52,
-  "Zombie/Attack-Of-The-Dead3.png": face53,
-  "Zombie/Skip1.png": face54,
-  "Zombie/Skip2.png": face55,
-  "Zombie/Skip3.png": face56,
-  "Zombie/Super-Skip1.png": face57,
-  "Zombie/Super-Skip2.png": face58,
-  "Zombie/See-the-Future1.png": face59,
-  "Zombie/See-The-Future2.png": face60,
-  "Zombie/See-the-Future3.png": face61,
-  "Zombie/See-The-Future4.png": face62,
-  "Zombie/Shuffle1.png": face63,
-  "Zombie/Shuffle2.png": face64,
-  "Zombie/Clairvoyance.png": face65,
-  "Zombie/Clairvoyance1.png": face66,
-  "Zombie/Feed-The-Dead1.png": face67,
-  "Zombie/Feed-The-Dead2.png": face68,
-  "Zombie/Grave-Robber.png": face69,
-  "Zombie/Clone1.png": face70,
-  "Zombie/Clone2.png": face71,
-  "Zombie/Clone3.png": face72,
-  "Zombie/Dig-Deeper1.png": face73,
-  "Zombie/Dig-Deeper2.png": face74,
-  "Zombie/Dig-Deeper3.png": face75,
-  "Zombie/Dig-Deeper4.png": face76,
-  "Zombie/Favor1.png": face77,
-  "Zombie/Favor2.png": face78,
-  "Zombie/Favor3.png": face79,
-  "Zombie/Nope1.png": face80,
-  "Zombie/Nope2.png": face81,
-  "Zombie/Nope3.png": face82,
-  "Zombie/Nope4.png": face83,
-  "Zombie/Nope5.png": face84,
-  "Zombie/Cat-O-Lantern.png": face85,
-  "Zombie/De-Cat-Ipated.png": face86,
-  "Zombie/Electrocat.png": face87,
-  "Zombie/Vampire-Cat.png": face88,
-  "ImplodingKittens/Imploding-Kitten.png": face89,
-  "ImplodingKittens/Reverse1.png": face90,
-  "ImplodingKittens/Reverse2.png": face91,
-  "ImplodingKittens/Reverse3.png": face92,
-  "ImplodingKittens/Reverse4.png": face93,
-  "ImplodingKittens/Draw-from-the-Bottom1.png": face94,
-  "ImplodingKittens/Draw-from-the-Bottom2.png": face95,
-  "ImplodingKittens/Draw-from-the-Bottom3.png": face96,
-  "ImplodingKittens/Draw-from-the-Bottom4.png": face97,
-  "ImplodingKittens/Alter-the-Future1.png": face98,
-  "ImplodingKittens/Alter-the-Future2.png": face99,
-  "ImplodingKittens/Alter-the-Future3.png": face100,
-  "ImplodingKittens/Alter-the-Future4.png": face101,
-  "ImplodingKittens/Targeted-Attack1.png": face102,
-  "ImplodingKittens/Targeted-Attack2.png": face103,
-  "ImplodingKittens/Targeted-Attack3.png": face104,
-  "ImplodingKittens/Feral-Cat.png": face105,
-  "StreakingKittens/Streaking-Kitten.png": face106,
-  "StreakingKittens/Exploding-Kitten.png": face107,
-  "StreakingKittens/Super-Skip.png": face108,
-  "StreakingKittens/See-the-Future.png": face109,
-  "StreakingKittens/Alter-the-Future.png": face110,
-  "StreakingKittens/Swap-Top-and-Bottom.png": face111,
-  "StreakingKittens/Mark.png": face112,
-  "StreakingKittens/Catomic-Bomb.png": face113,
-  "StreakingKittens/Garbage-Collection.png": face114,
-  "StreakingKittens/Curse-of-the-Cat-Butt.png": face115,
-  "BarkingKittens/Barking-Kitten1.png": face116,
-  "BarkingKittens/Barking-Kitten2.png": face117,
-  "BarkingKittens/Alter-the-Future.png": face118,
-  "BarkingKittens/Bury1.png": face119,
-  "BarkingKittens/Bury2.png": face120,
-  "BarkingKittens/Personal-Attack1.png": face121,
-  "BarkingKittens/Personal-Attack2.png": face122,
-  "BarkingKittens/Personal-Attack3.png": face123,
-  "BarkingKittens/Personal-Attack4.png": face124,
-  "BarkingKittens/Share-the-Future1.png": face125,
-  "BarkingKittens/Share-the-Future2.png": face126,
-  "BarkingKittens/Tower-of-Power.png": face127,
-  "BarkingKittens/Ill-Take-That1.png": face128,
-  "BarkingKittens/Ill-Take-That2.png": face129,
-  "BarkingKittens/Ill-Take-That3.png": face130,
-  "BarkingKittens/Ill-Take-That4.png": face131,
-  "BarkingKittens/Super-Skip.png": face132,
-  "BarkingKittens/Pot-Luck1.png": face133,
-  "BarkingKittens/Pot-Luck2.png": face134,
-  "CoffeeKittens/Coffee Kitten.png": face135,
-  "CoffeeKittens/Caffeine.png": face136,
-  "CoffeeKittens/Amateur archaeology.png": face137,
-  "CoffeeKittens/Change Seats-1.png": face138,
-  "CoffeeKittens/Change Seats-2.png": face139,
-  "CoffeeKittens/Change Seats-3.png": face140,
-  "CoffeeKittens/Coin Toss-1.png": face141,
-  "CoffeeKittens/Coin Toss-2.png": face142,
-  "CoffeeKittens/Copycat-1.png": face143,
-  "CoffeeKittens/Copycat-2.png": face144,
-  "CoffeeKittens/Copycat-3.png": face145,
-  "CoffeeKittens/Disable-1.png": face146,
-  "CoffeeKittens/Disable-2.png": face147,
-  "CoffeeKittens/Disable-3.png": face148,
-  "CoffeeKittens/Force Play-1.png": face149,
-  "CoffeeKittens/Force Play-2.png": face150,
-  "CoffeeKittens/Force Play-3.png": face151,
-  "CoffeeKittens/Force Play-4.png": face152,
-  "CoffeeKittens/Foresight v1.png": face153,
-  "CoffeeKittens/Foresight v2.png": face154,
-  "CoffeeKittens/NOW+.png": face155,
-  "CoffeeKittens/Super NOPE.png": face156,
-  "CoffeeKittens/The Choosen One-1.png": face157,
-  "CoffeeKittens/The Choosen One-2.png": face158,
-  "CoffeeKittens/Garbage Pile.png": face159,
-  "CoffeeKittens/Evil Plot.png": face160,
-  "TimebombKittens/Timebomb-Kitten1.png": face161,
-  "TimebombKittens/Timebomb-Kitten2.png": face162,
-  "TimebombKittens/Defuse-Timebomb1.png": face163,
-  "TimebombKittens/Defuse-Timebomb2.png": face164,
-  "TimebombKittens/Defuse-Timebomb3.png": face165,
-  "TimebombKittens/Blind.png": face166,
-  "TimebombKittens/Search1.png": face167,
-  "TimebombKittens/Search2.png": face168,
-  "TimebombKittens/Search3.png": face169,
-  "TimebombKittens/Discard1.png": face170,
-  "TimebombKittens/Discard2.png": face171,
-  "TimebombKittens/Discard3.png": face172,
-  "TimebombKittens/Copy1.png": face173,
-  "TimebombKittens/Copy2.png": face174,
-  "TimebombKittens/Copy3.png": face175,
-  "UnrylyKittens/Kitty Rick.png": face176,
-  "UnrylyKittens/Corona Kitten.png": face177,
-  "UnrylyKittens/Corona Defuse.png": face178,
-  "UnrylyKittens/Streaking Corona Kitten.png": face179,
-  "UnrylyKittens/Impending Imploding Kitten.png": face180,
-  "UnrylyKittens/Black Hole-V1.png": face181,
-  "UnrylyKittens/Black Hole-V2.png": face182,
-  "UnrylyKittens/Counting Kitten.png": face183,
-  "UnrylyKittens/Odd Exploding Kitten.png": face184,
-  "UnrylyKittens/Unholy Kitten.png": face185,
-  "UnrylyKittens/Super Defuse.png": face186,
-  "UnrylyKittens/Caternator.png": face187,
-  "UnrylyKittens/The twins.png": face188,
-  "UnrylyKittens/NOPE-1.png": face189,
-  "UnrylyKittens/NOPE-2.png": face190,
-  "UnrylyKittens/Self Attack-1.png": face191,
-  "UnrylyKittens/Self Attack-2.png": face192,
-  "UnrylyKittens/Self Attack-3.png": face193,
-  "UnrylyKittens/Creepy Peeky.png": face194,
-  "UnrylyKittens/Annoy Diarrhea Kitty-1.png": face195,
-  "UnrylyKittens/Annoy Diarrhea Kitty-2.png": face196,
-  "UnrylyKittens/Battle hamster.png": face197,
-  "UnrylyKittens/Hip bat.png": face198,
-  "UnholyKittens/Disable.png": face199,
-  "UnholyKittens/Gambler.png": face200,
-  "UnholyKittens/Dig Deep.png": face201,
-  "UnholyKittens/Unholy Kitten.png": face202,
-  "UnholyKittens/Loaded Dice.png": face203,
-  "UnholyKittens/Alter Dice.png": face204,
-  "UnholyKittens/Future Dice.png": face205,
-  "UnholyKittens/Unholy Hybrid-1.png": face206,
-  "UnholyKittens/Unholy Hybrid-2.png": face207,
-  "UnholyKittens/Unholy Hybrid-3.png": face208,
+export const CARD_FACE_ASSET_URLS: Readonly<Partial<Record<string, readonly [string, string]>>> = {
+  "Original/Exploding-Kitten1.png": ["f7524bf28b70faa8d3e10c44","3a9c30a7c46954be22326b03"],
+  "Original/Exploding-Kitten2.png": ["bf97fc5fcca1ef76d8d1b9da","02b1ea66141ff93505c39e82"],
+  "Original/Exploding-Kitten3.png": ["ddf0e7db5ef408fdcf67303d","1f35a8912f91b43f06442b7d"],
+  "Original/Exploding-Kitten4.png": ["802dc4c4462e62d90fff2118","d59b2ac37b2eacd48a2d0bbe"],
+  "Original/Defuse1.png": ["fdb2cddef0cdda92932fee39","9e540bd32260d4f8dfe2b199"],
+  "Original/Defuse2.png": ["90e7c1badc5334b4b1cd7ec9","5b966f550bb837d91c8b9e39"],
+  "Original/Defuse3.png": ["343c7dfdad990302c1842188","bb24e8411fb569e9e45443fb"],
+  "Original/Defuse4.png": ["8c3eef21bf953e3b67221013","112cd567263c4bcc5b0c9ef6"],
+  "Original/Defuse5.png": ["db49fc2f13522fc27a8b44f4","b08f14c183422bb5b262f716"],
+  "Original/Attack1.png": ["6dd8717d961ecb5c31fa0a1f","14bef711a31137573af2222c"],
+  "Original/Attack2.png": ["70173a098382ce69fff4ad7f","534fd7dbff63c0316334058c"],
+  "Original/Attack3.png": ["d83fd883e5e3698d0adac279","45663ddcb0b97663f9677f0a"],
+  "Original/Attack4.png": ["c8c96084a7b6141fce03dd20","d6d904bea45d414ec51ffede"],
+  "Original/Skip1.png": ["a2c051a3fc40a0f860ed8fc3","258cef3bf1c7e2dec1b6257e"],
+  "Original/Skip2.png": ["36312a87221e5ebcba2d2462","368d50cb021226995f17b38e"],
+  "Original/Skip3.png": ["0a9d206a3607231ab86087c7","4d4d5dc9a724db8fc1692c07"],
+  "Original/Skip4.png": ["2c7452bbfe7c3fb02de20482","dbfc867cd838b2439e897c68"],
+  "Original/Favor1.png": ["519342aab904ee497fa3a3d4","b9f3b489b7da718cdcad3d99"],
+  "Original/Favor2.png": ["caacbbf9d69deb8dccfac808","489af09016854c1adcf49777"],
+  "Original/Favor3.png": ["03ffa6fee381ce8b3a88ae68","e20b81269e0d0c5e56f4b845"],
+  "Original/Favor4.png": ["d4419ceab3ee0e3dbd28664c","9e91f0de415c66289ff53629"],
+  "Original/Shuffle1.png": ["a2c07fce0a998290335d1dc4","0b803a95d19df41a4d5679a0"],
+  "Original/Shuffle2.png": ["baf7cc3db0dfb2923b05c92b","f9972d310c149096d4b77674"],
+  "Original/Shuffle3.png": ["933d68d742f953ef3012776e","a87230d3357be5db3d87af01"],
+  "Original/Shuffle4.png": ["8c69d8cd1d5527c83a85f871","dea18b7bae02375c01e29e34"],
+  "Original/See-the-Future1.png": ["b0a719e8d4b71adcb8d051ff","68be4925a97465200d46ba9b"],
+  "Original/See-the-Future2.png": ["738518ca884bb5d102f8f08a","bbf79a5bc210d1c6668a279c"],
+  "Original/See-the-Future3.png": ["fb79e4d60bcb6b52efa2d37d","d9a3e3d4ceb2a20e4e02736a"],
+  "Original/See-the-Future4.png": ["f8d7b0db279b1ad0c74bb580","c43c3162958bcf3e44f104a1"],
+  "Original/See-the-Future5.png": ["92cef3e7f57036c13d097366","eef90decd7b497633199c9e0"],
+  "Original/Nope1.png": ["1b02730e18067392fb133e1f","bf7773103beb9bd83a33fd1b"],
+  "Original/Nope2.png": ["213f806e8a42c885cdf05845","a33ad74b35712cf36d042f83"],
+  "Original/Nope3.png": ["38ed3b8069ce5c3b8c10a237","e27c9f5a64eb8afc31348329"],
+  "Original/Nope4.png": ["77760dc7d54566c1e03f7af4","c612fac5b12a3f11004dcf8c"],
+  "Original/Nope5.png": ["7e82c56886475c09e03f9537","9000c2f93c6d818e56112b78"],
+  "Original/Tacocat.png": ["fc4a9ca1f0279021151ed105","59c3e2250a5ca5808e9f38ca"],
+  "Original/Cattermelon.png": ["86b07eefff431b18b450be5f","2a142b46256af42eecf6bec9"],
+  "Original/Hairy-Potato-Cat.png": ["6904c9c0997924e67defb548","59c3c53dced4045ce182d814"],
+  "Original/Beard-Cat.png": ["be8b460d6e9d2721750b67cb","62423d8dddfbb92d19e2fce3"],
+  "Original/Rainbow-Ralphing-Cat.png": ["c64e1ddd06c0d04130706bac","f7ef635ffbaa82b3b88ce8fb"],
+  "Zombie/Exploding-Kitten1.png": ["22117ebffdda7522f8c802d4","848ef020ffa917348fac0743"],
+  "Zombie/Exploding-Kitten2.png": ["b707c5ff05fc0724bda774ed","52e067d47599bafaab4d370c"],
+  "Zombie/Exploding-Kitten3.png": ["0427c21ad98921b81a15407d","72e0370dda80851bed573f3c"],
+  "Zombie/Exploding-Kitten4.png": ["462edc8c7f12dcee7ded8cb6","d4ca12a57d335d000f1796bb"],
+  "Zombie/Zombie-Kitten1.png": ["40a4e4e5754ed85172d94586","4c0c4685ff6d1d080334e0af"],
+  "Zombie/Zombie-Kitten3.png": ["b4c197cdf2031b6d6207c717","d750c3ddf3131ee4fea5eac4"],
+  "Zombie/Zombie-Kitten4.png": ["68bbfc01b5364e07adc9802a","9ee0745785c13213451b543f"],
+  "Zombie/Zombie-Kitten5.png": ["444e0d0b4a4b2c08f847d9b7","7962541917d4def0e3bd70d0"],
+  "Zombie/Zombie4.png": ["1d4ee21761a354d57207097c","53ef77f1e8f1d0333f5d3cc9"],
+  "Zombie/Attack1.png": ["f19bfb7ad6613be09d36c4ea","4047c664b59dbd7bc6fd0572"],
+  "Zombie/Attack2.png": ["d51260358286687ed2b9add3","0b5c180c13eb73ac1a94538c"],
+  "Zombie/Attack-Of-The-Dead1.png": ["6d36e677bfde103991b36e75","dfbde01499e2c5c9bedfe15a"],
+  "Zombie/Attack-Of-The-Dead2.png": ["beb8766981d54ecbbf903f01","068f9a9f1ca1d69659f17d57"],
+  "Zombie/Attack-Of-The-Dead3.png": ["1db8c3769e8dc2588ea1135b","b697a27df4d83b026d1ceb0b"],
+  "Zombie/Skip1.png": ["a9a9ccaf5e82cee785e1d79a","3b2cb995ace9abb8b95c4a8b"],
+  "Zombie/Skip2.png": ["d60be43e378413b398311b32","3858c8e34059786b01d01321"],
+  "Zombie/Skip3.png": ["a2262d4ab9913e1ef21ba323","611c1460825af088b7f52363"],
+  "Zombie/Super-Skip1.png": ["51d93cf47a96bc578eda898d","d81e146f26c18960d88d6dcf"],
+  "Zombie/Super-Skip2.png": ["417347338c27cdb389b09f89","2ab0c1bf4cf659724a70d2ec"],
+  "Zombie/See-the-Future1.png": ["b4c3408dce13544f4bd645ce","7a2ac743a73d185d261f53cb"],
+  "Zombie/See-The-Future2.png": ["f96bc3b4fee09e9eb3ee1857","613d74fc274ee6982aca6434"],
+  "Zombie/See-the-Future3.png": ["b063cd753a404b8d2834cab2","f8fea32d5eab8b3240235674"],
+  "Zombie/See-The-Future4.png": ["bcca1e19d65b5f646cd1f196","db77cc73c4d405573788b5ee"],
+  "Zombie/Shuffle1.png": ["e5e4faf6823f38e7f1bfdd63","ae10d6664b13db16bcb16e90"],
+  "Zombie/Shuffle2.png": ["3cd9951bd9d229f6e5c698de","80ded234b20ce27a19e97138"],
+  "Zombie/Clairvoyance.png": ["fcbb122438de432afc0f8419","4c96019d1fdacffe3a4bad44"],
+  "Zombie/Clairvoyance1.png": ["7a44ade4a9643b509f891c59","99e0988305ccee0695154421"],
+  "Zombie/Feed-The-Dead1.png": ["2e012eec2b60ff5de2f6af1c","8972017881a7b566461cda28"],
+  "Zombie/Feed-The-Dead2.png": ["6c26f19e5f363de01a77bc75","1f1c06e7b8b832b8b644b139"],
+  "Zombie/Grave-Robber.png": ["59e86082506883560a831f42","3a6a7f92cb3600b2f67c650b"],
+  "Zombie/Clone1.png": ["bccb987f059842f2f63941e9","ac1570986451a3584f990a36"],
+  "Zombie/Clone2.png": ["7dafc0791f3622f700f6be68","241bde42d3e7cabe5ba73e65"],
+  "Zombie/Clone3.png": ["0012190f277a6091ea528be2","c8c3703b89ed6951a9100ef4"],
+  "Zombie/Dig-Deeper1.png": ["8e44097a93cad6a9453019ed","d2d8f4bf90974336f0aa1ef1"],
+  "Zombie/Dig-Deeper2.png": ["e662c28e4a895c4057f68c31","f5b524134b9a52278461425f"],
+  "Zombie/Dig-Deeper3.png": ["da4bb6cad6127ae122e0cac9","8dca3df2ab83bc8a1e25812d"],
+  "Zombie/Dig-Deeper4.png": ["24642d3f8ccf3d3f6b526f5e","7b945a8df6676094bb4e47a8"],
+  "Zombie/Favor1.png": ["26cc6e0a10b081f99f229111","3c2565f45ea4bc6cad26d504"],
+  "Zombie/Favor2.png": ["dbca3bad8b63bed5d18ceb6d","4ce52da2351cebbebc69e9c0"],
+  "Zombie/Favor3.png": ["b6164a922904d26ca8662cab","3306ab24d2ba0efdf3a03c33"],
+  "Zombie/Nope1.png": ["85f90bbf9c7e1ac4aa0bf034","7bf70de338e46f340165309e"],
+  "Zombie/Nope2.png": ["1e20131f833721380b82d675","bde2247cd953a6c247f89b2a"],
+  "Zombie/Nope3.png": ["faf78f177be3e411891773d1","580b40f0a98635a60f5495ce"],
+  "Zombie/Nope4.png": ["0cb52ef9a66be5cb8fdf4c07","0fff914d842126a8df0d1646"],
+  "Zombie/Nope5.png": ["28ad17404efd9293961e52dd","079602940e6870104a722a13"],
+  "Zombie/Cat-O-Lantern.png": ["b606b4e37cf2d996590291a4","1389b3d1f296ad8f8909e8ec"],
+  "Zombie/De-Cat-Ipated.png": ["3f3b1a42abef5e86c997dbb2","eb90a2299cb4362731039160"],
+  "Zombie/Electrocat.png": ["f5c88287eb587cfe9ceed9aa","30e21d179648b6a822067a74"],
+  "Zombie/Vampire-Cat.png": ["53daf6c0ec64416fbb854e8f","b266d944ff4c815f83e991e0"],
+  "ImplodingKittens/Imploding-Kitten.png": ["1022b868d59bc3d7f2e2227a","27a15ce35cd24e623b075ab0"],
+  "ImplodingKittens/Reverse1.png": ["02d66ae928ebef65191de748","fdd46bf95c584877db20881d"],
+  "ImplodingKittens/Reverse2.png": ["0817ce50992ead518205f886","25de1744bacc314f8dda74ba"],
+  "ImplodingKittens/Reverse3.png": ["e21a6f9cee666e6b3c24f7a5","f1bd84904ff745a2484f5bc0"],
+  "ImplodingKittens/Reverse4.png": ["87f8149d10a5dfb71cfba53a","158991c0d9779470c99deaa6"],
+  "ImplodingKittens/Draw-from-the-Bottom1.png": ["d072362bf04a04b14dba00be","1d8701581616fc982a1c400b"],
+  "ImplodingKittens/Draw-from-the-Bottom2.png": ["cac16dc4f260852df4abdfad","7e52a0b2e4c687f3fcee9865"],
+  "ImplodingKittens/Draw-from-the-Bottom3.png": ["11134f301df0402e2ab88c3b","5fec843a8ef8504c26a7825a"],
+  "ImplodingKittens/Draw-from-the-Bottom4.png": ["e8e8d996bac9eb3445a17af6","9799ac45e0ea850765f1af4a"],
+  "ImplodingKittens/Alter-the-Future1.png": ["43c6fb89bc14253691ce5ba3","101b9f43cf45cb2c4cc99270"],
+  "ImplodingKittens/Alter-the-Future2.png": ["2d6f6a79d67d7333b49b0c40","95cdb70cc93a15907ad7929b"],
+  "ImplodingKittens/Alter-the-Future3.png": ["e74e56379c07603a26281401","cb792d09c8d9fe9f41009f0f"],
+  "ImplodingKittens/Alter-the-Future4.png": ["801175f0eeebaca812761e8d","86462d2c4f605644292f9dd4"],
+  "ImplodingKittens/Targeted-Attack1.png": ["215ab52def2681c8a3404b9a","9103819d8929f2af04452902"],
+  "ImplodingKittens/Targeted-Attack2.png": ["47bba67cc5d66dd6d0d03146","4271e80aaaae1606daaccbc0"],
+  "ImplodingKittens/Targeted-Attack3.png": ["292a9499592ea8f0212770e2","a1af43fd76fbe2273dd8f5ee"],
+  "ImplodingKittens/Feral-Cat.png": ["a33cecefd389f7071ab4a782","374aa39fafe8045b3884fe10"],
+  "StreakingKittens/Streaking-Kitten.png": ["d5b6180ba91d9cb47dd79926","b0299681b9f6cee5ffe34dc9"],
+  "StreakingKittens/Exploding-Kitten.png": ["c8113cdac9d3b96e95de81f5","ac5c0e7cac732aecb47c40fd"],
+  "StreakingKittens/Super-Skip.png": ["da06b2fd62321a5e4747270e","7783a41840adca6aa1e615f6"],
+  "StreakingKittens/See-the-Future.png": ["c3b40559a2d8ce2df4b9232f","0b5ac8d0ff512d414bb2067c"],
+  "StreakingKittens/Alter-the-Future.png": ["fc921aad3a8e95a62eca4f45","a5fd9069f547482f266bff05"],
+  "StreakingKittens/Swap-Top-and-Bottom.png": ["932bc892ed11bdb37055baf1","44f6f914c6042aa0af4c1fb4"],
+  "StreakingKittens/Mark.png": ["6a86031a95b4ad8f8cc459aa","34037ae5933c442606f4c831"],
+  "StreakingKittens/Catomic-Bomb.png": ["0994fa6f48eb4e9208f1c264","03603bb82580749773b82c2b"],
+  "StreakingKittens/Garbage-Collection.png": ["3e9c79caeb9cb2d4c8d8f127","3f413537db2349a4e90e0e20"],
+  "StreakingKittens/Curse-of-the-Cat-Butt.png": ["97fc90a6e56df1b0091b93e2","36a6319468eb2f782526aab3"],
+  "BarkingKittens/Barking-Kitten1.png": ["5f3366e12724368c173ad609","a1df55de9a7c39188049d8fc"],
+  "BarkingKittens/Barking-Kitten2.png": ["eb4ab5396babca3da7f66d94","924466577d0a79108fe54552"],
+  "BarkingKittens/Alter-the-Future.png": ["e723cebcc5854e94cde1e592","046045168d3b3a3f22b411fa"],
+  "BarkingKittens/Bury1.png": ["40698d6f2319eab13e978b9f","64bb4e3053d227183337577a"],
+  "BarkingKittens/Bury2.png": ["d7400ee0dbf90ef4096a18ca","3c4be3c552d6a6a3ef66cf3f"],
+  "BarkingKittens/Personal-Attack1.png": ["6cdb3a1722dce5378e0e0e14","203c86811d74391c34fc11cb"],
+  "BarkingKittens/Personal-Attack2.png": ["396e6bd87e943ae4c87ff9e5","77a9044322142f94aba36271"],
+  "BarkingKittens/Personal-Attack3.png": ["2e106ceff16b40ae9606eaa0","79083668a17df6d4b95428bc"],
+  "BarkingKittens/Personal-Attack4.png": ["3e32de8bf3452bfdd507d7fb","25210e208a3b3a59815bd65b"],
+  "BarkingKittens/Share-the-Future1.png": ["2dd40f48ce449be350477d00","df354b9c0b044b209af8a683"],
+  "BarkingKittens/Share-the-Future2.png": ["b08d2271846145fa1aadfcd9","de41599647d031da374d0bb3"],
+  "BarkingKittens/Tower-of-Power.png": ["a9fbed49d9ed3680a1125f14","0daf7858b5b4a301e2cc56b8"],
+  "BarkingKittens/Ill-Take-That1.png": ["b7d05f942fefb9b9c389dd1b","50fd913f2c8e63491ed896b6"],
+  "BarkingKittens/Ill-Take-That2.png": ["938286b92716ea37f9884330","a02ca27e9d5c72534b8d655b"],
+  "BarkingKittens/Ill-Take-That3.png": ["5b653d8d3b1c052c781b84d0","7d4f89ad196235fd0f8bff8d"],
+  "BarkingKittens/Ill-Take-That4.png": ["694efa46eda80383d809402b","cb0ac04a7d46d67ee6fb2711"],
+  "BarkingKittens/Super-Skip.png": ["f2a025623a09859b174ce6f0","1797e7c877de157205697e66"],
+  "BarkingKittens/Pot-Luck1.png": ["6880738f75416eec72621316","a33715a651c1906ed3e5dad0"],
+  "BarkingKittens/Pot-Luck2.png": ["dfaea92ed169bf59cf2af2b1","6a87f107e66d85fa12480507"],
+  "CoffeeKittens/Coffee Kitten.png": ["5893c6da97033afcad68f831","e03d845d03654aff3b4c98b5"],
+  "CoffeeKittens/Caffeine.png": ["5a020cf501bcb509d5d1d4b6","5f4c40517e8b969e751b88e3"],
+  "CoffeeKittens/Amateur archaeology.png": ["a152526de34786fa5bbca530","6888cf8750947e7303e9f695"],
+  "CoffeeKittens/Change Seats-1.png": ["a5a96e232738ecdcc0231edd","2ad10e1d41fc4200a9b50558"],
+  "CoffeeKittens/Change Seats-2.png": ["f51f991294584c8201b9bb80","0d09a336a9e95c7abd479a8f"],
+  "CoffeeKittens/Change Seats-3.png": ["3f6ae40c342f8f8ea93f8b9e","e2f6a2dc674a7966db1a3011"],
+  "CoffeeKittens/Coin Toss-1.png": ["db2ddd1c8c3b2d3edd197dbb","0546dedf7c76ec693fea44dd"],
+  "CoffeeKittens/Coin Toss-2.png": ["3f2a2183a72b97215112fc61","159caa85725433867c86e404"],
+  "CoffeeKittens/Copycat-1.png": ["f09a3821c254bd40b8074c1d","754d975eb1a5b08f5b08002b"],
+  "CoffeeKittens/Copycat-2.png": ["84cfd2951d540bf8eb10d233","d10523e5d4e6096c187b3054"],
+  "CoffeeKittens/Copycat-3.png": ["93eb237fbb4c962b1339d0c0","975bde62769d5ebad7c5ada4"],
+  "CoffeeKittens/Disable-1.png": ["d2bec6b2c79979fdd313077a","33d9989958b27ab7bb05fb99"],
+  "CoffeeKittens/Disable-2.png": ["154601590ddde7b79eb82f8a","86422b5fc7167f69b49a3afd"],
+  "CoffeeKittens/Disable-3.png": ["445bdf8b753cf099d7deb2e9","c69ee448b1966fbf3b7d3614"],
+  "CoffeeKittens/Force Play-1.png": ["f152c407e69698c5f47500b5","4037f5b95f66c8d6517b507d"],
+  "CoffeeKittens/Force Play-2.png": ["303d78424685606162ea6581","c26c91bbfdf49974d64e8645"],
+  "CoffeeKittens/Force Play-3.png": ["9212cfab2aed98898f13a24f","693e47a7343babac1f1654be"],
+  "CoffeeKittens/Force Play-4.png": ["3802b5c4a9f4bb884adb7a4e","159bace1038d0ebe78cb7712"],
+  "CoffeeKittens/Foresight v1.png": ["7c0bcb513b49d70d132ed876","3a8e51346fdc984e9dee2d5e"],
+  "CoffeeKittens/Foresight v2.png": ["4b969b282f593a773d76d343","1fe514f3cf8619637374c67c"],
+  "CoffeeKittens/NOW+.png": ["7e29c05cb7a570c7638bd52b","80c0449108e8049951d24f2f"],
+  "CoffeeKittens/Super NOPE.png": ["fad4418d2b9d42aac6966da8","d7248659bd4b03db527ac0fc"],
+  "CoffeeKittens/The Choosen One-1.png": ["eea826e50c4cb9d25d216d44","2161734af0e8a5578b87cf1c"],
+  "CoffeeKittens/The Choosen One-2.png": ["e251f5556ac298bac735c4d4","fd3a06400390efe8065b20a1"],
+  "CoffeeKittens/Garbage Pile.png": ["0da1700ac57b966b05d538f4","20ccd70aaa51d48210dfe391"],
+  "CoffeeKittens/Evil Plot.png": ["1a092a46b901a40f26eeb77a","7069772e246ee9745506a18d"],
+  "TimebombKittens/Timebomb-Kitten1.png": ["f3c6d81a3a8f8fd0e2dc8f16","00802131673a3ab45f58d59a"],
+  "TimebombKittens/Timebomb-Kitten2.png": ["52b7d736afa8b65194f0c3bb","6eb0a66488c6dffc03d2d4a8"],
+  "TimebombKittens/Defuse-Timebomb1.png": ["894d9568e34d964051a41c72","290ee451cc1db746bbb4f64e"],
+  "TimebombKittens/Defuse-Timebomb2.png": ["fbdc046170acfd61779f93f5","5bbe69a1bb7efbeb52d30f21"],
+  "TimebombKittens/Defuse-Timebomb3.png": ["6d68bd0316589c406b6b26ad","131366b3e8f06826c892fed8"],
+  "TimebombKittens/Blind.png": ["be9404091ac5d6af940087ab","d81763f1b59fcbd91e698250"],
+  "TimebombKittens/Search1.png": ["77a489da8445d9090041c4d7","26a1870aa47ed215d552f1c2"],
+  "TimebombKittens/Search2.png": ["73e1e7235dd14a460f9a9c6c","9dd713e1243e425d9f4113cf"],
+  "TimebombKittens/Search3.png": ["c1d487dd9c681b30073b7fb9","f38f9b37c5ec6897ed0dfae7"],
+  "TimebombKittens/Discard1.png": ["fced53936bfe3ac8ed359daa","c28f4ea357a88d5c69c4a602"],
+  "TimebombKittens/Discard2.png": ["1b11a341ab75d73b7e5569c3","1b26f0d6e79ed5646fdbe2bb"],
+  "TimebombKittens/Discard3.png": ["59db834b337274d2f6d2b91d","72d86dcb46776b8c351cb5ef"],
+  "TimebombKittens/Copy1.png": ["15cd0adc56b2f955de66f0e7","07fce4281dfdcb85c9f72900"],
+  "TimebombKittens/Copy2.png": ["34fcbec74c5733dce577e762","86a02a67d238e8bf835f5854"],
+  "TimebombKittens/Copy3.png": ["3b7e9fa57cf39f46798e8e77","009ff01d620d85c94d778fc6"],
+  "UnrylyKittens/Kitty Rick.png": ["c5ca6c82c659844a95d2f773","6a79d16ea1853db937abcee6"],
+  "UnrylyKittens/Corona Kitten.png": ["3053b1666d27fd4d0887de56","21c90d0cc9788da5713d42f1"],
+  "UnrylyKittens/Corona Defuse.png": ["ffb0de2e8d03d9ffad48b226","5b399f9b574d9a7b1e7d7187"],
+  "UnrylyKittens/Streaking Corona Kitten.png": ["70ece8f7ad2f704c8fac2881","b8d66479b7feed1c14681570"],
+  "UnrylyKittens/Impending Imploding Kitten.png": ["845ce15febf90c8e57b830dc","9176aa581e3cc6cb1a4de95f"],
+  "UnrylyKittens/Black Hole-V1.png": ["66ba3f9fc59c990bbb3e3384","86550d53d7dcc367b15a6f5c"],
+  "UnrylyKittens/Black Hole-V2.png": ["a4ad9a0d3046ea2b87bd9cfa","3c70fa6be07914c43b3b3b1c"],
+  "UnrylyKittens/Counting Kitten.png": ["9c6c520c7ce24cf068d7d710","61341bf74c00a5ec0a16d697"],
+  "UnrylyKittens/Odd Exploding Kitten.png": ["5eb69461e2e3912a82d99867","cdeee4b1af90946ae9ab8a71"],
+  "UnrylyKittens/Unholy Kitten.png": ["dd6ec8a2fc05ab6c260214f9","9b2ffc714907575e748d359e"],
+  "UnrylyKittens/Super Defuse.png": ["980ad921240fa330a49ca0df","0fd5e7e84533a397b71f2ae4"],
+  "UnrylyKittens/Caternator.png": ["9a493f13be9e758ed822e546","f513919434badb272eb232ec"],
+  "UnrylyKittens/The twins.png": ["a7b52f3fd1d980b865cf4bd4","bf06ad7b22dd8e84c74909d2"],
+  "UnrylyKittens/NOPE-1.png": ["7bbfd6f78aaf38d301ae12ac","c41ee4c61c512514f93a9f85"],
+  "UnrylyKittens/NOPE-2.png": ["0c02ce3cfa5213ff28f5effd","102f7d1a978614555141e543"],
+  "UnrylyKittens/Self Attack-1.png": ["4c5e1bfb4fcb473f8990c64c","aaa42e7acfdbbff733dac2bd"],
+  "UnrylyKittens/Self Attack-2.png": ["83ca015ea2c9b01259c28f84","08d758fa1304a1c04e6207fa"],
+  "UnrylyKittens/Self Attack-3.png": ["4cbbe1b369c398f840c88adc","41f5d95e6163d1376cbe6838"],
+  "UnrylyKittens/Creepy Peeky.png": ["ac095d04340637a629977287","8fd0c7954b7a3487dcc46b26"],
+  "UnrylyKittens/Annoy Diarrhea Kitty-1.png": ["ca0417840f9b3759c5a7ea24","fb99b27be49edf476ab8c517"],
+  "UnrylyKittens/Annoy Diarrhea Kitty-2.png": ["e9d31ec66cb89b4d42a4acb8","d8b97b2c725cd6eb255136ba"],
+  "UnrylyKittens/Battle hamster.png": ["a6440e6b7347d8cb655c33a8","b42e492047a5fa17d6a5f1a4"],
+  "UnrylyKittens/Hip bat.png": ["ab50035c1e4b5d57f83d62fa","d14e5982b2d07b7650e7f758"],
+  "UnholyKittens/Disable.png": ["d45590017829a90c181abd1f","114c2080d8c3fcc0dd2c27a3"],
+  "UnholyKittens/Gambler.png": ["273e3f064f5aa4b04e8fea42","bb09cfbef09f6cfb19767100"],
+  "UnholyKittens/Dig Deep.png": ["7718d87c4eb6b526a5d4e124","554addaba357ee644a4c4431"],
+  "UnholyKittens/Unholy Kitten.png": ["dd6ec8a2fc05ab6c260214f9","9b2ffc714907575e748d359e"],
+  "UnholyKittens/Loaded Dice.png": ["29dddd1d863d9f39285a7673","01a0c6b299b5c4e6a89c5fa4"],
+  "UnholyKittens/Alter Dice.png": ["3cd82394b5b6f54ffd4d82ac","0757012d1a1a14ed7911260f"],
+  "UnholyKittens/Future Dice.png": ["7bb0b26150e06593b12f76a6","2c82459a9a51c2793aedd98e"],
+  "UnholyKittens/Unholy Hybrid-1.png": ["092495b3028040776469e041","6777b08cbdf024939e163fad"],
+  "UnholyKittens/Unholy Hybrid-2.png": ["c7a422abbb97ecd1d2168735","8d7d8cf52eadf1f7c07329cb"],
+  "UnholyKittens/Unholy Hybrid-3.png": ["1144a89fbb1f560caa16f899","eaa3707cba3a888a1d9eaad2"],
 };

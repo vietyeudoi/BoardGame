@@ -99,17 +99,55 @@ function output(path, source) {
   }
 }
 
+const optimizedIndex = JSON.parse(readFileSync(new URL('./card-face-optimized.json', import.meta.url), 'utf8'));
+const publicRoot = new URL('../frontend/public/', import.meta.url);
+const verified = new Map();
+function variantsFor(face) {
+  const variants = optimizedIndex.images[face.sha256];
+  for (const tier of ['small', 'large']) {
+    const variant = variants?.[tier];
+    const prefix = '/card-faces/' + tier + '/';
+    if (!variant?.url?.startsWith(prefix) || !/^[a-f0-9]{24}\.webp$/.test(variant.url.slice(prefix.length))) {
+      throw new Error('Thiếu ảnh tối ưu ' + tier + ' cho ' + face.path + '. Chạy npm run optimize:card-faces.');
+    }
+    let actual = verified.get(variant.url);
+    if (!actual) {
+      const bytes = readFileSync(new URL(variant.url.slice(1), publicRoot));
+      actual = { ...readImage(bytes, variant.url), bytes: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex') };
+      verified.set(variant.url, actual);
+    }
+    if (actual.format !== 'webp' || actual.width !== variant.width || actual.height !== variant.height ||
+        actual.bytes !== variant.bytes || actual.sha256 !== variant.sha256 ||
+        variant.url !== prefix + actual.sha256.slice(0, 24) + '.webp') {
+      throw new Error('Ảnh tối ưu không khớp chỉ mục: ' + variant.url);
+    }
+  }
+  return variants;
+}
+
 const metadata = [...manifest].map(([type, faces]) => '  ' + JSON.stringify(type) + ': [\n' +
-  faces.map(face => '    ' + JSON.stringify(face) + ',\n').join('') + '  ],\n').join('');
-output('../shared/constants/cardFaceManifest.generated.ts', header +
-  "import type { CardType } from '../types/gameObjects.js';\n\n" +
+  faces.map(face => '    ' + JSON.stringify({ ...face, variants: variantsFor(face) }) + ',\n').join('') + '  ],\n').join('');
+const cardTypeImport = "import type { CardType } from '../types/gameObjects.js';\n\n";
+output('../shared/constants/cardFaceManifest.generated.ts', header + cardTypeImport +
+  "export interface OptimizedCardFace {\n  readonly url: string;\n  readonly width: number;\n  readonly height: number;\n" +
+  "  readonly bytes: number;\n  readonly sha256: string;\n}\n\n" +
   "export interface CardFaceAsset {\n  readonly path: string;\n  readonly format: 'png' | 'webp';\n" +
-  "  readonly width: number;\n  readonly height: number;\n  readonly bytes: number;\n  readonly sha256: string;\n}\n\n" +
+  "  readonly width: number;\n  readonly height: number;\n  readonly bytes: number;\n  readonly sha256: string;\n" +
+  "  readonly variants: Readonly<Record<'small' | 'large', OptimizedCardFace>>;\n}\n\n" +
   'export const CARD_FACE_MANIFEST: Readonly<Partial<Record<CardType, readonly CardFaceAsset[]>>> = {\n' + metadata + '};\n');
 
-const paths = [...manifest.values()].flat().map(face => face.path);
-const imports = paths.map((path, index) => 'import face' + index + ' from ' + JSON.stringify('../../../shared/constants/' + path + '?url') + ';\n').join('');
-const urls = paths.map((path, index) => '  ' + JSON.stringify(path) + ': face' + index + ',\n').join('');
-output('../frontend/src/objects/CardFaceAssetUrls.generated.ts', header + imports +
-  '\nexport const CARD_FACE_ASSET_URLS: Readonly<Partial<Record<string, string>>> = {\n' + urls + '};\n');
-console.log('Manifest mặt bài: ' + paths.length + ' mặt cho ' + manifest.size + ' loại.');
+const pathList = [...manifest].map(([type, faces]) => '  ' + JSON.stringify(type) + ': ' +
+  JSON.stringify(faces.map(face => face.path)) + ',\n').join('');
+output('../shared/constants/cardFacePaths.generated.ts', header + cardTypeImport +
+  'export const CARD_FACE_PATHS: Readonly<Partial<Record<CardType, readonly string[]>>> = {\n' + pathList + '};\n');
+
+const faces = [...manifest.values()].flat();
+const urls = faces.map(face => {
+  const variants = optimizedIndex.images[face.sha256];
+  const hashes = ['small', 'large'].map(tier => variants[tier].sha256.slice(0, 24));
+  return '  ' + JSON.stringify(face.path) + ': ' + JSON.stringify(hashes) + ',\n';
+}).join('');
+output('../frontend/src/objects/CardFaceAssetUrls.generated.ts', header +
+  'export const CARD_FACE_ASSET_URLS: Readonly<Partial<Record<string, readonly [string, string]>>> = {\n' + urls + '};\n');
+console.log('Manifest mặt bài: ' + faces.length + ' mặt cho ' + manifest.size + ' loại.');

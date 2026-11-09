@@ -12,6 +12,16 @@
   height: 100%;
   pointer-events: none;
 }
+.card-face-artwork {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.card-face-artwork--ready { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .card-face-artwork { transition: none; }
+}
 .card-face-text {
   padding: 8px;
   font: 13px Arial, sans-serif;

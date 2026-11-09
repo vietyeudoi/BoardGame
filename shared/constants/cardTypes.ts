@@ -1,10 +1,10 @@
 import { CardType, type CardDefinition, type CardPack, type BaseCardPack, type BaseCardPackId } from '../types/gameObjects.js';
 
-import { CARD_FACE_MANIFEST } from './cardFaceManifest.generated.js';
+import { CARD_FACE_PATHS } from './cardFacePaths.generated.js';
 
 function cardFaceImages(type: CardType): Pick<CardDefinition, 'faceImage'> {
-  const faces = CARD_FACE_MANIFEST[type];
-  return faces ? { faceImage: faces.map(face => face.path) } : {};
+  const paths = CARD_FACE_PATHS[type];
+  return paths ? { faceImage: paths } : {};
 }
 
 const baseCards: readonly CardDefinition[] = [
