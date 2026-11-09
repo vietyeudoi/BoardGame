@@ -25,7 +25,10 @@ describe('Mẫu mặt bài dùng chung', () => {
     expect(face.querySelector('img')).toBeNull();
     expect(face.querySelector('.card-face-text--hidden')).toBeNull();
     expect(face.querySelector('.fhfp-rules-description')?.textContent).toBe(definition.description);
-    expect(getCardFaceImage(CardType.Attack)).toBeUndefined();
+    expect(getCardFaceImage(type)).toBe(getCardFaceImage(type, paths[0]));
+    expect(getCardFaceImage(CardType.Attack)).toBeDefined();
+    expect(getCardFaceImage(CardType.ChaosPeek)).toBeUndefined();
+    expect(getCardFaceImage(CardType.GamblingLoadedDice)).toBeDefined();
     paintCardFace(face, { cardType: type, faceImage: paths[1], masked: true });
     expect(face.querySelector('img')).toBeNull();
     expect(face.querySelector('.fhfp-rules')).toBeNull();
@@ -75,9 +78,9 @@ describe('Mẫu mặt bài dùng chung', () => {
       .mockImplementation(function (this: HTMLCanvasElement) {
         return 'data:image/png;base64,' + this.width;
       });
-    const standard = createCardFace(document, 'defuse');
-    const repeated = createCardFace(document, 'defuse');
-    const large = createCardFace(document, 'defuse', 'large');
+    const standard = createCardFace(document, CardType.ChaosReturn);
+    const repeated = createCardFace(document, CardType.ChaosReturn);
+    const large = createCardFace(document, CardType.ChaosReturn, 'large');
     expect(repeated.querySelector('img')?.src).toBe(standard.querySelector('img')?.src);
     expect(large.querySelector('img')?.src).not.toBe(standard.querySelector('img')?.src);
     paintCardFace(standard, { cardType: 'attack', masked: true });

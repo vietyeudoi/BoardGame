@@ -1,0 +1,165 @@
+{
+  "packs": {
+    "base": {
+      "folder": "Original",
+      "cards": {
+        "exploding-kitten": ["Exploding-Kitten1.png", "Exploding-Kitten2.png", "Exploding-Kitten3.png", "Exploding-Kitten4.png"],
+        "defuse": ["Defuse1.png", "Defuse2.png", "Defuse3.png", "Defuse4.png", "Defuse5.png"],
+        "attack": ["Attack1.png", "Attack2.png", "Attack3.png", "Attack4.png"],
+        "skip": ["Skip1.png", "Skip2.png", "Skip3.png", "Skip4.png"],
+        "favor": ["Favor1.png", "Favor2.png", "Favor3.png", "Favor4.png"],
+        "shuffle": ["Shuffle1.png", "Shuffle2.png", "Shuffle3.png", "Shuffle4.png"],
+        "see-the-future": ["See-the-Future1.png", "See-the-Future2.png", "See-the-Future3.png", "See-the-Future4.png", "See-the-Future5.png"],
+        "nope": ["Nope1.png", "Nope2.png", "Nope3.png", "Nope4.png", "Nope5.png"],
+        "taco-cat": ["Tacocat.png"],
+        "cattermelon": ["Cattermelon.png"],
+        "hairy-potato-cat": ["Hairy-Potato-Cat.png"],
+        "beard-cat": ["Beard-Cat.png"],
+        "rainbow-ralphing-cat": ["Rainbow-Ralphing-Cat.png"]
+      }
+    },
+    "zombie": {
+      "folder": "Zombie",
+      "cards": {
+        "zombie:exploding-kitten": ["Exploding-Kitten1.png", "Exploding-Kitten2.png", "Exploding-Kitten3.png", "Exploding-Kitten4.png"],
+        "zombie:zombie-kitten": ["Zombie-Kitten1.png", "Zombie-Kitten3.png", "Zombie-Kitten4.png", "Zombie-Kitten5.png", "Zombie4.png"],
+        "zombie:attack": ["Attack1.png", "Attack2.png"],
+        "zombie:attack-of-the-dead": ["Attack-Of-The-Dead1.png", "Attack-Of-The-Dead2.png", "Attack-Of-The-Dead3.png"],
+        "zombie:skip": ["Skip1.png", "Skip2.png", "Skip3.png"],
+        "zombie:super-skip": ["Super-Skip1.png", "Super-Skip2.png"],
+        "zombie:see-the-future": ["See-the-Future1.png", "See-The-Future2.png", "See-the-Future3.png", "See-The-Future4.png"],
+        "zombie:shuffle": ["Shuffle1.png", "Shuffle2.png"],
+        "zombie:clairvoyance": ["Clairvoyance.png", "Clairvoyance1.png"],
+        "zombie:feed-the-dead": ["Feed-The-Dead1.png", "Feed-The-Dead2.png"],
+        "zombie:grave-robber": ["Grave-Robber.png"],
+        "zombie:clone": ["Clone1.png", "Clone2.png", "Clone3.png"],
+        "zombie:dig-deeper": ["Dig-Deeper1.png", "Dig-Deeper2.png", "Dig-Deeper3.png", "Dig-Deeper4.png"],
+        "zombie:favor": ["Favor1.png", "Favor2.png", "Favor3.png"],
+        "zombie:nope": ["Nope1.png", "Nope2.png", "Nope3.png", "Nope4.png", "Nope5.png"],
+        "zombie:cat-o-lantern": ["Cat-O-Lantern.png"],
+        "zombie:de-cat-ipated": ["De-Cat-Ipated.png"],
+        "zombie:electrocat": ["Electrocat.png"],
+        "zombie:vampire-cat": ["Vampire-Cat.png"]
+      }
+    },
+    "imploding": {
+      "folder": "ImplodingKittens",
+      "cards": {
+        "imploding:imploding-kitten": ["Imploding-Kitten.png"],
+        "imploding:reverse": ["Reverse1.png", "Reverse2.png", "Reverse3.png", "Reverse4.png"],
+        "imploding:draw-from-bottom": ["Draw-from-the-Bottom1.png", "Draw-from-the-Bottom2.png", "Draw-from-the-Bottom3.png", "Draw-from-the-Bottom4.png"],
+        "imploding:alter-future-3": ["Alter-the-Future1.png", "Alter-the-Future2.png", "Alter-the-Future3.png", "Alter-the-Future4.png"],
+        "imploding:targeted-attack": ["Targeted-Attack1.png", "Targeted-Attack2.png", "Targeted-Attack3.png"],
+        "imploding:feral-cat": ["Feral-Cat.png"]
+      }
+    },
+    "streaking": {
+      "folder": "StreakingKittens",
+      "cards": {
+        "streaking:streaking-kitten": ["Streaking-Kitten.png"],
+        "streaking:exploding-kitten": ["Exploding-Kitten.png"],
+        "streaking:super-skip": ["Super-Skip.png"],
+        "streaking:see-future-5": ["See-the-Future.png"],
+        "streaking:alter-future-5": ["Alter-the-Future.png"],
+        "streaking:swap-top-bottom": ["Swap-Top-and-Bottom.png"],
+        "streaking:mark": ["Mark.png"],
+        "streaking:catomic-bomb": ["Catomic-Bomb.png"],
+        "streaking:garbage-collection": ["Garbage-Collection.png"],
+        "streaking:curse-cat-butt": ["Curse-of-the-Cat-Butt.png"]
+      }
+    },
+    "barking": {
+      "folder": "BarkingKittens",
+      "cards": {
+        "barking:barking-kitten": ["Barking-Kitten1.png", "Barking-Kitten2.png"],
+        "barking:alter-future-now": ["Alter-the-Future.png"],
+        "barking:bury": ["Bury1.png", "Bury2.png"],
+        "barking:personal-attack": ["Personal-Attack1.png", "Personal-Attack2.png", "Personal-Attack3.png", "Personal-Attack4.png"],
+        "barking:share-future": ["Share-the-Future1.png", "Share-the-Future2.png"],
+        "barking:tower-of-power": ["Tower-of-Power.png"],
+        "barking:ill-take-that": ["Ill-Take-That1.png", "Ill-Take-That2.png", "Ill-Take-That3.png", "Ill-Take-That4.png"],
+        "barking:super-skip": ["Super-Skip.png"],
+        "barking:potluck": ["Pot-Luck1.png", "Pot-Luck2.png"]
+      }
+    },
+    "coffee": {
+      "folder": "CoffeeKittens",
+      "cards": {
+        "coffee:coffee-kitten": ["Coffee Kitten.png"],
+        "coffee:caffeine": ["Caffeine.png"],
+        "coffee:amateur-archaeology": ["Amateur archaeology.png"],
+        "coffee:change-seats": ["Change Seats-1.png", "Change Seats-2.png", "Change Seats-3.png"],
+        "coffee:coin-toss": ["Coin Toss-1.png", "Coin Toss-2.png"],
+        "coffee:copycat": ["Copycat-1.png", "Copycat-2.png", "Copycat-3.png"],
+        "coffee:disable": ["Disable-1.png", "Disable-2.png", "Disable-3.png"],
+        "coffee:force-play": ["Force Play-1.png", "Force Play-2.png", "Force Play-3.png", "Force Play-4.png"],
+        "coffee:foresight": ["Foresight v1.png", "Foresight v2.png"],
+        "coffee:now-plus": ["NOW+.png"],
+        "coffee:super-nope": ["Super NOPE.png"],
+        "coffee:the-chosen-one": ["The Choosen One-1.png", "The Choosen One-2.png"],
+        "coffee:garbage-pile": ["Garbage Pile.png"],
+        "coffee:evil-plot": ["Evil Plot.png"]
+      }
+    },
+    "timebomb": {
+      "folder": "TimebombKittens",
+      "cards": {
+        "timebomb:timebomb": ["Timebomb-Kitten1.png", "Timebomb-Kitten2.png"],
+        "timebomb:defuse-timebomb": ["Defuse-Timebomb1.png", "Defuse-Timebomb2.png", "Defuse-Timebomb3.png"],
+        "timebomb:blind": ["Blind.png"],
+        "timebomb:search": ["Search1.png", "Search2.png", "Search3.png"],
+        "timebomb:discard": ["Discard1.png", "Discard2.png", "Discard3.png"],
+        "timebomb:copy-cat": ["Copy1.png", "Copy2.png", "Copy3.png"]
+      }
+    },
+    "chaos": {
+      "folder": null,
+      "cards": {
+        "chaos:return": [],
+        "chaos:split": [],
+        "chaos:dumpster-dive": [],
+        "chaos:create-the-future": [],
+        "chaos:peek": [],
+        "chaos:refuse": [],
+        "chaos:youve-take-that": []
+      }
+    },
+    "attack": {
+      "folder": "UnrylyKittens",
+      "cards": {
+        "attack:kitty-rick": ["Kitty Rick.png"],
+        "attack:corona-kitten": ["Corona Kitten.png"],
+        "attack:defuse": ["Corona Defuse.png"],
+        "attack:streaking-kitten": ["Streaking Corona Kitten.png"],
+        "attack:impending-imploding-kitten": ["Impending Imploding Kitten.png"],
+        "attack:black-hole": ["Black Hole-V1.png", "Black Hole-V2.png"],
+        "attack:counting-kitten": ["Counting Kitten.png"],
+        "attack:odd-kitten": ["Odd Exploding Kitten.png"],
+        "attack:unholy-kitten": ["Unholy Kitten.png"],
+        "attack:super-defuse": ["Super Defuse.png"],
+        "attack:caternator": ["Caternator.png"],
+        "attack:the-twins": ["The twins.png"],
+        "attack:nope": ["NOPE-1.png", "NOPE-2.png"],
+        "attack:self-attack": ["Self Attack-1.png", "Self Attack-2.png", "Self Attack-3.png"],
+        "attack:creepy-peeky": ["Creepy Peeky.png"],
+        "attack:annoy-diarrhea-kitty": ["Annoy Diarrhea Kitty-1.png", "Annoy Diarrhea Kitty-2.png"],
+        "attack:battle-hamster": ["Battle hamster.png"],
+        "attack:hip-bat": ["Hip bat.png"]
+      }
+    },
+    "gambling": {
+      "folder": "UnholyKittens",
+      "cards": {
+        "gambling:disable": ["Disable.png"],
+        "gambling:gambler": ["Gambler.png"],
+        "gambling:dig-deep": ["Dig Deep.png"],
+        "gambling:unholy-kitten": ["Unholy Kitten.png"],
+        "gambling:loaded-dice": ["Loaded Dice.png"],
+        "gambling:alter-dice": ["Alter Dice.png"],
+        "gambling:future-dice": ["Future Dice.png"],
+        "gambling:unholy-hybrid": ["Unholy Hybrid-1.png", "Unholy Hybrid-2.png", "Unholy Hybrid-3.png"]
+      }
+    }
+  },
+  "ignored": ["CoffeeKittens/Coffee Kitten Defuse.png", "CoffeeKittens/Purrfect Boost-1.png", "CoffeeKittens/Purrfect Boost-2.png", "CoffeeKittens/Purrfect Boost-3.png", "UnrylyKittens/Disable-4.png", "MatSau/Backside-1.png"]
+}

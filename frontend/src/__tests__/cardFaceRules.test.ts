@@ -7,7 +7,9 @@ import { CardObject3D } from '../objects/CardObject3D';
 import { CardTextureGenerator } from '../objects/CardTextureGenerator';
 
 describe('Nội dung chức năng trên mặt bài', () => {
-  it.each([...CARD_DEFINITIONS.values()].filter(card => !card.faceImage?.length))('giữ đủ nội dung và vừa nửa dưới lá $name', definition => {
+  // Kiểm tra bố cục của các lá dùng mặt chữ mặc định (hiện là bộ Chaos).
+  const textFaces = [...CARD_DEFINITIONS.values()].filter(card => !card.faceImage?.length);
+  it.each(textFaces)('giữ đủ nội dung và vừa nửa dưới lá $name', definition => {
     const rules = getCardFaceRules(definition.type)!;
     expect(rules.title).toBe(definition.name);
     expect(rules.lines.join(' ')).toBe(definition.description);

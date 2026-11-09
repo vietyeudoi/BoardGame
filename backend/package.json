@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../scripts/generate-card-face-manifest.mjs",
+    "prebuild": "node ../scripts/generate-card-face-manifest.mjs",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/backend/src/index.js",

@@ -124,6 +124,7 @@ export interface CardDefinition {
   pack?: CardPackId;
   isBomb?: boolean;
   isRescue?: boolean;
+  noInitialDeal?: boolean;
   type: CardType;
   name: string;
   englishName: string;

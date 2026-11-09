@@ -8,7 +8,7 @@ import { getDefaultSeatPlacement, SEAT_CHANGE, SHARED_CONFIG } from '../../../sh
 import { IdGenerator } from '../utils/IdGenerator.js';
 import { Logger } from '../utils/Logger.js';
 
-import { buildRoundDeck, DEFAULT_DECK_SETUP, mergeDeckSetup, previewRound, shuffle } from './RoundDeck.js';
+import { buildRoundDeck, createRoundFaceSeed, DEFAULT_DECK_SETUP, mergeDeckSetup, previewRound, shuffle } from './RoundDeck.js';
 
 import { DeckViewSession } from './DeckViewSession.js';
 
@@ -36,6 +36,7 @@ export class Room {
   private readonly _dynamicLocks = new Map<string, string>();
   private _hostSessionId: string;
   private _phase?: RoundSetup['phase'];
+  private _roundFaceSeed?: string;
   private _deckSetup = DEFAULT_DECK_SETUP;
   private _seatDealUntil = 0;
   private _deckView?: DeckViewSession;
@@ -64,6 +65,9 @@ export class Room {
     return this._phase ? previewRound(this._deckSetup, this._seatedPlayers().length, this._phase, this._doubleDeck) : undefined;
   }
 
+  // Seed chỉ giữ trên server để tái lập mặt ảnh của ván.
+  get roundFaceSeed(): string | undefined { return this._roundFaceSeed; }
+
   private _seatedPlayers(): PlayerRecord[] {
     return [...this._players.values()].filter(player => player.isConnected && !player.spectator);
   }
@@ -73,9 +77,10 @@ export class Room {
     this._deckSetup = mergeDeckSetup(this._deckSetup, setup);
   }
 
-  dealRound(): void {
+  dealRound(faceSeed = createRoundFaceSeed()): void {
     if (this._phase !== 'SETUP') throw new Error('Ván này đã chia bài.');
-    const cards = buildRoundDeck(this._deckSetup, this._seatedPlayers().map(player => player.id), this._doubleDeck);
+    const cards = buildRoundDeck(this._deckSetup, this._seatedPlayers().map(player => player.id), this._doubleDeck, faceSeed);
+    this._roundFaceSeed = faceSeed;
     for (const card of cards) this._objects.set(card.id, card);
     this._phase = 'PLAYING';
     this._seatDealUntil = Date.now() + SEAT_CHANGE.dealLockMs;
@@ -91,6 +96,7 @@ export class Room {
     this._deckDrawEnd = DEFAULT_DECK_DRAW_END;
     this._deckAffectedCount = DEFAULT_DECK_AFFECTED_COUNT;
     this._phase = 'SETUP';
+    this._roundFaceSeed = undefined;
     this._seatDealUntil = 0;
     for (const [id, player] of this._players) {
       if (player.hasLeft) this._players.delete(id);

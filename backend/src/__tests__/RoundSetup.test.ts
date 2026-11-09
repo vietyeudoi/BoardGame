@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import { BASE_CARD_DEFINITIONS, CARD_DEFINITIONS, CARD_PACKS, getBasePack } from '../../../shared/constants/cardTypes.js';
+import { BASE_CARD_DEFINITIONS, BASE_CARD_PACKS, CARD_DEFINITIONS, CARD_PACKS, getBasePack, STARTING_OTHER_CARDS } from '../../../shared/constants/cardTypes.js';
 import { CardType } from '../../../shared/types/gameObjects.js';
 import type { ClientToServerMessage, ServerToClientMessage } from '../../../shared/types/protocol.js';
 import { RoomManager } from '../room/RoomManager.js';
@@ -17,8 +17,13 @@ describe('Bộ bài gốc và chia bài', () => {
   it('gán một ảnh cho mỗi bản Unholy Hybrid và chỉ gửi ảnh khi được xem mặt', () => {
     const cards = buildRoundDeck({ explodingKittens: 4, defuses: 6, enabledPacks: ['gambling'] }, ['a', 'b']);
     const hybrids = cards.filter(card => card.cardType === CardType.GamblingUnholyHybrid);
-    expect(hybrids.map(card => card.faceImage)).toEqual(CARD_DEFINITIONS.get(CardType.GamblingUnholyHybrid)?.faceImage);
-    expect(cards.filter(card => card.faceImage)).toHaveLength(3);
+    expect(hybrids).toHaveLength(3);
+    expect(CARD_DEFINITIONS.get(CardType.GamblingUnholyHybrid)?.faceImage)
+      .toEqual([1, 2, 3].map(index => 'UnholyKittens/Unholy Hybrid-' + index + '.png'));
+    expect(new Set(hybrids.map(card => card.faceImage)))
+      .toEqual(new Set(CARD_DEFINITIONS.get(CardType.GamblingUnholyHybrid)?.faceImage));
+    const deck = { ...hybrids[0]!, location: 'DECK' as const, faceUp: false };
+    expect(ViewStateBuilder.filterObjectForClient(deck, 'b', true).faceImage).toBeUndefined();
     const hand = { ...hybrids[0]!, location: 'HAND' as const, ownerId: 'a', faceUp: false };
     expect(ViewStateBuilder.filterObjectForClient(hand, 'a', true).faceImage).toBe(hand.faceImage);
     expect(ViewStateBuilder.filterObjectForClient(hand, 'b', true).faceImage).toBeUndefined();
@@ -26,6 +31,119 @@ describe('Bộ bài gốc và chia bài', () => {
     expect(ViewStateBuilder.filterObjectForClient(table, 'b', true).faceImage).toBeUndefined();
     expect(ViewStateBuilder.filterObjectForClient({ ...table, faceUp: true }, 'b', true).faceImage).toBe(table.faceImage);
   });
+  it('tái lập từng túi theo seed, dùng hết các mặt trước khi xáo lại', () => {
+    const type = CardType.Defuse;
+    const images = CARD_DEFINITIONS.get(type)!.faceImage!;
+    const setup = { explodingKittens: 4, defuses: images.length * 2 + 1 };
+    const cards = buildRoundDeck(setup, ['a', 'b'], false, 'mat-bai');
+    const faces = (deck: typeof cards) => deck.filter(card => card.cardType === type).map(card => card.faceImage);
+    const sequence = faces(cards);
+    expect(sequence).toEqual(faces(buildRoundDeck(setup, ['a', 'b'], false, 'mat-bai')));
+    expect(sequence).toHaveLength(setup.defuses);
+    for (let i = 0; i + images.length <= sequence.length; i += images.length) {
+      expect(new Set(sequence.slice(i, i + images.length))).toEqual(new Set(images));
+    }
+    expect(images).toContain(sequence.at(-1));
+    const cats = cards.filter(card => card.cardType === CardType.TacoCat);
+    expect(cats).toHaveLength(4);
+    expect(cats.every(card => card.faceImage === 'Original/Tacocat.png')).toBe(true);
+  });
+
+  it('giữ ảnh qua xáo, chuyển tay, đồng bộ và lưu seed riêng trên server', () => {
+    const rooms = new RoomManager();
+    const room = rooms.createRoom({ name: 'Mặt bài', hostSessionId: 'a', hostName: 'A' });
+    room.addPlayer('b', 'B', false);
+    room.dealRound('mat-bai');
+    expect(room.roundFaceSeed).toBe('mat-bai');
+    const before = new Map(room.getRawState().objects.map(card => [card.id, card.faceImage]));
+    const own = room.getRawState().objects.find(card => card.location === 'HAND' && card.ownerId === 'a')!;
+    expect(own.faceImage).toBeDefined();
+    room.shuffleDeck();
+    room.transferCard('a', own.id, 'b');
+    expect(new Map(room.getRawState().objects.map(card => [card.id, card.faceImage]))).toEqual(before);
+    const ownerState = ViewStateBuilder.buildRoomState(room, 'b');
+    expect(ownerState.objects.find(card => card.id === own.id)?.faceImage).toBe(own.faceImage);
+    expect(ViewStateBuilder.buildRoomState(room, 'a').objects.find(card => card.id === own.id)).toBeUndefined();
+    expect(ownerState.round).not.toHaveProperty('faceSeed');
+    expect(ownerState).not.toHaveProperty('roundFaceSeed');
+    room.resetRound();
+    expect(room.roundFaceSeed).toBeUndefined();
+  });
+
+  it('gắn cờ đúng các lá chỉ được rút và giữ dữ liệu Coffee Kitten, Clone', () => {
+    const flagged = [...CARD_DEFINITIONS.values()].filter(card => card.noInitialDeal).map(card => card.type);
+    expect(new Set(flagged)).toEqual(new Set([
+      CardType.ImplodingKitten, CardType.StreakingExplodingKitten,
+      CardType.CoffeeCoffeeKitten, CardType.CoffeeEvilPlot,
+      CardType.TimebombTimebomb, CardType.TimebombDefuseTimebomb,
+      CardType.AttackKittyRick, CardType.AttackCoronaKitten, CardType.AttackDefuse,
+      CardType.AttackImpendingImplodingKitten, CardType.AttackCountingKitten, CardType.AttackOddKitten,
+      CardType.AttackUnholyKitten, CardType.AttackSuperDefuse, CardType.GamblingUnholyKitten,
+    ]));
+    expect(CARD_DEFINITIONS.get(CardType.CoffeeCoffeeKitten)).toMatchObject({
+      englishName: 'Coffee Kitten', faceImage: ['CoffeeKittens/Coffee Kitten.png'],
+    });
+    expect(CARD_DEFINITIONS.get(CardType.Clone)?.description).toBe(
+      'Sao chép lá vừa đánh ngay trước nó trên chồng bỏ, trừ Clone khác. Chỉ đánh trong lượt của mình khi còn sống.',
+    );
+  });
+
+  it.each([2, 5, 10])('giữ đủ lá chỉ được rút trong chồng sau khi chia cho %i người', seated => {
+    const players = Array.from({ length: seated }, (_, i) => 'P' + i);
+    const expansions = CARD_PACKS.filter(pack => pack.kind === 'expansion');
+    const combinations = [...expansions.map(pack => [pack]), expansions];
+    for (const base of BASE_CARD_PACKS) {
+      for (const packs of combinations) {
+        const rescueCount = Math.max(base.rescue.count, seated);
+        const setup = {
+          basePackId: base.id, explodingKittens: 4, defuses: Math.max(6, seated),
+          enabledPacks: packs.map(pack => pack.id), cardCounts: { [base.rescue.type]: rescueCount },
+        };
+        const definitions = [base, ...packs].flatMap(pack => pack.cards);
+        const expected = new Map(definitions.map(card => [
+          card.type, card.type === base.rescue.type ? rescueCount : card.count,
+        ]));
+        for (const seed of ['mat-a', 'mat-b', 'mat-c', 'mat-d']) {
+          const cards = buildRoundDeck(setup, players, false, seed);
+          const actual = new Map<CardType, number>();
+          const deckCounts = new Map<CardType, number>();
+          for (const card of cards) {
+            const type = card.cardType as CardType;
+            actual.set(type, (actual.get(type) ?? 0) + 1);
+            if (card.location === 'DECK') deckCounts.set(type, (deckCounts.get(type) ?? 0) + 1);
+          }
+          const label = [base.id, ...setup.enabledPacks, seed].join(' / ');
+          expect(actual, label).toEqual(expected);
+          for (const card of definitions) {
+            if (card.noInitialDeal || card.isBomb) expect(deckCounts.get(card.type), label).toBe(expected.get(card.type));
+          }
+          expect(deckCounts.get(base.rescue.type) ?? 0, label).toBe(rescueCount - seated);
+          for (const player of players) {
+            const hand = cards.filter(card => card.location === 'HAND' && card.ownerId === player);
+            expect(hand, label).toHaveLength(STARTING_OTHER_CARDS + 1);
+            expect(hand.filter(card => card.cardType === base.rescue.type), label).toHaveLength(1);
+          }
+        }
+      }
+    }
+  });
+
+  it('báo thiếu khi cấu hình 10 người chỉ đủ lá nếu tính cả lá không được chia', () => {
+    const players = Array.from({ length: 10 }, (_, i) => 'P' + i);
+    const gambling = CARD_PACKS.find(pack => pack.id === 'gambling')!;
+    // 46 lá thường bộ gốc + 3 Hybrid. Unholy Kitten không được tính là lá có thể chia.
+    const cardCounts = Object.fromEntries(gambling.cards.map(card => [
+      card.type, card.type === CardType.GamblingUnholyHybrid || card.type === CardType.GamblingUnholyKitten ? card.count : 0,
+    ]));
+    const setup = { explodingKittens: 4, defuses: 10, enabledPacks: [gambling.id], cardCounts };
+    const plan = previewRound(setup, players.length, 'SETUP');
+    expect(plan.validationError).toContain('Còn thiếu 1 lá');
+    expect(() => buildRoundDeck(setup, players)).toThrow(plan.validationError!);
+    const exact = { ...setup, cardCounts: { ...cardCounts, [CardType.GamblingUnholyHybrid]: 4 } };
+    expect(previewRound(exact, players.length, 'SETUP').validationError).toBeUndefined();
+    expect(buildRoundDeck(exact, players).filter(card => card.location === 'HAND')).toHaveLength(60);
+  });
+
   it('có đúng 56 lá, 13 loại và 5 loại mèo thường', () => {
     expect(BASE_CARD_DEFINITIONS.reduce((sum, card) => sum + card.count, 0)).toBe(56);
     expect(new Set(BASE_CARD_DEFINITIONS.map(card => card.type)).size).toBe(13);
@@ -359,7 +477,7 @@ describe('Bộ bài gốc và chia bài', () => {
       host.send({ type: 'deck:view-open', payload: { mode: 'see' } });
       const see = (await host.read('deck:view-state'))!;
       expect(see).toMatchObject({ mode: 'see', viewerId: a.playerId, seat: 0 });
-      expect(see.cards).toEqual([0, 1, 2].map(token => ({ token, cardType: expect.any(String) })));
+      expect(see.cards).toEqual([0, 1, 2].map(token => ({ token, cardType: expect.any(String), faceImage: expect.any(String) })));
       for (const client of [peer, guest]) {
         const publicView = (await client.read('deck:view-state'))!;
         expect(publicView.cards).toEqual([{ token: 0 }, { token: 1 }, { token: 2 }]);

@@ -23,7 +23,7 @@ describe('Phiên xem chồng', () => {
 
     expect(room.openDeckView('a', 'see')).toBe(true);
     expect(room.deckView!.viewFor('b').cards).toEqual([
-      { token: 0, cardType: publicCard.cardType }, { token: 1 }, { token: 2 },
+      { token: 0, cardType: publicCard.cardType, faceImage: publicCard.faceImage }, { token: 1 }, { token: 2 },
     ]);
     expect(room.deckView!.setOrder([1, 0, 2])).toBe(false);
     room.closeDeckView();
@@ -34,7 +34,7 @@ describe('Phiên xem chồng', () => {
       expect(view.setOrder(invalid)).toBe(false);
     }
     expect(view.setOrder([2, 0, 1])).toBe(true);
-    expect(view.viewFor('b').cards).toEqual([{ token: 2 }, { token: 0, cardType: publicCard.cardType }, { token: 1 }]);
+    expect(view.viewFor('b').cards).toEqual([{ token: 2 }, { token: 0, cardType: publicCard.cardType, faceImage: publicCard.faceImage }, { token: 1 }]);
     room.closeDeckView();
     expect(room.getRawState().objects.filter(card => card.location === 'DECK').reverse()).toEqual(original);
 
