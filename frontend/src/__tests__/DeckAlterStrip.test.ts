@@ -56,7 +56,7 @@ describe('DeckAlterStrip', () => {
     const card = host.querySelector('[data-alter-token]')!;
     expect(card.querySelector('.fhfp-rules-name')?.textContent).toBe('Đảo chiều');
     expect(card.querySelector('.fhfp-pack-label')?.textContent).toBe('Imploding Kittens');
-    expect(card.querySelector('.fhfp-rules-description')?.textContent?.replace(/\s+/g, ' ')).toContain('Khi có hai người');
+    expect(card.querySelector('.fhfp-rules-description')?.textContent?.replace(/\s+/g, ' ')).toContain('đổi chiều bốc');
   });
 
   it('bỏ thao tác thả ra ngoài và xóa các lá khi phiên đóng', () => {

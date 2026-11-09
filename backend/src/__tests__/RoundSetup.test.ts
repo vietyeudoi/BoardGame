@@ -47,7 +47,7 @@ describe('Bộ bài gốc và chia bài', () => {
   });
 
   it('có đúng số lượng mặc định và mã loại riêng cho từng bộ', () => {
-    expect(CARD_PACKS.map(pack => pack.cards.reduce((sum, card) => sum + card.count, 0))).toEqual([56, 61, 20, 15, 20]);
+    expect(CARD_PACKS.map(pack => pack.cards.reduce((sum, card) => sum + card.count, 0))).toEqual([56, 61, 20, 15, 20, 28, 15, 14, 26, 10]);
     const definitions = CARD_PACKS.flatMap(pack => pack.cards);
     expect(CARD_DEFINITIONS.size).toBe(definitions.length);
     for (const pack of CARD_PACKS) expect(pack.cards.every(card => card.pack === pack.id)).toBe(true);
