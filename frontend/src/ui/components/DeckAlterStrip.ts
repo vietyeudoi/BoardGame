@@ -103,10 +103,10 @@ export class DeckAlterStrip {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const previous = new Map(reduced || fresh ? [] :
       [...this._nodes.values()].map(card => [card, card.getBoundingClientRect().left] as const));
-    const nodes = view.cards.map(({ token, cardType }, index) => {
+    const nodes = view.cards.map(({ token, cardType, faceImage }, index) => {
       let card = this._nodes.get(token);
       if (!card) {
-        card = this._createCard(token, cardType, alter);
+        card = this._createCard(token, cardType, alter, faceImage);
         this._nodes.set(token, card);
       }
       card.querySelector('.deck-view-number')!.textContent = String(index + 1);
@@ -125,7 +125,7 @@ export class DeckAlterStrip {
     }
   }
 
-  private _createCard(token: number, type: string | undefined, alter: boolean): HTMLElement {
+  private _createCard(token: number, type: string | undefined, alter: boolean, faceImage?: string): HTMLElement {
     const card = document.createElement('article');
     card.className = 'deck-alter-card';
     card.dataset.alterToken = String(token);
@@ -138,7 +138,7 @@ export class DeckAlterStrip {
     number.className = 'deck-view-number';
     const depth = document.createElement('small');
     depth.className = 'deck-view-depth';
-    card.append(createCardFace(document, type, 'large'), number, depth);
+    card.append(createCardFace(document, type, 'large', faceImage), number, depth);
     return card;
   }
 

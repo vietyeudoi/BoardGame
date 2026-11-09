@@ -43,6 +43,7 @@ export class ViewStateBuilder {
         faceUp: false,
       };
       delete filtered.cardType;
+      delete filtered.faceImage;
       return filtered;
     }
 

@@ -129,6 +129,8 @@ export interface CardDefinition {
   englishName: string;
   isNormalCat: boolean;
   description: string;
+  /** Đường dẫn mặt trước theo thứ tự bản sao, tương đối với shared/constants. */
+  faceImage?: readonly string[];
   count: number;
 }
 

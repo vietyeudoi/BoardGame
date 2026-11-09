@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { CARD_PACKS, DEFAULT_BASE_PACK, getBasePack, STARTING_OTHER_CARDS } from '../../../shared/constants/cardTypes.js';
+import { CARD_DEFINITIONS, CARD_PACKS, DEFAULT_BASE_PACK, getBasePack, STARTING_OTHER_CARDS } from '../../../shared/constants/cardTypes.js';
 import type { BaseCardPack, CardPackId, CardType } from '../../../shared/types/gameObjects.js';
 import type { DeckSetup, RoundSetup, SandboxObject } from '../../../shared/types/room.js';
 import { IdGenerator } from '../utils/IdGenerator.js';
@@ -83,10 +83,22 @@ export function buildRoundDeck(setup: DeckSetup, seatedIds: readonly string[], d
   const plan = summarize(normalized, base, cards, seatedIds.length, 'SETUP', doubleDeck);
   if (plan.validationError) throw new Error(plan.validationError);
 
-  const makeCard = (cardType: CardType, ownerId: string | null = null, handIndex?: number): SandboxObject => ({
-    id: IdGenerator.generate(), type: 'card', cardType, ownerId, handIndex, lockedBy: null,
-    position: { x: 0, y: 0, z: 0 }, rotation: 0, location: ownerId ? 'HAND' : 'DECK', faceUp: ownerId !== null,
-  });
+  const faceCopies = new Map<CardType, number>();
+  const makeCard = (cardType: CardType, ownerId: string | null = null, handIndex?: number): SandboxObject => {
+    const images = CARD_DEFINITIONS.get(cardType)?.faceImage;
+    let faceImage: string | undefined;
+    if (images?.length) {
+      // Gắn ảnh vào lá thật để xáo, chuyển tay và lật không làm đổi ảnh.
+      const copy = faceCopies.get(cardType) ?? 0;
+      faceCopies.set(cardType, copy + 1);
+      faceImage = images[copy % images.length];
+    }
+    return {
+      id: IdGenerator.generate(), type: 'card', cardType, ownerId, handIndex, lockedBy: null,
+      position: { x: 0, y: 0, z: 0 }, rotation: 0, location: ownerId ? 'HAND' : 'DECK', faceUp: ownerId !== null,
+      ...(faceImage ? { faceImage } : {}),
+    };
+  };
   const pool: CardType[] = [];
   const bombs: CardType[] = [];
   for (const { type, count, isBomb, isRescue } of cards) {

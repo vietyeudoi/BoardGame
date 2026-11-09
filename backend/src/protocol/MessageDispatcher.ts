@@ -671,6 +671,7 @@ export class MessageDispatcher {
         objectId: flippedObj.id,
         faceUp: flippedObj.faceUp,
         cardType: flippedObj.faceUp ? flippedObj.cardType : undefined,
+        faceImage: flippedObj.faceUp ? flippedObj.faceImage : undefined,
         ownerId: flippedObj.ownerId ?? null,
 
         location: flippedObj.location,

@@ -1,3 +1,4 @@
+import { getCardFaceImage } from '../../objects/CardFaceImages';
 import { CARD_CONFIG } from '../../objects/CardConfig';
 import { getCardFaceStyle } from '../../objects/CardFaceStyle';
 import { CardTextureGenerator, type CardTextureSize } from '../../objects/CardTextureGenerator';
@@ -32,13 +33,14 @@ function getFaceImage(type: string, size: CardTextureSize): string | undefined {
 }
 
 export function paintCardFace(
-  el: HTMLElement, card: { cardType?: string | null; masked?: boolean },
+  el: HTMLElement, card: { cardType?: string | null; masked?: boolean; faceImage?: string },
   size: CardTextureSize = 'standard',
 ): void {
   const doc = el.ownerDocument;
   const style = getCardFaceStyle(card.cardType, !card.masked);
   const type = style.back ? '' : card.cardType!;
-  const url = getFaceImage(type, size);
+  const artwork = style.back ? undefined : getCardFaceImage(type, card.faceImage);
+  const url = artwork ?? getFaceImage(type, size);
   el.classList.toggle('fhfp-card--back', style.back);
   el.dataset.masked = String(style.back);
   el.dataset.cardType = type || 'unknown';
@@ -79,13 +81,26 @@ export function paintCardFace(
   image.className = 'card-face-image';
   image.alt = '';
   image.draggable = false;
+  if (artwork) {
+    image.style.objectFit = 'cover';
+    image.addEventListener('error', () => {
+      const fallback = getFaceImage(type, size);
+      if (fallback) {
+        image.style.removeProperty('object-fit');
+        image.src = fallback;
+      } else {
+        image.remove();
+        text.classList.remove('card-face-text--hidden');
+      }
+    }, { once: true });
+  }
   image.src = url;
   el.replaceChildren(image, text);
 }
 
-export function createCardFace(document: Document, type?: string | null, size: CardTextureSize = 'standard'): HTMLElement {
+export function createCardFace(document: Document, type?: string | null, size: CardTextureSize = 'standard', faceImage?: string): HTMLElement {
   const face = document.createElement('div');
   face.className = 'card-face-preview';
-  paintCardFace(face, { cardType: type }, size);
+  paintCardFace(face, { cardType: type, faceImage }, size);
   return face;
 }

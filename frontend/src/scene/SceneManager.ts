@@ -916,7 +916,8 @@ export class SceneManager {
     playerIndex: number,
     cardType?: string,
     faceUp = true,
-    ownerId?: string
+    ownerId?: string,
+    faceImage?: string
   ): CardObject3D | null {
     const handZone = this._handZoneManager.getHandZoneForPlayer(playerIndex);
     if (!handZone) {
@@ -933,7 +934,7 @@ export class SceneManager {
       card.setMasked(this._shouldMask('HAND', ownerId ?? null, faceUp));
       if (ownerId !== undefined) card.setOwnerId(ownerId);
       if (cardType) {
-        card.setCardType(cardType);
+        card.setCardType(cardType, faceImage);
         card.updateContent({ title: getCardTitle(cardType) });
       }
     } else {
@@ -946,6 +947,7 @@ export class SceneManager {
       card = new CardObject3D({
         id: cardId,
         cardType,
+        faceImage,
         title: (faceUp && cardType) ? getCardTitle(cardType) : 'Card',
         faceUp: faceUp,
         ownerId: ownerId ?? null,
@@ -985,7 +987,8 @@ export class SceneManager {
     faceUp = true,
     seq?: number,
     handIndex?: number,
-    ownerId?: string
+    ownerId?: string,
+    faceImage?: string
   ): CardObject3D | null {
     const toHandZone = this._handZoneManager.getHandZoneForPlayer(toPlayerIndex);
     if (!toHandZone) {
@@ -1011,6 +1014,7 @@ export class SceneManager {
       card = new CardObject3D({
         id: cardId,
         cardType,
+        faceImage,
         title: (faceUp && cardType) ? getCardTitle(cardType) : 'Card',
         faceUp: faceUp,
         ownerId: ownerId ?? null,
@@ -1023,7 +1027,7 @@ export class SceneManager {
       card.setOwnerId(ownerId);
     }
 
-    if (cardType) card.setCardType(cardType);
+    if (cardType) card.setCardType(cardType, faceImage);
 
     // Already at the destination: update privacy/layout without re-animating.
     if (card.getHandZoneId() === toHandZone.zoneId) {
@@ -1562,11 +1566,11 @@ export class SceneManager {
   }
 
 
-  setOnlineDeckCount(count: number, topCardType?: string): void {
+  setOnlineDeckCount(count: number, topCardType?: string, topFaceImage?: string): void {
     const deck = this.getOriginalDeck();
     if (!deck) return;
     const countChanged = deck.setOnlineCount(count);
-    const faceChanged = deck.setOnlineTopType(topCardType);
+    const faceChanged = deck.setOnlineTopType(topCardType, topFaceImage);
     if (faceChanged && count > 0) deck.animateActivity('flip', () => this.requestRender());
     if (countChanged || faceChanged) this.requestRender();
   }
@@ -1621,6 +1625,7 @@ export class SceneManager {
           card = new CardObject3D({
             id: obj.id,
             cardType: obj.cardType,
+            faceImage: obj.faceImage,
             title: (obj.faceUp && obj.cardType) ? getCardTitle(obj.cardType) : 'Card',
             faceUp: obj.faceUp,
             ownerId: obj.ownerId ?? null,
@@ -1642,7 +1647,7 @@ export class SceneManager {
         card.setMasked(this._shouldMask('HAND', obj.ownerId, obj.faceUp));
         if (obj.ownerId !== undefined) card.setOwnerId(obj.ownerId);
         if (obj.cardType) {
-          card.setCardType(obj.cardType);
+          card.setCardType(obj.cardType, obj.faceImage);
           card.updateContent({ title: getCardTitle(obj.cardType) });
         }
 
@@ -1669,6 +1674,7 @@ export class SceneManager {
           card = new CardObject3D({
             id: obj.id,
             cardType: obj.cardType,
+            faceImage: obj.faceImage,
             title: obj.cardType ? getCardTitle(obj.cardType) : 'Card',
             position: { x: obj.position.x, y: obj.position.y ?? TABLE_CONFIG.SURFACE_Y, z: obj.position.z },
             faceUp: obj.faceUp,
@@ -1703,7 +1709,7 @@ export class SceneManager {
           card.setMasked(this._shouldMask('TABLE', null, obj.faceUp));
           if (card.isFaceUp() !== obj.faceUp) card.setFaceUp(obj.faceUp);
           if (obj.cardType) {
-            card.setCardType(obj.cardType);
+            card.setCardType(obj.cardType, obj.faceImage);
             card.updateContent({ title: getCardTitle(obj.cardType) });
           }
           modified = true;
@@ -1723,7 +1729,7 @@ export class SceneManager {
     if (modified) this.requestRender();
   }
 
-  syncFlippedCard(cardId: string, faceUp: boolean, cardType?: string, ownerId?: string | null, location?: string, notifyHand = true): void {
+  syncFlippedCard(cardId: string, faceUp: boolean, cardType?: string, ownerId?: string | null, location?: string, notifyHand = true, faceImage?: string): void {
     const card = this._cardRegistry.getCardObject(cardId);
     if (!card || card.isDisposed()) return;
 
@@ -1739,7 +1745,7 @@ export class SceneManager {
     const localOfflineHand = loc === 'HAND' && !this._onlineCardRoomId && this.isLocalHandCard(card);
     card.setMasked(localOfflineHand ? !faceUp : this._shouldMask(loc, owner, faceUp));
     if (faceUp && cardType) {
-      card.setCardType(cardType);
+      card.setCardType(cardType, faceImage);
       card.updateContent({ title: getCardTitle(cardType) });
     }
     if (card.isFaceUp() !== faceUp) card.animateFlipTo(faceUp, { requestRender: () => this.requestRender() });

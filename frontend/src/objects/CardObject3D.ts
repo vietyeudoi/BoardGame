@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { CARD_CONFIG } from './CardConfig';
 import { TABLE_CONFIG } from './TableConfig';
+import { getCardFaceImage } from './CardFaceImages';
 import { getCardFaceRules } from './CardFaceRules';
 import { CardTextureGenerator } from './CardTextureGenerator';
 import { Logger } from '../utils/Logger';
@@ -25,6 +26,7 @@ export interface CardContent {
 export interface CardOptions {
   id?: string;
   cardType?: string;
+  faceImage?: string;
   ownerId?: string | null;
   width?: number;
   height?: number;
@@ -97,6 +99,8 @@ export class CardObject3D extends THREE.Group {
   private _frontCanvas: HTMLCanvasElement | null = null;
   private _ownsFrontTexture = false;
   private _externalFrontTexture = false;
+  private _faceImage?: string;
+  private _sharedFrontImage?: string;
   private _sharedFrontKey: string | null = null;
   private _sharedBackTexture = false;
 
@@ -115,6 +119,7 @@ export class CardObject3D extends THREE.Group {
 
     this._faceUp = options?.faceUp ?? true;
     this._cardType = options?.cardType ?? null;
+    this._faceImage = options?.faceImage;
     this._ownerId = options?.ownerId ?? null;
 
     this._content = {
@@ -219,9 +224,14 @@ export class CardObject3D extends THREE.Group {
   }
 
   /** Stores the canonical card type for display (screen-space fan preview). */
-  setCardType(cardType: string | null): void {
-    if (this._isDisposed || this._cardType === cardType) return;
+  getFaceImage(): string | undefined {
+    return this._faceImage;
+  }
+
+  setCardType(cardType: string | null, faceImage = this._cardType === cardType ? this._faceImage : undefined): void {
+    if (this._isDisposed || (this._cardType === cardType && this._faceImage === faceImage)) return;
     this._cardType = cardType;
+    this._faceImage = faceImage;
     this._refreshFrontTexture();
   }
 
@@ -449,10 +459,15 @@ export class CardObject3D extends THREE.Group {
     // Lá đã biết loại dùng mẫu chuẩn, kể cả khi nơi tạo truyền thêm nhãn thao tác.
     if (!artwork && !backgroundColor && (canonical || plainUnknown)) {
       const key = type ?? '';
-      if (this._sharedFrontKey === key) return;
+      const image = getCardFaceImage(type, this._faceImage) ? this._faceImage ?? '' : undefined;
+      if (this._sharedFrontKey === key && this._sharedFrontImage === image) return;
       this._releaseFrontTexture();
-      this._frontTexture = CardTextureGenerator.acquireFrontTexture(key);
-      if (this._frontTexture) this._sharedFrontKey = key;
+      this._frontTexture = image === undefined ? CardTextureGenerator.acquireFrontTexture(key)
+        : CardTextureGenerator.acquireFrontTexture(key, 'standard', image);
+      if (this._frontTexture) {
+        this._sharedFrontKey = key;
+        this._sharedFrontImage = image;
+      }
       return;
     }
     if (this._sharedFrontKey !== null) this._releaseFrontTexture();
@@ -475,9 +490,10 @@ export class CardObject3D extends THREE.Group {
 
 
   private _releaseFrontTexture(): void {
-    if (this._sharedFrontKey !== null) CardTextureGenerator.releaseFrontTexture(this._sharedFrontKey);
+    if (this._sharedFrontKey !== null) CardTextureGenerator.releaseFrontTexture(this._sharedFrontKey, 'standard', this._sharedFrontImage);
     else if (this._ownsFrontTexture) this._frontTexture?.dispose();
     this._sharedFrontKey = null;
+    this._sharedFrontImage = undefined;
     this._ownsFrontTexture = false;
     this._frontTexture = null;
     this._frontCanvas = null;

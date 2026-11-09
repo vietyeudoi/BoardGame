@@ -5,6 +5,7 @@
 import type { DeckViewState } from '@shared/types/protocol';
 import { cardsAtTablePile, DEFAULT_DECK_DRAW_END } from '@shared/types/room';
 import { TABLE_ROLL, tableRollLabel, type TableRollKind } from '@shared/types/tableRoll';
+import { CARD_FACE_IMAGE_READY } from '../objects/CardTextureGenerator';
 import { SceneManager } from '../scene/SceneManager';
 import { SeatPrompt } from '../ui/components/SeatPrompt';
 import { UIManager } from '../ui/UIManager';
@@ -62,6 +63,9 @@ export class App {
     }
 
     this._sceneManager = new SceneManager(canvasContainer);
+    window.addEventListener(CARD_FACE_IMAGE_READY, () => this._sceneManager.requestRender(), {
+      signal: this._cursorPointerListeners.signal,
+    });
     this._uiManager = new UIManager(uiContainer, this._store);
     this._contextMenu = new ContextMenu(_container);
     this._insertionModal = new InsertionModal(_container);
@@ -358,6 +362,7 @@ export class App {
         hand.map((card: CardObject3D): FanCardData => ({
           id: card.cardId,
           cardType: card.getCardType(),
+          faceImage: card.getFaceImage(),
           title: card.getContent().title ?? '',
           masked: card.isMasked() || !card.isFaceUp(),
         }))
@@ -376,6 +381,7 @@ export class App {
         hand.map((card: CardObject3D): FanCardData => ({
           id: card.cardId,
           cardType: card.getCardType(),
+          faceImage: card.getFaceImage(),
           title: card.getContent().title ?? '',
           masked: card.isMasked() || !card.isFaceUp(),
         }))
@@ -509,7 +515,7 @@ export class App {
 
     // Wire multiplayer card draws and errors (M1.5.1)
     this._messageHandler.onCardDrawn = (card, playerIndex) => {
-      this._sceneManager.syncDrawnCard(card.id, playerIndex, card.cardType, card.faceUp, card.ownerId ?? undefined);
+      this._sceneManager.syncDrawnCard(card.id, playerIndex, card.cardType, card.faceUp, card.ownerId ?? undefined, card.faceImage);
     };
     // Wire multiplayer card transfers (M1.5.4 / M1.7.4)
     this._messageHandler.onCardTransferred = (payload) => {
@@ -521,7 +527,8 @@ export class App {
         payload.card.faceUp,
         payload.seq,
         payload.card.handIndex,
-        payload.card.ownerId ?? undefined
+        payload.card.ownerId ?? undefined,
+        payload.card.faceImage
       );
     };
     this._sceneManager.onCardTransferRequested = (cardId, targetPlayerIndex, handIndex) => {
@@ -540,7 +547,7 @@ export class App {
     this._messageHandler.onRejection = (objectId, code) => {
       if ((code === "FLIP_REJECTED" || code === "INVALID_OPERATION" || code === "OBJECT_NOT_FOUND") && pendingFlips.delete(objectId)) {
         const object = this._store.getRoomState()?.objects.find(card => card.id === objectId);
-        if (object) this._sceneManager.syncFlippedCard(objectId, object.faceUp, object.cardType, object.ownerId, object.location);
+        if (object) this._sceneManager.syncFlippedCard(objectId, object.faceUp, object.cardType, object.ownerId, object.location, true, object.faceImage);
         return;
       }
       this._sceneManager.handleServerRejection(objectId, code);
@@ -1178,7 +1185,7 @@ export class App {
           if (oldHandOrder.length) this._sceneManager.getLocalHandZone()?.reorderCards(oldHandOrder);
           const count = roomState.deckCount ?? roomState.objects.filter((obj) => obj.type === "card" && obj.location === "DECK").length;
 
-          this._sceneManager.setOnlineDeckCount(count, roomState.deck?.topCardType);
+          this._sceneManager.setOnlineDeckCount(count, roomState.deck?.topCardType, roomState.deck?.topFaceImage);
           const deck = roomState.round?.phase === 'PLAYING' ? roomState.deck : undefined;
           const position = customDrawRoomId === roomId && deck
             ? Math.min(this._sceneManager.getCustomInsertionAboveCount(), deck.count) + 1

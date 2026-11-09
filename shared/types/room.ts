@@ -28,6 +28,7 @@ export interface SandboxObject {
   lockedBy: string | null;
   /** Only populated for cards visible to the receiving player */
   cardType?: string;
+  faceImage?: string;
   ownerId?: string | null;
   location?: ObjectLocation;
   handIndex?: number;
@@ -76,6 +77,7 @@ export interface PublicDeckState {
   count: number;
   affectedCount: number;
   topCardType?: string;
+  topFaceImage?: string;
 }
 
 export interface RoomState {

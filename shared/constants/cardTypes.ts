@@ -32,13 +32,14 @@ export const BASE_CARD_DEFINITIONS: readonly CardDefinition[] = baseCards.map(ca
   ...card, pack: 'base', isBomb: card.isBomb ?? false, isRescue: card.isRescue ?? false,
 }));
 
-type PackCard = [CardType, string, string, number, string, { bomb?: boolean; rescue?: boolean; cat?: boolean }?];
+type PackCard = [CardType, string, string, number, string, { bomb?: boolean; rescue?: boolean; cat?: boolean; faceImage?: readonly string[] }?];
 
 
 function defineCards(id: CardPack['id'], cards: PackCard[]): CardDefinition[] {
   return cards.map(([type, englishName, name, count, description, flags]) => ({
     type, englishName, name, count, description, pack: id, isBomb: flags?.bomb ?? false,
     isRescue: flags?.rescue ?? false, isNormalCat: flags?.cat ?? false,
+    ...(flags?.faceImage ? { faceImage: flags.faceImage } : {}),
   }));
 }
 
@@ -182,7 +183,9 @@ export const CARD_PACKS: readonly CardPack[] = [
     [CardType.GamblingAlterDice, 'Alter Dice', 'Đổi tương lai bằng xúc xắc', 1, 'Tung xúc xắc và bí mật xem từng đó lá bài nằm trên cùng của chồng bài. Sau đó bạn có thể tùy ý sắp xếp vị trí của các lá bài đó và đặt lại vào chồng bài.'],
     [CardType.GamblingFutureDice, 'Future Dice', 'Xem tương lai bằng xúc xắc', 1, 'Tung xúc xắc và được bí mật xem số lượng lá bài tương ứng nằm trên cùng của chồng bài.'],
     // TODO: Xác nhận các chức năng được in trên lá Mèo quỷ lai.
-    [CardType.GamblingUnholyHybrid, 'Unholy Hybrid', 'Mèo quỷ lai', 3, 'Bạn có thể sử dụng lá này như 1 trong các chức năng được ghi trên lá bài.'],
+    [CardType.GamblingUnholyHybrid, 'Unholy Hybrid', 'Mèo quỷ lai', 3, 'Bạn có thể sử dụng lá này như 1 trong các chức năng được ghi trên lá bài.', {
+      faceImage: ['UnholyHybrid/4cdjYw0.png', 'UnholyHybrid/4EwQpOe.png', 'UnholyHybrid/f8ICm0e.png'],
+    }],
   ]),
 ];
 

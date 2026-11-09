@@ -203,7 +203,9 @@ export class MessageHandler {
           msg.payload.faceUp,
           msg.payload.cardType,
           msg.payload.ownerId ?? undefined,
-          msg.payload.location ?? undefined
+          msg.payload.location ?? undefined,
+          true,
+          msg.payload.faceImage
         );
         break;
       }

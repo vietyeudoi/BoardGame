@@ -382,7 +382,7 @@ export class Room {
     return {
       count: cards.length,
       affectedCount: Math.min(cards.length, this._deckAffectedCount),
-      ...(top?.faceUp && top.cardType ? { topCardType: top.cardType } : {}),
+      ...(top?.faceUp && top.cardType ? { topCardType: top.cardType, ...(top.faceImage ? { topFaceImage: top.faceImage } : {}) } : {}),
     };
   }
 

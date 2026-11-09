@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { DECK_CONFIG } from './DeckConfig';
 import { TABLE_CONFIG } from './TableConfig';
+import { getCardFaceImage } from './CardFaceImages';
 import { CardTextureGenerator } from './CardTextureGenerator';
 import { Logger } from '../utils/Logger';
 
@@ -50,6 +51,7 @@ export class DeckObject3D extends THREE.Group {
   private _ownsTopTexture = false;
   private _sharedBackTexture = false;
   private _onlineTopType?: string;
+  private _onlineTopFaceImage?: string;
   private _onlineTopTexture: THREE.CanvasTexture | null = null;
   private _activityFrame?: number;
   private _flippingFace = false;
@@ -403,11 +405,13 @@ export class DeckObject3D extends THREE.Group {
   }
 
 
-  setOnlineTopType(cardType?: string): boolean {
-    if (this._onlineTopType === cardType) return false;
-    if (this._onlineTopType) CardTextureGenerator.releaseFrontTexture(this._onlineTopType);
+  setOnlineTopType(cardType?: string, faceImage?: string): boolean {
+    const image = getCardFaceImage(cardType, faceImage) ? faceImage ?? '' : undefined;
+    if (this._onlineTopType === cardType && this._onlineTopFaceImage === image) return false;
+    if (this._onlineTopType) CardTextureGenerator.releaseFrontTexture(this._onlineTopType, 'standard', this._onlineTopFaceImage);
     this._onlineTopType = cardType;
-    this._onlineTopTexture = cardType ? CardTextureGenerator.acquireFrontTexture(cardType) : null;
+    this._onlineTopFaceImage = image;
+    this._onlineTopTexture = cardType ? CardTextureGenerator.acquireFrontTexture(cardType, 'standard', image) : null;
     this._updateVisualMesh();
     return true;
   }
@@ -626,7 +630,7 @@ export class DeckObject3D extends THREE.Group {
     this._isDisposed = true;
 
     this._clearActivity();
-    if (this._onlineTopType) CardTextureGenerator.releaseFrontTexture(this._onlineTopType);
+    if (this._onlineTopType) CardTextureGenerator.releaseFrontTexture(this._onlineTopType, 'standard', this._onlineTopFaceImage);
     this._onlineTopType = undefined;
     this._onlineTopTexture = null;
 

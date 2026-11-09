@@ -16,6 +16,7 @@ import { FAN_PREVIEW_LAYOUT } from '../FanPreviewConfig';
 export interface FanCardData {
   id: string;
   cardType: string | null;
+  faceImage?: string;
   title: string;
   masked?: boolean;
 }
@@ -316,7 +317,7 @@ export class FullHandFanPreviewUI {
     if (!this._root || !this._stage) return;
 
     const signature = this._cards
-      .map((c) => `${c.id}:${c.cardType ?? ''}:${c.masked ? 1 : 0}:${c.title}`)
+      .map((c) => `${c.id}:${c.cardType ?? ''}:${c.faceImage ?? ''}:${c.masked ? 1 : 0}:${c.title}`)
       .join('|');
     if (signature !== this._signature) {
       if (canReuse) {
@@ -327,7 +328,7 @@ export class FullHandFanPreviewUI {
           el.dataset.fanIndex = String(index);
           const card = this._cards[index]!;
           const old = previousById.get(card.id)!;
-          if (old.masked === card.masked && old.title === card.title && old.cardType === card.cardType) return;
+          if (old.masked === card.masked && old.title === card.title && old.cardType === card.cardType && old.faceImage === card.faceImage) return;
           paintCardFace(el, card);
           if (old.masked !== card.masked) {
             el.firstElementChild?.animate?.([{ transform: "rotateY(-82deg)" }, { transform: "rotateY(0)" }], { duration: 150, easing: "ease-out" });

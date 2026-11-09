@@ -73,14 +73,14 @@ export class DeckViewRow {
       this._add(DECK_VIEW_PREFIX + 'name', this._name);
     }
     const pitch = Math.min(CARD_CONFIG.DEFAULT_WIDTH * CARD_SCALE + 0.15, ROW_WIDTH / state.cards.length);
-    state.cards.forEach(({ token, cardType }, index) => {
+    state.cards.forEach(({ token, cardType, faceImage }, index) => {
       let entry = this._cards.get(token);
       if (entry?.index === index) return;
       if (!entry) {
         const id = DECK_VIEW_PREFIX + state.id + ':' + token;
         // Mặt bài riêng đã có trong bảng 2D, hàng 3D chỉ giúp theo dõi thứ tự.
         const face = this._local ? undefined : cardType;
-        const card = new CardObject3D({ id, cardType: face, title: getCardTitle(face), faceUp: Boolean(face) });
+        const card = new CardObject3D({ id, cardType: face, faceImage: face ? faceImage : undefined, title: getCardTitle(face), faceUp: Boolean(face) });
         card.setMasked(!face);
         card.position.copy(deckPosition ?? center);
         card.scale.setScalar(0.58);

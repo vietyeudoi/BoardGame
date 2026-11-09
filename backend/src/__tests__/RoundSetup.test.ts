@@ -6,6 +6,7 @@ import { CardType } from '../../../shared/types/gameObjects.js';
 import type { ClientToServerMessage, ServerToClientMessage } from '../../../shared/types/protocol.js';
 import { RoomManager } from '../room/RoomManager.js';
 import { buildRoundDeck, previewRound } from '../room/RoundDeck.js';
+import { ViewStateBuilder } from '../room/ViewStateBuilder.js';
 import { HttpServer } from '../server/HttpServer.js';
 import { WebSocketServer } from '../server/WebSocketServer.js';
 
@@ -13,6 +14,18 @@ type WithPayload = Exclude<ServerToClientMessage, { type: 'pong' }>;
 type Payload = { [M in WithPayload as M['type']]: M['payload'] };
 
 describe('Bộ bài gốc và chia bài', () => {
+  it('gán một ảnh cho mỗi bản Unholy Hybrid và chỉ gửi ảnh khi được xem mặt', () => {
+    const cards = buildRoundDeck({ explodingKittens: 4, defuses: 6, enabledPacks: ['gambling'] }, ['a', 'b']);
+    const hybrids = cards.filter(card => card.cardType === CardType.GamblingUnholyHybrid);
+    expect(hybrids.map(card => card.faceImage)).toEqual(CARD_DEFINITIONS.get(CardType.GamblingUnholyHybrid)?.faceImage);
+    expect(cards.filter(card => card.faceImage)).toHaveLength(3);
+    const hand = { ...hybrids[0]!, location: 'HAND' as const, ownerId: 'a', faceUp: false };
+    expect(ViewStateBuilder.filterObjectForClient(hand, 'a', true).faceImage).toBe(hand.faceImage);
+    expect(ViewStateBuilder.filterObjectForClient(hand, 'b', true).faceImage).toBeUndefined();
+    const table = { ...hand, location: 'TABLE' as const, ownerId: null };
+    expect(ViewStateBuilder.filterObjectForClient(table, 'b', true).faceImage).toBeUndefined();
+    expect(ViewStateBuilder.filterObjectForClient({ ...table, faceUp: true }, 'b', true).faceImage).toBe(table.faceImage);
+  });
   it('có đúng 56 lá, 13 loại và 5 loại mèo thường', () => {
     expect(BASE_CARD_DEFINITIONS.reduce((sum, card) => sum + card.count, 0)).toBe(56);
     expect(new Set(BASE_CARD_DEFINITIONS.map(card => card.type)).size).toBe(13);

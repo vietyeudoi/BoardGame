@@ -77,7 +77,7 @@ export type ServerToClientMessage =
   | { type: 'hand:card-drawn'; payload: { card: SandboxObject; playerIndex: number } }
   | { type: 'hand:card-transferred'; payload: { cardId: string; fromPlayerIndex: number; toPlayerIndex: number; card: SandboxObject; seq?: number } }
   | { type: 'object:moved'; payload: ObjectPosition }
-  | { type: 'object:flipped'; payload: { objectId: string; faceUp: boolean; cardType?: string; ownerId?: string | null; location?: string } }
+  | { type: 'object:flipped'; payload: { objectId: string; faceUp: boolean; cardType?: string; faceImage?: string; ownerId?: string | null; location?: string } }
   | { type: 'object:locked'; payload: { objectId: string; lockedBy: string } }
   | { type: 'object:unlocked'; payload: { objectId: string } }
   | { type: 'draw:hovered'; payload: DrawHoverUpdatePayload }
@@ -102,7 +102,7 @@ export interface DeckViewState {
   viewerName: string;
   seat: number;
   // Token chỉ là chỉ số trong phiên, không phải ID lá thật.
-  cards: { token: number; cardType?: string }[];
+  cards: { token: number; cardType?: string; faceImage?: string }[];
 }
 
 export interface Vector3Like {

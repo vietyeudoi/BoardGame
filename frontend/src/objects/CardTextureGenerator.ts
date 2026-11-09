@@ -8,6 +8,7 @@ import { getCardFaceRules, RULE_FONT, RULE_PANEL } from './CardFaceRules';
 import { getCardTitle } from './CardTypeHelper';
 import { CARD_CONFIG } from './CardConfig';
 import { FACE_STYLE, getCardFaceStyle } from './CardFaceStyle';
+import { getCardFaceImage } from './CardFaceImages';
 import { Logger } from '../utils/Logger';
 
 const logger = Logger.create('CardTextureGenerator');
@@ -22,13 +23,16 @@ export interface CardRenderContent {
 }
 
 export type CardTextureSize = 'small' | 'standard' | 'large';
+export const CARD_FACE_IMAGE_READY = 'card-face-image-ready';
 const SIZE_SCALE: Record<CardTextureSize, number> = { small: .5, standard: 1, large: 2 };
 
 export class CardTextureGenerator {
   private static readonly _frontTextures = new Map<string, { texture: THREE.CanvasTexture; users: number }>();
 
-  static acquireFrontTexture(key: string, size: CardTextureSize = 'standard'): THREE.CanvasTexture | null {
-    const cacheKey = size + ':' + key;
+  private static readonly _loadedImages = new Map<string, Promise<HTMLImageElement | null>>();
+
+  static acquireFrontTexture(key: string, size: CardTextureSize = 'standard', faceImage?: string): THREE.CanvasTexture | null {
+    const cacheKey = size + ':' + key + (faceImage === undefined ? '' : ':' + faceImage);
     const entry = this._frontTextures.get(cacheKey);
     if (entry) {
       entry.users++;
@@ -39,17 +43,46 @@ export class CardTextureGenerator {
     if (getCardFaceRules(key)) this.drawFront(canvas, { title: getCardTitle(key) }, key);
     else this.drawBack(canvas);
     const texture = this.createTextureFromCanvas(canvas);
-    if (texture) this._frontTextures.set(cacheKey, { texture, users: 1 });
+    if (texture) {
+      this._frontTextures.set(cacheKey, { texture, users: 1 });
+      const url = faceImage === undefined ? undefined : getCardFaceImage(key, faceImage);
+      if (url) void this._applyImage(cacheKey, texture, canvas, url);
+    }
     return texture;
   }
 
-  static releaseFrontTexture(key: string, size: CardTextureSize = 'standard'): void {
-    const cacheKey = size + ':' + key;
+  static releaseFrontTexture(key: string, size: CardTextureSize = 'standard', faceImage?: string): void {
+    const cacheKey = size + ':' + key + (faceImage === undefined ? '' : ':' + faceImage);
     const entry = this._frontTextures.get(cacheKey);
     if (!entry || --entry.users > 0) return;
     this._frontTextures.delete(cacheKey);
     entry.texture.dispose();
   }
+  private static async _applyImage(cacheKey: string, texture: THREE.CanvasTexture, canvas: HTMLCanvasElement, url: string): Promise<void> {
+    let pending = this._loadedImages.get(url);
+    if (!pending) {
+      pending = new Promise(resolve => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => resolve(null);
+        image.src = url;
+      });
+      this._loadedImages.set(url, pending);
+    }
+    const image = await pending;
+    if (!image || this._frontTextures.get(cacheKey)?.texture !== texture) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    // Phủ kín mặt lá, giữ tỉ lệ gốc và cắt đều hai mép nếu cần.
+    const scale = Math.max(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+    const width = image.naturalWidth * scale;
+    const height = image.naturalHeight * scale;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+    texture.needsUpdate = true;
+    window.dispatchEvent(new Event(CARD_FACE_IMAGE_READY));
+  }
+
   static acquireBackTexture(): THREE.CanvasTexture | null {
     return this.acquireFrontTexture('');
   }

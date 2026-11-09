@@ -101,7 +101,9 @@ export class RoundSetupPanel {
     gallery.append(galleryTitle, faces);
     gallery.addEventListener('toggle', () => {
       if (gallery.open && !faces.childElementCount) {
-        faces.append(...pack.cards.map(card => createCardFace(document, card.type, 'small')));
+        faces.append(...pack.cards.flatMap(card => card.faceImage?.length
+          ? card.faceImage.map(image => createCardFace(document, card.type, 'small', image))
+          : [createCardFace(document, card.type, 'small')]));
       }
     }, { signal: this._abort.signal });
     settings.append(gallery);

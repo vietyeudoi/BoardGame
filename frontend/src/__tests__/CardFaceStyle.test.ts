@@ -1,11 +1,35 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CARD_DEFINITIONS } from '@shared/constants/cardTypes';
+import { CardType } from '@shared/types/gameObjects';
+import { getCardFaceImage } from '../objects/CardFaceImages';
 import { getCardFaceStyle } from '../objects/CardFaceStyle';
 import { CardTextureGenerator } from '../objects/CardTextureGenerator';
 import { createCardFace, paintCardFace } from '../ui/components/CardFaceDOM';
 
 describe('Mẫu mặt bài dùng chung', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('dùng ba ảnh riêng cho Unholy Hybrid và quay về mặt chữ khi ảnh lỗi', () => {
+    const type = CardType.GamblingUnholyHybrid;
+    const definition = CARD_DEFINITIONS.get(type)!;
+    expect(definition.count).toBe(3);
+    const paths = definition.faceImage!;
+    expect(paths).toHaveLength(3);
+    expect(new Set(paths.map(path => getCardFaceImage(type, path))).size).toBe(3);
+    const face = createCardFace(document, type, 'large', paths[1]);
+    const image = face.querySelector('img')!;
+    expect(image.getAttribute('src')).toBe(getCardFaceImage(type, paths[1]));
+    expect(image.style.objectFit).toBe('cover');
+    expect(face.querySelector('.card-face-text--hidden')).not.toBeNull();
+    image.dispatchEvent(new Event('error'));
+    expect(face.querySelector('img')).toBeNull();
+    expect(face.querySelector('.card-face-text--hidden')).toBeNull();
+    expect(face.querySelector('.fhfp-rules-description')?.textContent).toBe(definition.description);
+    expect(getCardFaceImage(CardType.Attack)).toBeUndefined();
+    paintCardFace(face, { cardType: type, faceImage: paths[1], masked: true });
+    expect(face.querySelector('img')).toBeNull();
+    expect(face.querySelector('.fhfp-rules')).toBeNull();
+  });
 
   it('dùng cùng tên và màu cho tất cả lá đã định nghĩa', () => {
     for (const [type, definition] of CARD_DEFINITIONS) {

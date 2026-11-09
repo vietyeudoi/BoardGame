@@ -33,7 +33,7 @@ export class DeckViewSession {
       id: this.id, mode: this.mode, viewerId: this.viewerId, viewerName: this.viewerName, seat: this.seat,
       cards: this._order.map(token => {
         const card = this._cards[token]!;
-        return { token, ...(sessionId === this.viewerId || card.faceUp ? { cardType: card.cardType } : {}) };
+        return { token, ...(sessionId === this.viewerId || card.faceUp ? { cardType: card.cardType, ...(card.faceImage ? { faceImage: card.faceImage } : {}) } : {}) };
       }),
     };
   }
