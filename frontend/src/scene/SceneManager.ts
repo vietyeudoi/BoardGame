@@ -37,7 +37,7 @@ import { getTableOuterRadius, resolveTableSeatCount, PlayerCount } from '../obje
 import { CARD_TYPES, getCardTitle } from '../objects/CardTypeHelper';
 import { computePlayerPerspective } from './PlayerPerspectiveHelper';
 import { SEAT_CHANGE } from '@shared/constants/config';
-import { ANONYMOUS_HAND_PREFIX, getAnonymousHandSlotId, type SandboxObject, type PlayerInfo } from '@shared/types/room';
+import { ANONYMOUS_HAND_PREFIX, getAnonymousHandSlotId, type DeckDrawEnd, type SandboxObject, type PlayerInfo } from '@shared/types/room';
 import {
   INTERACTION_CONFIG,
   clampTablePosition,
@@ -89,6 +89,8 @@ export class SceneManager {
   readonly remoteDragPreview: RemoteDragPreview;
   onOnlineDeckInsert?: (cards: CardObject3D[]) => boolean;
   onOnlineDeckClick?: () => void;
+  private _discardDisplay?: DeckObject3D;
+  private _discardTopId?: string;
   private _roundSetup = false;
   private _roundSpectator = false;
   private readonly _sharedHandCards = new Map<string, SandboxObject>();
@@ -917,7 +919,8 @@ export class SceneManager {
     cardType?: string,
     faceUp = true,
     ownerId?: string,
-    faceImage?: string
+    faceImage?: string,
+    end?: DeckDrawEnd,
   ): CardObject3D | null {
     const handZone = this._handZoneManager.getHandZoneForPlayer(playerIndex);
     if (!handZone) {
@@ -970,6 +973,7 @@ export class SceneManager {
     this._handZoneManager.addCardToHand(handZone.zoneId, card);
     this.requestRender();
 
+    if (end) this.animateDeckTake(cardId, this.getDeckFlightStart(end));
     logger.info(`syncDrawnCard: Card "${cardId}" placed in player ${playerIndex}'s hand (faceUp=${faceUp})`);
     return card;
   }
@@ -1299,24 +1303,21 @@ export class SceneManager {
   }
 
 
-  syncTablePile(cardIds: string[]): void {
+  syncTablePile(cardIds: string[], rotation?: number): void {
     const cards = cardIds.flatMap(id => this._cardRegistry.getCardObject(id) ?? []);
     if (cards.length < 2) return;
     const current = this._stackManager.getStackForCard(cardIds[0]!);
     const existing = current?.getCardIds();
-    if (existing?.length === cardIds.length && existing.every((id, index) => id === cardIds[index])) return;
+    if (current && existing?.length === cardIds.length && existing.every((id, index) => id === cardIds[index])) {
+      if (rotation !== undefined && Math.abs(current.getRotationY() - rotation) > 0.00001) current.setRotationY(rotation);
+      return;
+    }
     const affected = new Set(cards.flatMap(card => this._stackManager.getStackForCard(card.cardId) ?? []));
-    const transforms = new Map([...cards, ...[...affected].flatMap(stack => stack.getCards())]
-      .map(card => [card, { position: card.position.clone(), quaternion: card.quaternion.clone() }]));
-
     const wasDiscard = [...affected].some(stack => stack.stackId === this._discardStackId);
     for (const stack of affected) this._stackManager.dissolveStack(stack.stackId);
     const stack = this._stackManager.createStack(cards);
+    if (rotation !== undefined) stack.setRotationY(rotation);
     if (wasDiscard) this._discardStackId = stack.stackId;
-    for (const [card, transform] of transforms) {
-      card.position.copy(transform.position);
-      card.quaternion.copy(transform.quaternion);
-    }
     this.requestRender();
   }
 
@@ -1332,9 +1333,16 @@ export class SceneManager {
     });
   }
 
-  animateDeckTake(cardId: string): void {
+  getDeckFlightStart(end?: DeckDrawEnd): THREE.Vector3 | undefined {
     const deck = this.getOriginalDeck();
-    if (deck) this._animateCardFlight(cardId, deck);
+    if (!deck) return;
+    const start = deck.getWorldPosition(new THREE.Vector3());
+    if (end !== 'BOTTOM') start.y += Math.max(0, deck.getVisualHeight() - deck.cardThickness);
+    return start;
+  }
+
+  animateDeckTake(cardId: string, start = this.getDeckFlightStart()): void {
+    if (start) this._animateCardFlight(cardId, undefined, start);
   }
 
   private _animateCardFlight(cardId: string, source?: THREE.Object3D, start?: THREE.Vector3): void {
@@ -1353,7 +1361,8 @@ export class SceneManager {
       card.position.y += DECK_CONFIG.CARD_THICKNESS;
       source.getWorldQuaternion(card.quaternion);
     } else if (start) card.position.copy(start);
-    this._transferAnimator.start({ card, getTarget: () => target });
+    const zone = card.isInHand() ? this._handZoneManager.getHandZone(card.getHandZoneId()!) : undefined;
+    this._transferAnimator.start({ card, getTarget: () => zone?.getCardSlotTransform(card) ?? target });
   }
 
   restoreRejectedTableDrop(objectId: string, position: { x: number; y: number; z: number }, rotation: number): void {
@@ -1527,7 +1536,7 @@ export class SceneManager {
         if (object.location === 'TABLE' && object.takenFromDeck) this._spectatorFlipIds.add(object.id);
       }
     }
-    const visible = [...objects];
+    const visible = objects.filter(card => card.location !== 'DISCARD');
     for (const player of players) {
       if (player.id === this._localSessionId || player.spectator) continue;
       // Mã ổn định từ máy chủ dùng để chọn đúng lá úp khi kéo.
@@ -1566,13 +1575,60 @@ export class SceneManager {
   }
 
 
-  setOnlineDeckCount(count: number, topCardType?: string, topFaceImage?: string): void {
+  isDiscardAtScreenPos(x: number, y: number): boolean {
+    if (!this._onlineCardRoomId || this._roundSetup || !this._updateTablePointerRay(x, y)) return false;
+    const display = this._discardDisplay;
+    if (display?.visible && this._tablePointerRaycaster.intersectObject(display.getMesh()).length) return true;
+    const point = this._getTablePointerHit();
+    return !!point && this.isInsideDiscardZone(point.x, point.z);
+  }
+
+  selectDiscardPile(selected: boolean): void {
+    const pile = this._discardDisplay;
+    if (!pile?.visible && selected) return;
+    if (pile) {
+      pile.setHighlighted(selected);
+      this.requestRender();
+    }
+  }
+
+  animateDiscardTake(cardIds: string[]): void {
+    this.syncTablePile(cardIds);
+    const start = this._tableZoneManager.getDiscardPosition();
+    for (const id of cardIds) this._animateCardFlight(id, undefined, start);
+  }
+
+  animateDiscardShuffle(): void {
+    this._discardDisplay?.animateActivity('shuffle', () => this.requestRender());
+  }
+
+  syncDiscardPile(cards: readonly SandboxObject[]): void {
+    const top = cards[0];
+    if (top && !this._discardDisplay) {
+      this._discardDisplay = new DeckObject3D({ id: 'discard-pile-display' });
+      this._discardDisplay.resetLocalCards([], true);
+      this._scene.add(this._discardDisplay);
+    }
+    const display = this._discardDisplay;
+    if (!display) return;
+    const visible = !!top;
+    const changed = display.visible !== visible;
+    display.visible = visible;
+    if (!visible) display.setHighlighted(false);
+    const position = this._tableZoneManager.getDiscardPosition();
+    const moved = !display.position.equals(position);
+    if (moved) display.position.copy(position);
+    const countChanged = display.setOnlineCount(cards.length);
+    const faceChanged = display.setOnlineTopType(top?.faceUp ? top.cardType : undefined, top?.faceUp ? top.faceImage : undefined);
+    if (top && this._discardTopId === top.id && faceChanged) display.animateActivity('flip', () => this.requestRender());
+    this._discardTopId = top?.id;
+    if (changed || moved || countChanged || faceChanged) this.requestRender();
+  }
+
+  setOnlineDeckCount(count: number): void {
     const deck = this.getOriginalDeck();
     if (!deck) return;
-    const countChanged = deck.setOnlineCount(count);
-    const faceChanged = deck.setOnlineTopType(topCardType, topFaceImage);
-    if (faceChanged && count > 0) deck.animateActivity('flip', () => this.requestRender());
-    if (countChanged || faceChanged) this.requestRender();
+    if (deck.setOnlineCount(count)) this.requestRender();
   }
 
 
@@ -1607,6 +1663,11 @@ export class SceneManager {
 
     for (const obj of objects) {
       if (obj.type !== 'card') continue;
+      if (obj.location === 'DISCARD') {
+        const card = this._cardRegistry.getCardObject(obj.id);
+        if (card) this._removeRoomCard(obj.id, card);
+        continue;
+      }
 
 
       if (this.isCardTransferAnimating(obj.id)) {
@@ -2202,7 +2263,16 @@ export class SceneManager {
         card.rotation.y = yaw;
         card.setMasked(this._shouldMask('TABLE', null, card.isFaceUp()));
       }
-      this._handleDropInDiscardZone(card, isEntireStack, cardStack);
+      if (this._onlineCardRoomId) {
+        // Điểm neo chung cho cả nhóm. Server xếp từng lá theo thứ tự nhận.
+        const center = this._tableZoneManager.getDiscardPosition();
+        for (const item of [card, ...followers]) {
+          item.position.x = center.x;
+          item.position.z = center.z;
+        }
+      } else {
+        this._handleDropInDiscardZone(card, isEntireStack, cardStack);
+      }
       this.requestRender();
       return;
     }
@@ -2292,7 +2362,11 @@ export class SceneManager {
           // Case 1: Card → Card with insertion mode index (M1.3.4.5)
           const insertIdx = this.calculateInsertionIndex(1);
           if (insertIdx === 0) {
+            const { x, z } = target.position;
+            const yaw = target.getRotationY();
             const newStack = this._stackManager.createStack([card, target]);
+            newStack.setRotationY(yaw);
+            newStack.setPosition(x, z);
             this.selectStack(newStack.stackId);
           } else {
             this._stackManager.stackCards(target, card);
@@ -3442,6 +3516,8 @@ export class SceneManager {
     this.onLocalHandChanged = null;
     this.isPointOverLocalHandPreview = null;
     this.remoteDragPreview.clear();
+    this._discardDisplay?.removeFromParent();
+    this._discardDisplay?.dispose();
     this.deckViewRow.dispose();
     this.tableRollEffects.dispose();
     this._transferAnimator.dispose();

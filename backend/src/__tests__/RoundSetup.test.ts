@@ -525,7 +525,7 @@ describe('Bộ bài gốc và chia bài', () => {
       expect((await guest.read('error')).code).toBe('ROUND_HOST_REQUIRED');
       host.send({ type: 'deck:insert', payload: { cardIds: [tableCard.id] } });
       peer.send({ type: 'deck:insert', payload: { cardIds: [tableCard.id] } });
-      expect(await guest.read('deck:inserted')).toEqual({ count: 1 });
+      expect(await guest.read('deck:inserted')).toEqual({ count: 1, playerName: expect.any(String) });
       const conflictingClients = () => [host, peer].filter(client => client.queue.some(message =>
         message.type === 'error' && message.payload.code === 'DRAG_END_FAILED'));
       await expect.poll(() => conflictingClients().length).toBe(1);

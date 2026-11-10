@@ -2,7 +2,8 @@
  * Room.ts — Room state and player management (authoritative)
  */
 import { cardsAtTablePile, ANONYMOUS_HAND_PREFIX, DEFAULT_DECK_AFFECTED_COUNT, DEFAULT_DECK_DRAW_END, type PublicDeckState, type DeckDrawEnd, type RoomState, type SandboxObject, type PlayerInfo, type DeckSetup, type RoundSetup } from '../../../shared/types/room.js';
-import type { DeckViewMode, Vector3Like } from '../../../shared/types/protocol.js';
+import type { DeckViewMode, DiscardTakeMode, Vector3Like } from '../../../shared/types/protocol.js';
+import { getDiscardZoneCenter, isInDiscardZone, PILE_LAYER_HEIGHT } from '../../../shared/constants/tablePiles.js';
 import { isRegularBomb } from '../../../shared/constants/cardTypes.js';
 import { getDefaultSeatPlacement, SEAT_CHANGE, SHARED_CONFIG } from '../../../shared/constants/config.js';
 import { IdGenerator } from '../utils/IdGenerator.js';
@@ -334,6 +335,8 @@ export class Room {
   }
 
 
+  get deckDrawEnd(): DeckDrawEnd { return this._deckDrawEnd; }
+
   setDeckDrawEnd(end: DeckDrawEnd): void {
     this._deckDrawEnd = end;
   }
@@ -482,17 +485,25 @@ export class Room {
       throw new Error('Chỉ xếp được các lá công khai trên bàn đang rảnh.');
     }
     const { x, z } = cards[0]!.position;
+    const rotation = cards[0]!.rotation;
     const existing = cardsAtTablePile([...this._objects.values()], cards[0]!.id);
     if (existing.some(card => !cards.includes(card))) throw new Error('Hãy chọn cả chồng tại điểm đặt.');
-    cards.forEach((card, index) => { card.position = { x, y: index * SEAT_CARD_LAYER_HEIGHT, z }; });
+    cards.forEach((card, index) => {
+      card.position = { x, y: index * PILE_LAYER_HEIGHT, z };
+      card.rotation = rotation;
+    });
   }
 
   shuffleTablePile(anchorId: string): boolean {
     const cards = cardsAtTablePile([...this._objects.values()], anchorId);
     if (cards.length < 2) return false;
     if (cards.some(card => card.lockedBy || card.privateViewerId)) throw new Error('Chồng bài đang có lá được thao tác.');
-    const positions = cards.map(card => card.position);
-    shuffle(cards).forEach((card, index) => { card.position = positions[index]!; });
+    const { x, y, z } = cards[0]!.position;
+    const rotation = cards[0]!.rotation;
+    shuffle(cards).forEach((card, index) => {
+      card.position = { x, y: y + index * PILE_LAYER_HEIGHT, z };
+      card.rotation = rotation;
+    });
     return true;
   }
 
@@ -545,7 +556,7 @@ export class Room {
     return card;
   }
 
-  drawCard(sessionId: string): SandboxObject {
+  drawCard(sessionId: string, end: DeckDrawEnd = DEFAULT_DECK_DRAW_END): SandboxObject {
     if (!this._players.has(sessionId)) {
       throw new Error(`Room: Session ${sessionId} is not in room ${this.id}`);
     }
@@ -556,8 +567,8 @@ export class Room {
       throw new Error(`Room: Deck is empty in room ${this.id}`);
     }
 
-    // Top card is the last one in the stack
-    const topCard = deckCards[deckCards.length - 1]!;
+    // Map lưu thứ tự từ đáy lên đỉnh.
+    const topCard = deckCards[end === 'BOTTOM' ? 0 : deckCards.length - 1]!;
 
     // Count current cards in player's hand
     const playerHandCount = Array.from(this._objects.values()).filter(
@@ -580,7 +591,72 @@ export class Room {
     return topCard;
   }
 
-  playCardToTable(sessionId: string, cardId: string, position: Vector3Like, faceUp?: boolean): SandboxObject {
+  private _discardCards(): SandboxObject[] {
+    return [...this._objects.values()].filter(card => card.location === 'DISCARD')
+      .sort((a, b) => a.position.y - b.position.y);
+  }
+
+  private _alignDiscard(cards: readonly SandboxObject[]): void {
+    const center = getDiscardZoneCenter(this.maxPlayers);
+    cards.forEach((card, index) => {
+      card.position = { ...center, y: index * PILE_LAYER_HEIGHT };
+      card.rotation = 0;
+    });
+  }
+
+  private _placeInDiscard(card: SandboxObject): void {
+    if (card.type !== 'card' || card.privateViewerId || !isInDiscardZone(card.position, this.maxPlayers)) return;
+    const cards = this._discardCards();
+    card.location = 'DISCARD';
+    this._alignDiscard([...cards, card]);
+  }
+
+  findDiscardDrop(isOnTable: (position: Vector3Like) => boolean): Vector3Like | undefined {
+    const center = getDiscardZoneCenter(this.maxPlayers);
+    const occupied = [...this._objects.values()].filter(card => card.location === 'TABLE' || card.location === 'DISCARD').map(card => card.position);
+    // Chừa cả vùng quanh tâm bàn cho chồng bốc và các nút.
+    occupied.push({ x: 0, y: 0, z: 0 });
+    const spacing = 4.5;
+    const offsets = [0, -spacing, spacing, -2 * spacing, 2 * spacing];
+    const candidates = offsets.flatMap(x => offsets.map(z => ({ x: center.x + x, y: 0, z: center.z + z })))
+      .sort((a, b) => Math.hypot(a.x - center.x, a.z - center.z) - Math.hypot(b.x - center.x, b.z - center.z));
+    return candidates.find(point => isOnTable(point) && !isInDiscardZone(point, this.maxPlayers)
+      && occupied.every(card => Math.hypot(card.x - point.x, card.z - point.z) >= spacing));
+  }
+
+  flipDiscardPile(sessionId: string, cardId: string): boolean {
+    const player = this.getPlayer(sessionId);
+    if (!player?.isConnected || player.spectator || this._phase === 'SETUP') return false;
+    const discard = this._discardCards();
+    // Kiểm tra cả chồng trước khi lật để không đổi dở dang hoặc lật nhầm chồng đã thay đỉnh.
+    if (discard.at(-1)?.id !== cardId || discard.some(card => card.lockedBy || card.privateViewerId)) return false;
+    for (const card of discard) card.faceUp = !card.faceUp;
+    return true;
+  }
+
+  takeDiscardCards(sessionId: string, cardId: string, position: Vector3Like, mode?: DiscardTakeMode): SandboxObject[] {
+    const player = this.getPlayer(sessionId);
+    if (!player?.isConnected || player.spectator || this._phase === 'SETUP' || isInDiscardZone(position, this.maxPlayers)) return [];
+    const discard = this._discardCards();
+    const requested = discard.find(card => card.id === cardId);
+    // ID của lá đỉnh là điều kiện để hai yêu cầu từ cùng một ảnh chụp chỉ thắng một lần.
+    if (!requested || (mode && discard.at(-1) !== requested)) return [];
+    const taken = mode === 'all' ? discard : [requested];
+    if (taken.some(card => card.lockedBy || card.privateViewerId)) return [];
+
+    taken.forEach((card, index) => {
+      card.location = 'TABLE';
+      card.position = { ...position, y: index * PILE_LAYER_HEIGHT };
+    });
+    this._alignDiscard(discard.filter(card => card.location === 'DISCARD'));
+    return taken;
+  }
+
+  takeDiscardCard(sessionId: string, cardId: string, position: Vector3Like): boolean {
+    return this.takeDiscardCards(sessionId, cardId, position).length > 0;
+  }
+
+  playCardToTable(sessionId: string, cardId: string, position: Vector3Like, faceUp?: boolean, discard = false): SandboxObject {
     const card = this._objects.get(cardId);
     if (!card) {
       throw new Error(`Room: Card ${cardId} not found in room ${this.id}`);
@@ -602,6 +678,7 @@ export class Room {
     }
     card.handIndex = undefined;
 
+    if (discard) this._placeInDiscard(card);
     if (previousOwner) this._reindexHands(previousOwner);
     logger.info('Card played to table', { roomId: this.id, sessionId, cardId, position, faceUp: card.faceUp });
     return card;
@@ -758,7 +835,8 @@ export class Room {
   updateObjectAfterDrag(
     objectId: string, sessionId: string, position: Vector3Like,
     faceUp?: boolean, targetPlayerIndex?: number | null, handIndex?: number,
-    rotation?: number
+    rotation?: number,
+    discard = false
   ): SandboxObject | null {
     this._dynamicLocks.delete(objectId);
     const obj = this._objects.get(objectId);
@@ -791,7 +869,8 @@ export class Room {
     // M1.7.5 Part 2/3: store the table yaw (seat default at HAND→TABLE, or the
     // current manual yaw) so every client renders the same orientation.
     if (rotation !== undefined) obj.rotation = rotation;
-    if (obj.location === 'HAND' || obj.location === 'DISCARD') {
+    const wasDiscard = obj.location === 'DISCARD';
+    if (obj.location === 'HAND' || wasDiscard) {
       const previousOwner = obj.ownerId;
       this._handAliases.delete(obj);
       obj.location = 'TABLE';
@@ -799,6 +878,8 @@ export class Room {
       obj.handIndex = undefined;
       if (previousOwner) this._reindexHands(previousOwner);
     }
+    if (discard) this._placeInDiscard(obj);
+    if (wasDiscard && obj.location !== 'DISCARD') this._alignDiscard(this._discardCards());
     return obj;
   }
 

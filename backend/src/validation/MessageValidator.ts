@@ -131,9 +131,37 @@ export const MessageValidator = {
       case 'round:reset':
       case 'room:leave':
       case 'ping':
-      case 'card:draw':
         return { success: true, data: raw as ClientToServerMessage };
 
+
+      case 'card:draw': {
+        const p = msg['payload'] as Record<string, unknown> | undefined;
+        if (p !== undefined && (!p || typeof p !== 'object' || Array.isArray(p)
+          || (p['end'] !== undefined && p['end'] !== 'TOP' && p['end'] !== 'BOTTOM'))) {
+          return { success: false, error: 'card:draw: invalid end' };
+        }
+        return { success: true, data: raw as ClientToServerMessage };
+      }
+
+      case 'discard:flip-all': {
+        const p = msg['payload'] as Record<string, unknown> | undefined;
+        if (!isNonEmptyString(p?.['cardId'])) {
+          return { success: false, error: 'Thiếu lá trên cùng của chồng bỏ.' };
+        }
+        return { success: true, data: raw as ClientToServerMessage };
+      }
+
+      case 'discard:take': {
+        const p = msg['payload'] as Record<string, unknown> | undefined;
+        const pos = p?.['position'] as Record<string, unknown> | undefined;
+        if (!isNonEmptyString(p?.['cardId']) || !pos ||
+          (p?.['mode'] !== undefined && p['mode'] !== 'top' && p['mode'] !== 'all') ||
+          (p?.['nearby'] !== undefined && (typeof p['nearby'] !== 'boolean' || !p['mode'])) ||
+          !['x', 'y', 'z'].every(key => typeof pos[key] === 'number' && Number.isFinite(pos[key]))) {
+          return { success: false, error: 'Vị trí lấy bài bỏ không hợp lệ.' };
+        }
+        return { success: true, data: raw as ClientToServerMessage };
+      }
 
       case 'deck:set-draw-end': {
         const p = msg['payload'] as Record<string, unknown> | undefined;
@@ -212,6 +240,9 @@ export const MessageValidator = {
         if (!p || typeof p['cardId'] !== 'string') {
           return { success: false, error: 'card:play-to-table requires string "cardId"' };
         }
+        if (p['discard'] !== undefined && typeof p['discard'] !== 'boolean') {
+          return { success: false, error: 'card:play-to-table: invalid discard' };
+        }
         const pos = p['position'] as Record<string, unknown> | undefined;
         if (!pos || typeof pos['x'] !== 'number' || typeof pos['y'] !== 'number' || typeof pos['z'] !== 'number') {
           return { success: false, error: 'card:play-to-table requires "position" with x, y, z numbers' };
@@ -272,7 +303,10 @@ export const MessageValidator = {
       case 'object:release': {
         const p = msg['payload'] as Record<string, unknown> | undefined;
         if (!p || typeof p['objectId'] !== 'string') {
-          return { success: false, error: `${type} requires string "objectId"` };
+          return { success: false, error: type + ' requires string "objectId"' };
+        }
+        if (type === 'object:flip' && p['discard'] !== undefined && typeof p['discard'] !== 'boolean') {
+          return { success: false, error: 'object:flip: invalid discard' };
         }
         return { success: true, data: raw as ClientToServerMessage };
       }
@@ -387,6 +421,9 @@ export const MessageValidator = {
         }
         if (p['handIndex'] !== undefined && !isNonNegativeInteger(p['handIndex'])) {
           return { success: false, error: 'object:drag-end: handIndex must be a non-negative integer if provided' };
+        }
+        if (p['discard'] !== undefined && typeof p['discard'] !== 'boolean') {
+          return { success: false, error: 'object:drag-end: invalid discard' };
         }
         // M1.7.5 Part 2: optional seat-derived / manual table yaw (radians).
         if (p['rotation'] !== undefined && !isFiniteInRange(p['rotation'], -1000, 1000)) {

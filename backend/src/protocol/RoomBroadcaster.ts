@@ -43,7 +43,8 @@ export class RoomBroadcaster {
     sessions: Map<string, PlayerSession>,
     room: Room,
     card: SandboxObject,
-    playerIndex: number
+    playerIndex: number,
+    end?: import('../../../shared/types/room.js').DeckDrawEnd,
   ): void {
     room.getConnectedSessionIds().forEach((sid) => {
       if (room.phase && sid !== card.ownerId) return;
@@ -52,6 +53,7 @@ export class RoomBroadcaster {
         payload: {
           card: ViewStateBuilder.filterObjectForClient(card, sid, Boolean(room.phase)),
           playerIndex,
+          end,
         },
       });
     });

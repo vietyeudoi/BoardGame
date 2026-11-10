@@ -3,7 +3,7 @@
  */
 import type { TableRollEvent } from '@shared/types/tableRoll';
 import type { DeckViewState, DrawHoverUpdatePayload, ServerToClientMessage } from '@shared/types/protocol';
-import type { SandboxObject } from '@shared/types/room';
+import type { DeckDrawEnd, SandboxObject } from '@shared/types/room';
 import type { ClientStore } from '../store/ClientStore';
 import type { SceneManager } from '../scene/SceneManager';
 import type { RemoteCursorManager } from '../scene/RemoteCursorManager';
@@ -14,7 +14,7 @@ const logger = Logger.create('MessageHandler');
 export class MessageHandler {
   public onDrawHoverChanged: ((payload: DrawHoverUpdatePayload) => void) | null = null;
   public onFlipConfirmed?: (cardId: string) => void;
-  public onCardDrawn: ((card: SandboxObject, playerIndex: number) => void) | null = null;
+  public onCardDrawn: ((card: SandboxObject, playerIndex: number, end?: DeckDrawEnd) => void) | null = null;
   public onCardTransferred: ((payload: { cardId: string; fromPlayerIndex: number; toPlayerIndex: number; card: SandboxObject; seq?: number }) => void) | null = null;
   onTableRolled?: (event: TableRollEvent) => void;
   public onDeckView?: (state: DeckViewState | null) => void;
@@ -26,6 +26,7 @@ export class MessageHandler {
   onStackFormed?: (payload: Extract<ServerToClientMessage, { type: 'stack:formed' }>['payload']) => void;
   onGatherEmpty?: (message: string) => void;
   onStackShuffled?: (payload: Extract<ServerToClientMessage, { type: 'stack:shuffled' }>['payload']) => void;
+  public onDeckNotice?: (message: string) => void;
   public onDeckShuffled?: (playerName: string) => void;
   public onError: ((message: string) => void) | null = null;
   /** M1.7.4: server rejection tied to an object, used to restore optimistic UI. */
@@ -72,10 +73,29 @@ export class MessageHandler {
         break;
       case 'deck:inserted':
         this._sceneManager.animateDeckInsertion(msg.payload.count);
+        if (msg.payload.playerName) this.onDeckNotice?.(msg.payload.playerName + ' vừa bỏ ' + msg.payload.count + ' lá vào chồng bài');
         break;
-      case 'deck:count':
-        this._store.updateDeckCount(msg.payload.count, msg.payload.ownerId, msg.payload.handCount, msg.payload.deck, msg.payload.handSlots);
+      case 'discard:taken': {
+        const { cardIds, playerName, mode } = msg.payload;
+        this._sceneManager.animateDiscardTake(cardIds);
+        if (mode) this.onDeckNotice?.(playerName + (mode === 'all'
+          ? ' vừa lấy cả chồng bỏ ra bàn' : ' vừa lấy lá trên cùng của chồng bỏ ra bàn'));
         break;
+      }
+      case 'deck:draw-notice': {
+        const { playerName, count, end } = msg.payload;
+        const source = end === 'BOTTOM' ? 'đáy chồng bài' : end === 'TOP' ? 'đỉnh chồng bài' : 'chồng bài';
+        this.onDeckNotice?.(playerName + ' vừa rút ' + count + ' lá từ ' + source);
+        break;
+      }
+      case 'deck:count': {
+        const { count, ownerId, handCount, deck, handSlots, drawEnd } = msg.payload;
+        const remoteDraw = drawEnd && ownerId !== this._store.getPlayerId() ? handSlots?.at(-1) : undefined;
+        const start = remoteDraw ? this._sceneManager.getDeckFlightStart(drawEnd) : undefined;
+        this._store.updateDeckCount(count, ownerId, handCount, deck, handSlots);
+        if (remoteDraw && start) this._sceneManager.animateDeckTake(remoteDraw, start);
+        break;
+      }
 
       case 'seat:request':
         this.onSeatRequest?.(msg.payload);
@@ -110,13 +130,15 @@ export class MessageHandler {
         this._sceneManager.remoteDragPreview?.stop(msg.payload.playerId);
         this.onDrawHoverChanged?.({ playerId: msg.payload.playerId, playerName: "", hovering: false });
         break;
-      case 'deck:card-taken':
+      case 'deck:card-taken': {
+        const start = this._sceneManager.getDeckFlightStart(msg.payload.end);
         this._store.addOrUpdateObject(msg.payload.card, msg.payload.deckCount, msg.payload.deck);
-        this._sceneManager.animateDeckTake(msg.payload.card.id);
+        this._sceneManager.animateDeckTake(msg.payload.card.id, start);
         break;
+      }
       case 'hand:card-drawn':
         this._store.addOrUpdateObject(msg.payload.card);
-        this.onCardDrawn?.(msg.payload.card, msg.payload.playerIndex);
+        this.onCardDrawn?.(msg.payload.card, msg.payload.playerIndex, msg.payload.end);
         break;
       case 'hand:card-transferred':
         this._store.addOrUpdateObject(msg.payload.card);

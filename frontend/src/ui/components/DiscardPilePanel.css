@@ -1,0 +1,94 @@
+.discard-panel {
+  position: fixed;
+  top: 15%;
+  right: max(12px, 2vw);
+  width: min(390px, 46vw);
+  max-height: 74dvh;
+  z-index: 60;
+  pointer-events: auto;
+  color: #f5f6fa;
+  background: #121a28;
+  border: 1px solid #526780;
+  border-radius: 12px;
+  box-shadow: 0 8px 35px #0008;
+}
+.discard-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.discard-panel button {
+  color: inherit;
+  background: #26354a;
+  border: 1px solid #526780;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.discard-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 128px), 1fr));
+  gap: 10px;
+  padding: 10px;
+  overflow: auto;
+  max-height: 63dvh;
+}
+.discard-list article {
+  position: relative;
+  min-width: 0;
+  user-select: none;
+}
+.discard-list article.discard-draggable {
+  cursor: grab;
+  touch-action: pan-y;
+}
+.discard-list article > span {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 1;
+  border-radius: 999px;
+  background: #172338;
+  padding: 3px 7px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.discard-face { aspect-ratio: 5 / 7; transition: transform 110ms ease-out; }
+.discard-list article:hover { z-index: 2; }
+.discard-list article:hover .discard-face { transform: scale(1.08); }
+.discard-pile-ghost {
+  position: fixed;
+  width: 126px;
+  z-index: 2000;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: .85;
+}
+@media (prefers-reduced-motion: reduce) {
+  .discard-face { transition: none; }
+}
+.discard-drag-label {
+  position: fixed;
+  z-index: 2000;
+  transform: translate(12px, 12px);
+  pointer-events: none;
+  padding: 5px 9px;
+  color: #f5f6fa;
+  background: #172338;
+  border: 1px solid #73e8ff;
+  border-radius: 6px;
+}
+#tabletop-context-menu [role='menuitem']:focus-visible {
+  outline: 2px solid #73e8ff;
+  outline-offset: -2px;
+}
+.discard-list .discard-flip {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 2;
+  touch-action: manipulation;
+}
+.discard-list .discard-flip:disabled { opacity: .45; cursor: default; }

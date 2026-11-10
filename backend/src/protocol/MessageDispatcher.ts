@@ -3,6 +3,7 @@
  */
 import { DEFAULT_TABLE_RADIUS, SHARED_CONFIG } from "../../../shared/constants/config.js";
 import type { ClientToServerMessage, CursorMovePayload, DragPreviewFrame, RemoteDragPreviewFrame, Vector3Like } from '../../../shared/types/protocol.js';
+import { DEFAULT_DECK_DRAW_END, type DeckDrawEnd } from '../../../shared/types/room.js';
 import type { RoomManager } from '../room/RoomManager.js';
 import type { PlayerSession } from '../player/PlayerSession.js';
 import type { Room } from '../room/Room.js';
@@ -176,8 +177,31 @@ export class MessageDispatcher {
         this._handleDeckAction(sessionId, session, msg);
         break;
       case 'card:draw':
-        this._handleCardDraw(sessionId, session);
+        this._handleCardDraw(sessionId, session, msg.payload?.end);
         break;
+      case 'discard:flip-all':
+        if (!room?.flipDiscardPile(sessionId, msg.payload.cardId)) {
+          session.sendError('Không thể lật cả chồng bỏ. Hãy thử lại nếu chồng vừa thay đổi.', 'FLIP_REJECTED');
+        } else {
+          this._broadcastRoomState(room.id);
+        }
+        break;
+      case 'discard:take': {
+        const { cardId, mode, nearby } = msg.payload;
+        const isOnTable = (position: Vector3Like) => isValidDefaultTableDrop(position.x, position.y, position.z);
+        const position = nearby ? room?.findDiscardDrop(isOnTable) : msg.payload.position;
+        const taken = room && position && isOnTable(position)
+          ? room.takeDiscardCards(sessionId, cardId, position, mode) : [];
+        if (room && taken.length) {
+          this._broadcastRoomState(room.id);
+          this._broadcastToRoom(room.id, '', { type: 'discard:taken', payload: {
+            cardIds: taken.map(card => card.id), playerName: room.getPlayer(sessionId)!.name, mode,
+          } });
+        } else {
+          session.sendError('Chồng bỏ đã thay đổi hoặc không thể đặt bài tại đây.', 'DISCARD_DROP_FAILED');
+        }
+        break;
+      }
       case 'card:play-to-table':
         this._handleCardPlay(sessionId, session, msg.payload);
         break;
@@ -518,7 +542,7 @@ export class MessageDispatcher {
 
     // Xóa bản xem trước cũ để người mới vào phòng không nhận ID lá đã chèn.
     this._stopDragPreview(id);
-    this._broadcastToRoom(room.id, '', { type: 'deck:inserted', payload: { count: cardIds.length } });
+    this._broadcastToRoom(room.id, '', { type: 'deck:inserted', payload: { count: cardIds.length, playerName: room.getPlayer(id)!.name } });
     this._broadcastRoomState(room.id);
   }
 
@@ -537,7 +561,10 @@ export class MessageDispatcher {
       this._broadcastRoomState(room.id);
       return;
     }
-    const card = room.takeDeckCard(sessionId, msg.payload?.cardsAbove);
+    const cardsAbove = msg.payload?.cardsAbove;
+    const end = cardsAbove === undefined ? room.deckDrawEnd
+      : cardsAbove === 0 ? 'TOP' : cardsAbove === room.getDeckCount() - 1 ? 'BOTTOM' : undefined;
+    const card = room.takeDeckCard(sessionId, cardsAbove);
     if (!card) {
       if (room.hasCardsInDeck()) {
         session.sendError('Vị trí đã chọn không còn trong chồng bài.', 'DECK_POSITION_INVALID');
@@ -548,11 +575,17 @@ export class MessageDispatcher {
     }
     this._broadcastToRoom(room.id, '', {
       type: 'deck:card-taken',
-      payload: { card: ViewStateBuilder.filterObjectForClient(card), ...(room.phase ? { deckCount: room.getDeckCount(), deck: room.getPublicDeckState() } : {}) },
+      payload: { card: ViewStateBuilder.filterObjectForClient(card), end, ...(room.phase ? { deckCount: room.getDeckCount(), deck: room.getPublicDeckState() } : {}) },
     });
+    this._broadcastDrawNotice(room, sessionId, end);
   }
 
-  private _handleCardDraw(sessionId: string, session: PlayerSession): void {
+  private _broadcastDrawNotice(room: Room, sessionId: string, end?: DeckDrawEnd): void {
+    const player = room.getPlayer(sessionId);
+    if (player) this._broadcastToRoom(room.id, '', { type: 'deck:draw-notice', payload: { playerName: player.name, count: 1, end } });
+  }
+
+  private _handleCardDraw(sessionId: string, session: PlayerSession, end = DEFAULT_DECK_DRAW_END): void {
     if (!session.roomId) {
       session.sendError('Cannot draw: not in a room', 'NOT_IN_ROOM');
       return;
@@ -564,19 +597,20 @@ export class MessageDispatcher {
     }
 
     if (!room.hasCardsInDeck()) return;
-    const drawnCard = room.drawCard(sessionId);
+    const drawnCard = room.drawCard(sessionId, end);
     const playerIndex = room.getPlayerIndex(sessionId);
-    RoomBroadcaster.broadcastCardDrawn(this._sessions, room, drawnCard, playerIndex);
+    RoomBroadcaster.broadcastCardDrawn(this._sessions, room, drawnCard, playerIndex, end);
     if (room.phase) this._broadcastToRoom(room.id, '', { type: 'deck:count', payload: {
-      count: room.getDeckCount(), ownerId: sessionId, handCount: room.getHandCount(sessionId), handSlots: room.getHandSlots(sessionId), deck: room.getPublicDeckState(),
+      count: room.getDeckCount(), ownerId: sessionId, handCount: room.getHandCount(sessionId), handSlots: room.getHandSlots(sessionId), deck: room.getPublicDeckState(), drawEnd: end,
     } });
+    this._broadcastDrawNotice(room, sessionId, end);
     logger.info('Card drawn & distributed securely', { roomId: room.id, drawerSessionId: sessionId, cardId: drawnCard.id });
   }
 
   private _handleCardPlay(
     sessionId: string,
     session: PlayerSession,
-    payload: { cardId: string; position: Vector3Like; faceUp?: boolean }
+    payload: { cardId: string; position: Vector3Like; faceUp?: boolean; discard?: boolean }
   ): void {
     if (!session.roomId) return;
     const room = this._roomManager.getRoom(session.roomId);
@@ -585,7 +619,7 @@ export class MessageDispatcher {
     const card = room.getInteractableObject(payload.cardId, sessionId);
     if (!card) return;
     const faceUp = room.phase && card.ownerId !== sessionId ? false : payload.faceUp;
-    room.playCardToTable(sessionId, card.id, payload.position, faceUp);
+    room.playCardToTable(sessionId, card.id, payload.position, faceUp, payload.discard === true);
     this._broadcastRoomState(room.id);
   }
 
@@ -637,7 +671,7 @@ export class MessageDispatcher {
   private _handleObjectFlip(
     sessionId: string,
     session: PlayerSession,
-    payload: { objectId: string }
+    payload: { objectId: string; discard?: boolean }
   ): void {
     if (!session.roomId) return;
     const room = this._roomManager.getRoom(session.roomId);
@@ -648,7 +682,11 @@ export class MessageDispatcher {
       session.sendError('Object not found', 'OBJECT_NOT_FOUND', payload.objectId);
       return;
     }
-    if (targetObj.location === 'DECK' || targetObj.location === 'DISCARD') {
+    if (payload.discard && targetObj.location !== 'DISCARD') {
+      session.sendError('Lá này đã rời chồng bỏ.', 'FLIP_REJECTED', payload.objectId);
+      return;
+    }
+    if (targetObj.location === 'DECK') {
       session.sendError('Cannot flip card in deck', 'INVALID_OPERATION', payload.objectId);
       return;
     }
@@ -662,6 +700,13 @@ export class MessageDispatcher {
     if (targetObj.lockedBy && targetObj.lockedBy !== sessionId) {
       session.sendError("Card locked by another player", "FLIP_REJECTED", payload.objectId);
       return;
+    }
+    if (targetObj.location === 'DISCARD') {
+      const player = room.getPlayer(sessionId);
+      if (!player?.isConnected || player.spectator) {
+        session.sendError('Chỉ người đang chơi mới được lật lá trong chồng bỏ.', 'FLIP_REJECTED');
+        return;
+      }
     }
     const flippedObj = room.flipObject(targetObj.id);
 
@@ -896,6 +941,7 @@ export class MessageDispatcher {
       z: number;
       seq?: number;
       faceUp?: boolean;
+      discard?: boolean;
       targetPlayerIndex?: number | null;
       handIndex?: number;
       rotation?: number;
@@ -953,7 +999,7 @@ export class MessageDispatcher {
           ? false : (prevObj.privateViewerId || (payload.dragId !== undefined && prevObj.location === 'HAND'))
             ? prevObj.faceUp : payload.faceUp,
         payload.targetPlayerIndex, payload.handIndex,
-        payload.rotation
+        payload.rotation, payload.discard === true
       );
     } catch (err) {
       if (payload.dragId !== undefined) this._stopDragPreview(sessionId, payload.dragId);
@@ -988,7 +1034,7 @@ export class MessageDispatcher {
 
     // Never broadcast raw private hand transforms. Hand membership changes are
     // communicated by room:state / hand:card-transferred instead.
-    if (updated.location === 'HAND') return;
+    if (updated.location === 'HAND' || updated.location === 'DISCARD') return;
 
     // Với bài riêng, chỉ đồng bộ vị trí; từng máy giữ mặt bài theo quyền xem.
     const broadcastFaceUp = updated.privateViewerId ? undefined : updated.faceUp ?? payload.faceUp;

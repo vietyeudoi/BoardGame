@@ -200,8 +200,13 @@ export class CardStackManager {
 
     const insertIdx = index !== undefined ? Math.max(0, Math.min(index, 1)) : 1;
     const finalCards = insertIdx === 0 ? [...sourceCards, targetCard] : [targetCard, ...sourceCards];
-
+    const { x, z } = targetCard.position;
+    const yaw = targetCard.getRotationY();
     const newStack = this.createStack(finalCards);
+    if (insertIdx === 0) {
+      newStack.setRotationY(yaw);
+      newStack.setPosition(x, z);
+    }
     logger.info(
       `mergeStackOntoCard: merged "${sourceStack.stackId}" onto card "${targetCard.cardId}" (index: ${insertIdx}) into "${newStack.stackId}"`
     );

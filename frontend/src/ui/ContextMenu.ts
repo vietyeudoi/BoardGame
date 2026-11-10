@@ -17,11 +17,14 @@ export interface ContextMenuItem {
 export class ContextMenu {
   private readonly _element: HTMLElement;
   private _isOpen = false;
+  private _previousFocus?: HTMLElement;
   private readonly _abortController = new AbortController();
 
   constructor(private readonly _container: HTMLElement) {
     this._element = document.createElement('div');
     this._element.id = 'tabletop-context-menu';
+    this._element.setAttribute('role', 'menu');
+    this._element.tabIndex = -1;
     this._element.style.cssText = `
       display: none;
       position: fixed;
@@ -32,6 +35,8 @@ export class ContextMenu {
       border-radius: 8px;
       padding: 6px 0;
       min-width: min(180px, calc(100vw - 16px));
+      box-sizing: border-box;
+      max-width: calc(100vw - 16px);
       max-height: calc(100dvh - 16px);
       overflow-y: auto;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -48,10 +53,15 @@ export class ContextMenu {
   show(clientX: number, clientY: number, items: ContextMenuItem[]): void {
     if (items.length === 0) return;
 
+    this.hide();
+    this._previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     this._element.innerHTML = '';
 
     for (const item of items) {
       const btn = document.createElement('div');
+      btn.setAttribute('role', 'menuitem');
+      btn.setAttribute('aria-disabled', String(!!item.disabled));
+      btn.tabIndex = -1;
       btn.style.cssText = `
         display: flex;
         align-items: center;
@@ -106,35 +116,65 @@ export class ContextMenu {
     this._element.style.left = `${posX}px`;
     this._element.style.top = `${posY}px`;
 
+    (this._enabledItems()[0] ?? this._element).focus({ preventScroll: true });
     logger.debug('Context menu displayed', { x: posX, y: posY });
   }
 
   hide(): void {
     if (!this._isOpen) return;
+    const hadFocus = this._element.contains(document.activeElement);
     this._element.style.display = 'none';
     this._isOpen = false;
+    if (hadFocus) this._previousFocus?.focus({ preventScroll: true });
+    this._previousFocus = undefined;
   }
 
   isOpen(): boolean {
     return this._isOpen;
   }
 
+  private _enabledItems(): HTMLElement[] {
+    return [...this._element.querySelectorAll<HTMLElement>('[role="menuitem"][aria-disabled="false"]')];
+  }
+
   private _setupGlobalListeners(): void {
     const opts = { signal: this._abortController.signal };
 
-    window.addEventListener('click', () => {
-      if (this._isOpen) this.hide();
+    window.addEventListener('pointerdown', e => {
+      if (this._isOpen && (!(e.target instanceof Node) || !this._element.contains(e.target))) this.hide();
+    }, { ...opts, capture: true });
+
+    window.addEventListener('click', e => {
+      if (this._isOpen && (!(e.target instanceof Node) || !this._element.contains(e.target))) this.hide();
     }, opts);
+
+    window.addEventListener('scroll', e => {
+      if (this._isOpen && (!(e.target instanceof Node) || !this._element.contains(e.target))) this.hide();
+    }, { ...opts, capture: true });
 
     window.addEventListener('contextmenu', (e) => {
       // If clicking outside context menu, hide it
-      if (this._isOpen && !this._element.contains(e.target as Node)) {
+      if (this._isOpen && (!(e.target instanceof Node) || !this._element.contains(e.target))) {
         this.hide();
       }
     }, opts);
 
-    window.addEventListener('keydown', (e) => {
+    this._element.addEventListener('keydown', e => {
+      const items = this._enabledItems();
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      if (!['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!items.length) return;
+      if (e.key === 'Enter' || e.key === ' ') items[index]?.click();
+      else {
+        const next = e.key === 'ArrowDown' ? index + 1 : index < 0 ? items.length - 1 : index - 1;
+        items[(next + items.length) % items.length]?.focus({ preventScroll: true });
+      }
+    }, opts);
+    window.addEventListener('keydown', e => {
       if (e.key === 'Escape' && this._isOpen) {
+        e.preventDefault();
         this.hide();
       }
     }, opts);

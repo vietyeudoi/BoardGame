@@ -255,6 +255,23 @@ describe('DeckObject3D (M1.2.2)', () => {
       expect(box.max.y - box.min.y).toBeCloseTo(DECK_CONFIG.CARD_THICKNESS, 4);
     });
 
+    it('cả hai chồng cố định giữ cùng mesh và bề dày khi số lá online đổi', () => {
+      for (const id of ['draw-pile', 'discard-pile']) {
+        const pile = new DeckObject3D({ id });
+        pile.resetLocalCards([], true);
+        const mesh = pile.getMesh();
+        for (const count of [1, 104, 2]) {
+          pile.setOnlineCount(count);
+          expect(pile.getMesh()).toBe(mesh);
+          expect(pile.children.filter(child => child.type === 'Mesh')).toEqual([mesh]);
+          expect(pile.getCount()).toBe(count);
+          expect(pile.getVisualHeight()).toBe(DECK_CONFIG.CARD_THICKNESS);
+          expect(pile.getTopY() - pile.getBottomY()).toBeCloseTo(DECK_CONFIG.CARD_THICKNESS);
+        }
+        pile.dispose();
+      }
+    });
+
     it('empty deck has zero visual height and does not have negative height', () => {
       const emptyDeck = new DeckObject3D();
       emptyDeck.setPosition(0, TABLE_CONFIG.SURFACE_Y, 0);

@@ -8,6 +8,8 @@ import type { TableRollEvent, TableRollKind } from './tableRoll.js';
 
 // ─── Client → Server Messages ───────────────────────────────────────────────
 
+export type DiscardTakeMode = 'top' | 'all';
+
 export type ClientToServerMessage =
   | { type: 'room:create'; payload: { roomName: string; playerName?: string; password?: string; doubleDeck?: boolean } }
   | { type: 'room:join'; payload: { roomId: string; playerName: string; password?: string } }
@@ -36,11 +38,13 @@ export type ClientToServerMessage =
   | { type: 'stack:shuffle'; payload: { anchorId: string } }
   | { type: 'stack:form'; payload: { cardIds: string[] } }
   | { type: 'deck:take'; payload?: { cardsAbove: number } }
-  | { type: 'card:draw'; payload?: { deckId?: string } }
-  | { type: 'card:play-to-table'; payload: { cardId: string; position: Vector3Like; faceUp?: boolean } }
+  | { type: 'card:draw'; payload?: { deckId?: string; end?: DeckDrawEnd } }
+  | { type: 'discard:flip-all'; payload: { cardId: string } }
+  | { type: 'discard:take'; payload: { cardId: string; position: Vector3Like; mode?: DiscardTakeMode; nearby?: boolean } }
+  | { type: 'card:play-to-table'; payload: { cardId: string; position: Vector3Like; faceUp?: boolean; discard?: boolean } }
   | { type: 'card:transfer'; payload: { cardId: string; targetPlayerIndex?: number; targetPlayerId?: string; handIndex?: number; seq?: number; dragId?: number } }
   | { type: 'object:move'; payload: { objectId: string; position: Vector3Like; rotation: number } }
-  | { type: 'object:flip'; payload: { objectId: string } }
+  | { type: 'object:flip'; payload: { objectId: string; discard?: boolean } }
   | { type: 'object:grab'; payload: { objectId: string } }
   | { type: 'object:release'; payload: { objectId: string } }
   | { type: 'draw:hover'; payload: { hovering: boolean } }
@@ -62,19 +66,21 @@ export type ServerToClientMessage =
   | { type: 'table:rolled'; payload: TableRollEvent }
   | { type: 'room:state'; payload: RoomState }
   | { type: 'round:configured'; payload: RoundSetup }
-  | { type: 'deck:count'; payload: { count: number; ownerId?: string; handCount?: number; handSlots?: string[]; deck?: PublicDeckState } }
+  | { type: 'deck:count'; payload: { count: number; ownerId?: string; handCount?: number; handSlots?: string[]; deck?: PublicDeckState; drawEnd?: DeckDrawEnd } }
   | { type: 'deck:view-state'; payload: DeckViewState | null }
   | { type: 'hand:shuffled'; payload: { playerId: string; playerName: string; placedIds: string[] } }
   | { type: 'stack:formed'; payload: { anchorId: string; gatheredBy?: string } }
   | { type: 'deck:gather-empty'; payload: { message: string } }
   | { type: 'stack:shuffled'; payload: { anchorId: string; playerName: string } }
   | { type: 'deck:shuffled'; payload: { deck: PublicDeckState; playerName: string } }
-  | { type: 'deck:inserted'; payload: { count: number } }
+  | { type: 'deck:inserted'; payload: { count: number; playerName?: string } }
+  | { type: 'discard:taken'; payload: { cardIds: string[]; playerName: string; mode?: DiscardTakeMode } }
+  | { type: 'deck:draw-notice'; payload: { playerName: string; count: number; end?: DeckDrawEnd } }
   | { type: 'room:joined'; payload: { roomId: string; playerId: string; playerIndex: number; resumeToken?: string } }
   | { type: 'room:player-joined'; payload: PlayerInfo }
   | { type: 'room:player-left'; payload: { playerId: string } }
-  | { type: 'deck:card-taken'; payload: { card: SandboxObject; deckCount?: number; deck?: PublicDeckState } }
-  | { type: 'hand:card-drawn'; payload: { card: SandboxObject; playerIndex: number } }
+  | { type: 'deck:card-taken'; payload: { card: SandboxObject; deckCount?: number; deck?: PublicDeckState; end?: DeckDrawEnd } }
+  | { type: 'hand:card-drawn'; payload: { card: SandboxObject; playerIndex: number; end?: DeckDrawEnd } }
   | { type: 'hand:card-transferred'; payload: { cardId: string; fromPlayerIndex: number; toPlayerIndex: number; card: SandboxObject; seq?: number } }
   | { type: 'object:moved'; payload: ObjectPosition }
   | { type: 'object:flipped'; payload: { objectId: string; faceUp: boolean; cardType?: string; faceImage?: string; ownerId?: string | null; location?: string } }
@@ -181,6 +187,7 @@ export interface RemoteDragPreviewFrame extends Omit<DragPreviewFrame, "cards"> 
 }
 
 export interface ObjectDragEndPayload {
+  discard?: boolean;
   /** Khóa của phiên kéo mới, tùy chọn cho client cũ. */
   dragId?: number;
   objectId: string;

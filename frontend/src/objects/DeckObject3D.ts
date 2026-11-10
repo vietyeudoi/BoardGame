@@ -35,11 +35,12 @@ export class DeckObject3D extends THREE.Group {
   private _cardIds: string[] = [];
   private _isDisposed = false;
   private _onlineCount: number | null = null;
-  private readonly _emptyOutline: THREE.LineLoop;
+  private readonly _emptyOutline: THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   private _badge: THREE.Sprite | null = null;
   private _badgeCount = -1;
 
   // 3D Visual Mesh & Materials
+  private _highlighted = false;
   private readonly _deckMesh: THREE.Mesh;
   private readonly _topMaterial: THREE.MeshStandardMaterial;
   private readonly _bottomMaterial: THREE.MeshStandardMaterial;
@@ -346,7 +347,7 @@ export class DeckObject3D extends THREE.Group {
   // ─── Visual & Transform API ───────────────────────────────────────────────
 
   /**
-   * Chiều cao biểu tượng của bộ bài, cố định bằng một lá khi còn bài.
+   * Chồng bốc và chồng bỏ dùng một lá đại diện, bất kể số lá.
    * Returns 0 if empty.
    */
   getVisualHeight(): number {
@@ -416,6 +417,14 @@ export class DeckObject3D extends THREE.Group {
     return true;
   }
 
+  setHighlighted(highlighted: boolean): void {
+    this._highlighted = highlighted;
+    this._emptyOutline.material.color.setHex(highlighted ? 0x73e8ff : 0xb29a76);
+    this._emptyOutline.material.opacity = highlighted ? 1 : 0.45;
+    this._topMaterial.emissive.setHex(highlighted ? 0x24586b : 0x000000);
+    this._emptyOutline.visible = highlighted || this.getCount() === 0;
+  }
+
   private _clearActivity(): void {
     if (this._activityFrame !== undefined) cancelAnimationFrame(this._activityFrame);
     this._activityFrame = undefined;
@@ -459,6 +468,7 @@ export class DeckObject3D extends THREE.Group {
       if (kind === 'shuffle') this._deckMesh.rotation.y = Math.sin(t * Math.PI * 4) * 0.24 * (1 - t);
       this._activityCards.forEach((card, index) => {
         const distance = (1 - t) ** 2;
+        // Lá minh họa đáp ở mặt đại diện, không tiết lộ vị trí chèn thật.
         card.position.set((index - 0.5) * 0.38 * distance, this.cardThickness + 0.5 * distance, 1.35 * distance);
       });
       requestRender();
@@ -576,7 +586,7 @@ export class DeckObject3D extends THREE.Group {
     const empty = count === 0;
     this._deckMesh.position.y = this.cardThickness / 2;
     this._deckMesh.castShadow = !empty;
-    this._emptyOutline.visible = empty;
+    this._emptyOutline.visible = empty || this._highlighted;
     const map = empty ? null : this._onlineTopTexture ?? this._topTexture;
     if (this._topMaterial.map !== map) {
       this._topMaterial.map = map;

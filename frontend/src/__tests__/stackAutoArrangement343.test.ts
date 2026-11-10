@@ -192,7 +192,7 @@ describe('M1.3.4.3 Stack Interaction, Auto Arrangement & Selection Visual Feedba
   // Group 2: Auto Arrangement & Cascade Layout
   // ═════════════════════════════════════════════════════════════════════════════
   describe('Group 2: Auto Arrangement & Cascade Layout', () => {
-    it('2.1 Applies micro cascade offset on mesh without modifying card group position', () => {
+    it('2.1 Căn tâm cả phần hiển thị và phần tương tác', () => {
       const sm = sceneManager.getStackManager();
       const c1 = createCard('cas_1', 1.0, 2.0);
       const c2 = createCard('cas_2', 1.0, 2.0);
@@ -204,11 +204,11 @@ describe('M1.3.4.3 Stack Interaction, Auto Arrangement & Selection Visual Feedba
       expect(c2.position.x).toBeCloseTo(1.0, 5);
       expect(c2.position.z).toBeCloseTo(2.0, 5);
 
-      // Card 0 mesh has 0 offset, Card 1 mesh has cascade offset
+      // Cả hai mặt lá không dịch khỏi tâm.
       expect(c1.getCascadeOffset().x).toBeCloseTo(0, 5);
       expect(c1.getCascadeOffset().z).toBeCloseTo(0, 5);
-      expect(c2.getCascadeOffset().x).toBeCloseTo(INTERACTION_CONFIG.STACK_CASCADE_OFFSET_X, 5);
-      expect(c2.getCascadeOffset().z).toBeCloseTo(INTERACTION_CONFIG.STACK_CASCADE_OFFSET_Z, 5);
+      expect(c2.getCascadeOffset().x).toBeCloseTo(0, 5);
+      expect(c2.getCascadeOffset().z).toBeCloseTo(0, 5);
 
       stack.dispose();
     });
@@ -221,11 +221,11 @@ describe('M1.3.4.3 Stack Interaction, Auto Arrangement & Selection Visual Feedba
       const stack = sm.createStack([c1, c2]);
 
       sm.addCardToStack(c3, stack);
-      expect(c3.getCascadeOffset().x).toBeCloseTo(2 * INTERACTION_CONFIG.STACK_CASCADE_OFFSET_X, 5);
+      expect(c3.position.y - c1.position.y).toBeCloseTo(2 * INTERACTION_CONFIG.STACK_OFFSET_Y, 5);
 
       stack.removeCard('re_2');
       // After removing index 1, c3 is shifted to index 1
-      expect(c3.getCascadeOffset().x).toBeCloseTo(INTERACTION_CONFIG.STACK_CASCADE_OFFSET_X, 5);
+      expect(c3.position.y - c1.position.y).toBeCloseTo(INTERACTION_CONFIG.STACK_OFFSET_Y, 5);
 
       // Moving stack updates world positions for both
       stack.setPosition(4.0, 5.0);
@@ -239,7 +239,7 @@ describe('M1.3.4.3 Stack Interaction, Auto Arrangement & Selection Visual Feedba
       const c2 = createCard('leave_2');
       const stack = sm.createStack([c1, c2]);
 
-      expect(c2.getCascadeOffset().x).toBeGreaterThan(0);
+      expect(c2.position.y - c1.position.y).toBeCloseTo(INTERACTION_CONFIG.STACK_OFFSET_Y);
 
       const popped = stack.takeTopCard();
       expect(popped).toBe(c2);

@@ -53,6 +53,34 @@ describe('Lấy bài từ chồng trong phòng', () => {
     };
   }
 
+  it('rút đúng đầu và phát thông báo chỉ chứa tên người, số lá và đầu rút', async () => {
+    const a = await connect();
+    const b = await connect();
+    a.send({ type: 'room:create', payload: { roomName: 'Hai đầu chồng', playerName: 'Alice' } });
+    const joined = await a.receive('room:joined');
+    const deck = (await a.receive('room:state')).objects.filter(card => card.location === 'DECK');
+    b.send({ type: 'room:join', payload: { roomId: joined.roomId, playerName: 'Bob' } });
+    await b.receive('room:joined');
+    await b.receive('room:state');
+
+    for (const [end, id] of [['BOTTOM', deck[0]!.id], ['TOP', deck.at(-1)!.id], [undefined, deck.at(-2)!.id]] as const) {
+      a.send({ type: 'card:draw', payload: end ? { end } : undefined });
+      const event = await a.receive('hand:card-drawn');
+      expect(event.card.id).toBe(id);
+      expect(event.end).toBe(end ?? 'TOP');
+      for (const client of [a, b]) {
+        expect(await client.receive('deck:draw-notice')).toEqual({ playerName: 'Alice', count: 1, end: end ?? 'TOP' });
+      }
+    }
+
+    a.send({ type: 'deck:set-draw-end', payload: { end: 'TOP' } });
+    for (const client of [a, b]) {
+      const state = await client.receive('room:state');
+      expect(state.objects.filter(card => card.location === 'DECK')).toHaveLength(deck.length - 3);
+    }
+  });
+
+
   it('đồng bộ Đỉnh/Đáy, giữ Tùy chọn riêng và lấy đồng thời không trùng lá', async () => {
     const a = await connect();
     const b = await connect();

@@ -6,6 +6,7 @@
  */
 
 import { getDefaultSeatPlacement, SHARED_CONFIG, TABLE_PLAYER_AREA_INSET } from '../../../shared/constants/config';
+import { DISCARD_ZONE_DEPTH, DISCARD_ZONE_WIDTH, getDiscardZoneCenter } from '@shared/constants/tablePiles';
 import { TABLE_CONFIG } from './TableConfig';
 import { PlayerCount, TABLE_SHAPE_CONFIGS, getPolygonVertices } from './TableShapeConfig';
 
@@ -28,8 +29,8 @@ export interface TableZonesLayout {
 }
 
 export const ZONE_VISUAL_CONFIG = {
-  DECK_WIDTH: 2.6,
-  DECK_DEPTH: 3.6,
+  DECK_WIDTH: DISCARD_ZONE_WIDTH,
+  DECK_DEPTH: DISCARD_ZONE_DEPTH,
   PLACEMENT_WIDTH: 4.6,
   PLACEMENT_DEPTH: 2.4,
   DECK_COLOR: 0x00ccff,
@@ -62,7 +63,6 @@ export function computeTableZones(
 
   // 1. Deck and Discard zones
   const deckX = playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM ? 0 : playerCount === 2 ? -4.5 : -2.5;
-  const discardX = playerCount === SHARED_CONFIG.MAX_PLAYERS_PER_ROOM ? 3.6 : playerCount === 2 ? 4.5 : 2.5;
 
   const deckZone: ZoneRect = {
     id: 'zone_deck',
@@ -76,8 +76,7 @@ export function computeTableZones(
 
   const discardZone: ZoneRect = {
     id: 'zone_discard',
-    x: discardX,
-    z: 0,
+    ...getDiscardZoneCenter(playerCount),
     rotationY: 0,
     width: ZONE_VISUAL_CONFIG.DECK_WIDTH,
     depth: ZONE_VISUAL_CONFIG.DECK_DEPTH,

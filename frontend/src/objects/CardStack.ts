@@ -7,7 +7,7 @@
  * 2. A Card cannot belong to two stacks simultaneously.
  * 3. Cards in a stack retain their ON_TABLE ownership in CardRegistry.
  * 4. Cards in a stack are visually layered with physical Y-offsets to prevent Z-fighting,
- *    and subtle X/Z cascade offsets for aesthetic layered visibility (M1.3.4.3).
+ *    with a shared center and yaw.
  * 5. When a stack has <= 1 card, it can be dissolved back to standalone cards.
  */
 import type * as THREE from 'three';
@@ -134,8 +134,8 @@ export class CardStack {
     if (this._cards.length === 0 && !this._position.x && !this._position.z) {
       this._position.x = card.position.x;
       this._position.z = card.position.z;
-      this._rotationY = card.getRotationY();
     }
+    if (this._cards.length === 0) this._rotationY = card.getRotationY();
 
     this._cards.splice(index, 0, card);
     card.setStackId(this.stackId);
@@ -193,8 +193,8 @@ export class CardStack {
     if (this._cards.length === 0 && !this._position.x && !this._position.z) {
       this._position.x = cards[0]!.position.x;
       this._position.z = cards[0]!.position.z;
-      this._rotationY = cards[0]!.getRotationY();
     }
+    if (this._cards.length === 0) this._rotationY = cards[0]!.getRotationY();
 
     this._cards.splice(index, 0, ...cards);
     for (const card of cards) {
@@ -278,10 +278,6 @@ export class CardStack {
     this._rotationY = angleRadians % (Math.PI * 2);
     if (this._rotationY < 0) this._rotationY += Math.PI * 2;
 
-    for (const card of this._cards) {
-      card.rotation.y = this._rotationY;
-    }
-
     // Re-clamp stack position with new rotation extents and realign
     const clamped = clampTablePosition(
       this._position.x,
@@ -307,26 +303,17 @@ export class CardStack {
   /**
    * Centralized layout calculation function (M1.3.4.3 Requirement A).
    * Calculates consistent physical positions for all cards in the stack,
-   * applying uniform Y-elevation and subtle X/Z cascade stair-stepping.
+   * Các lá có cùng tâm và góc, chỉ tách lớp theo trục Y.
    */
   realignCards(): void {
     const count = this._cards.length;
-    const cos = Math.cos(this._rotationY);
-    const sin = Math.sin(this._rotationY);
-
     for (let i = 0; i < count; i++) {
       const card = this._cards[i]!;
-      const stepX = i * INTERACTION_CONFIG.STACK_CASCADE_OFFSET_X;
-      const stepZ = i * INTERACTION_CONFIG.STACK_CASCADE_OFFSET_Z;
-
-      const rx = stepX * cos - stepZ * sin;
-      const rz = stepX * sin + stepZ * cos;
-
       card.position.x = this._position.x;
       card.position.y = TABLE_CONFIG.SURFACE_Y + i * INTERACTION_CONFIG.STACK_OFFSET_Y;
       card.position.z = this._position.z;
-      card.rotation.y = this._rotationY;
-      card.setCascadeOffset(rx, rz);
+      card.rotation.set(0, this._rotationY, 0);
+      card.setCascadeOffset(0, 0);
       card.setLayerIndex(i);
     }
 

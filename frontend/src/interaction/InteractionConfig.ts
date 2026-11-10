@@ -5,6 +5,7 @@
  * Part of M1.3.1 & M1.3.2 — Raycasting, Hover & Drag Interaction.
  */
 
+import { PILE_LAYER_HEIGHT } from '@shared/constants/tablePiles';
 import { TABLE_CONFIG } from '../objects/TableConfig';
 import { CARD_CONFIG } from '../objects/CardConfig';
 import { TableShapeParams, clampPointToTable } from '../objects/TableShapeConfig';
@@ -106,14 +107,7 @@ export const INTERACTION_CONFIG = {
   WHEEL_DELTA_UNITS_PER_LINE: 100,
 
   /** Physical elevation difference per stacked card (prevents geometry clipping) */
-  STACK_OFFSET_Y: CARD_CONFIG.DEFAULT_THICKNESS + 0.002,
-
-  /**
-   * Horizontal and depth cascade offsets for stacked cards (M1.3.4.3).
-   * Creates a neat stair-step cascade revealing underlying card layers.
-   */
-  STACK_CASCADE_OFFSET_X: 0.04,
-  STACK_CASCADE_OFFSET_Z: 0.05,
+  STACK_OFFSET_Y: PILE_LAYER_HEIGHT,
 
   /** Proximity threshold for joining an existing stack (generous 1.5 units) vs stacking onto a standalone card (0.25 units) */
   STACK_DETECT_RADIUS: 0.25,
